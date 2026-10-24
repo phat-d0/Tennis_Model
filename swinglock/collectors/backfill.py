@@ -28,7 +28,7 @@ import pandas as pd
 from ..config import load_config
 from ..schema import MATCH_COLUMNS, QUOTE_COLUMNS, empty, validate_quotes
 from .kalshi import KalshiClient, KalshiError
-from .kalshi_normalize import candles_to_quotes, match_row, matches_frame, ts
+from .kalshi_normalize import DEFAULT_MAX_CARRY_S, candles_to_quotes, match_row, matches_frame, ts
 
 log = logging.getLogger("swinglock.backfill")
 
@@ -100,7 +100,8 @@ def collect_series(client: KalshiClient, series: str, cutoff: pd.Timestamp, sinc
     return out[:max_matches] if max_matches else out
 
 
-def normalize_one(client: KalshiClient, r: dict, starts: dict, stats: dict) -> tuple[dict, pd.DataFrame]:
+def normalize_one(client: KalshiClient, r: dict, starts: dict, stats: dict,
+                  max_carry_s: float | None = DEFAULT_MAX_CARRY_S) -> tuple[dict, pd.DataFrame]:
     e, mk = r["event"], r["markets"]
     row = match_row(e, mk, r["series"], r["fee_changes"], starts.get(e["event_ticker"]))
     try:
@@ -112,7 +113,7 @@ def normalize_one(client: KalshiClient, r: dict, starts: dict, stats: dict) -> t
         c = {}
     q = candles_to_quotes(row["match_id"], row["instrument_a"], row["instrument_b"],
                           c.get(row["instrument_a"], []), c.get(row["instrument_b"], []),
-                          until=row["close_time"])
+                          until=row["close_time"], max_carry_s=max_carry_s)
     return row, q
 
 
@@ -127,7 +128,8 @@ def write_outputs(out_dir: Path, rows: list[dict], quotes: list[pd.DataFrame]):
 
 
 def run(series_list: list[str], out_dir: Path, raw_dir: Path, since: str | None = None,
-        max_matches: int | None = None, min_interval_s: float = 0.5) -> dict:
+        max_matches: int | None = None, min_interval_s: float = 0.5,
+        max_carry_s: float | None = DEFAULT_MAX_CARRY_S) -> dict:
     client = KalshiClient(raw_dir=raw_dir, min_interval_s=min_interval_s)
     t0 = time.time()
     cutoff = ts(client.historical_cutoff()["market_settled_ts"])
@@ -139,7 +141,7 @@ def run(series_list: list[str], out_dir: Path, raw_dir: Path, since: str | None 
         todo = collect_series(client, s, cutoff, since_ts, max_matches, stats)
         log.info("%s: %d settled matches to normalize", s, len(todo))
         for i, r in enumerate(todo, 1):
-            row, q = normalize_one(client, r, starts, stats)
+            row, q = normalize_one(client, r, starts, stats, max_carry_s)
             rows.append(row)
             quotes.append(q)
             if i % 50 == 0:
@@ -152,7 +154,8 @@ def run(series_list: list[str], out_dir: Path, raw_dir: Path, since: str | None 
     summary = summarize(matches, q, cutoff)
     summary.update({
         "run_at": datetime.now(timezone.utc).isoformat(timespec="seconds"),
-        "series": series_list, "since": since, "events_listed": stats["events_listed"],
+        "series": series_list, "since": since, "max_carry_s": max_carry_s,
+        "events_listed": stats["events_listed"],
         "skipped": dict(stats["skipped"]), "requests": client.requests_made,
         "cache_hits": client.cache_hits, "rate_limited_429": client.rate_limited,
         "final_min_interval_s": client.min_interval_s, "elapsed_s": round(time.time() - t0),
@@ -190,7 +193,9 @@ def main(argv: list[str] | None = None) -> None:
     ap.add_argument("--min-interval", type=float, default=0.5, help="seconds between requests")
     a = ap.parse_args(argv)
     logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
-    print(json.dumps(run(a.series, a.out, a.raw, a.since, a.max_matches, a.min_interval), indent=1, default=str))
+    carry = (cfg.get("data") or {}).get("max_carry_s", DEFAULT_MAX_CARRY_S)
+    print(json.dumps(run(a.series, a.out, a.raw, a.since, a.max_matches, a.min_interval, carry),
+                     indent=1, default=str))
 
 
 if __name__ == "__main__":

@@ -44,10 +44,12 @@ Scheduled start: one bulk listing of `GET /milestones?type=tennis_tournament_sin
 - **Candles:** we use each period's `yes_bid.close` / `yes_ask.close` (quote at period end).
   Never the `price` block (trades), never mid. `ask_size`/`bid_size` are NaN (candles have no size).
   Both field shapes are parsed (`close_dollars` live, `close` historical).
-- **Sparse candles:** Kalshi omits a minute when nothing changed (VanMus: 786 candles over
-  1,745 minutes). Each leg's last close is carried forward to the other leg's candle times;
-  nothing is filled before a leg's first candle. Rows are at the union of both legs' times.
-  *Assumption:* a missing candle means an unchanged quote. Not stated in the docs.
+- **Sparse candles:** Kalshi omits some minutes (VanMus: 786 candles over 1,745 minutes).
+  Each leg's last close is carried forward to the other leg's candle times, **for at most
+  `data.max_carry_s` (default 300 s)**; an older leg counts as missing (NaN), so a stale leg
+  can't be paired with a fresh one. Nothing is filled before a leg's first candle. Rows are
+  at the union of both legs' times. Whether a missing minute means "quote unchanged": see
+  "Carry-forward check" below.
 - **No quote → NaN.** A YES ask of 1.00 (no NO bids) or a YES bid of 0.00 (no YES bids)
   means that level doesn't exist; it becomes NaN, not a price.
 - Candles ending more than one minute after the match's close_time are dropped.
@@ -61,11 +63,34 @@ Scheduled start: one bulk listing of `GET /milestones?type=tennis_tournament_sin
 - `orderbooks_to_quotes()` builds the same two rows from a `GET /markets/orderbooks` snapshot,
   with sizes; the recorder (next task) will use it.
 
+## Carry-forward check (2026-10-24)
+Question (Lead): does Kalshi write a 1-min candle when only the quote moves (no trade)? If
+candles only appeared on trade minutes, carrying a leg forward would pair stale quotes.
+
+1. **Cached candles** (265 batch responses, 382,891 candles, live markets Aug–Oct 2026):
+   250,383 candles have `volume_fp` 0, and **26,786 of those show a different yes_bid/yes_ask
+   close than the previous candle**, so quote-only moves do produce candles. A further 9,060
+   zero-volume candles have an intra-minute quote move that reverted by the close. 218,076 are
+   zero-volume and fully flat. So candles are not trade-driven; flat ones appear too
+   (presumably on size changes, which candles don't show).
+2. **Live comparison:** KXATPMATCH-26OCT24BASTSI (ATP Basel, the busiest open match at
+   09:50 UTC). Both legs' books were polled every 10 s for 12 min (72 snapshots), then
+   that window's candles and `/markets/trades` were fetched (77 requests, 1 × 429).
+   - The candles covered 14/15 and 15/15 minutes. 6 and 9 of those candle minutes had no trade.
+   - Every minute in which a snapshot saw the top of book change had a candle (1 of 1).
+   - The carried candle state (last close at or before the snapshot) matched the snapshot's
+     best YES bid/ask in **140 of 144** cases. The 4 misses were one intra-minute move
+     (YES bid .31 vs carried .32, 9–42 s into the minute) that the next candle picked up.
+- **Answer:** candles are emitted on quote changes, not only on trades, and between candles the
+  carried quote matched the live book. Limits: one match, 12 minutes, a quiet book (one top
+  change). Within a minute the carried state lags by up to 60 s. The order-book recorder will
+  give a much bigger sample. The 300 s cap bounds the damage if a gap hides a move.
+
 ## Known limits / caveats for Backtest
 - Candle closes of the two legs are both "at period end", but within a minute they can still
-  come from different seconds; and carried-forward legs can be minutes old (the as-of join's
-  staleness rule doesn't see that, because each row is stamped at the union time). A tight
-  combined price from candles is a lead to check, not a fill.
+  come from different seconds; and a carried-forward leg can be up to `max_carry_s` old (the
+  as-of join's staleness rule doesn't see that, because each row is stamped at the union time).
+  A tight combined price from candles is a lead to check, not a fill.
 - Last minutes of a decided match show lopsided quotes (0.01 / NaN). Use phase and close_time.
 - No depth anywhere in history. Depth starts with the order-book recorder.
 

@@ -263,3 +263,23 @@ def test_client_eases_back_after_clean_run(tmp_path):
     for i in range(1, 51):
         c.get(f"/x{i}", cache=False)
     assert c.base_interval_s < c.min_interval_s < widened
+
+
+def test_carry_forward_is_capped():
+    def c(t, yb, ya):
+        return {"end_period_ts": t, "yes_bid": {"close_dollars": yb}, "yes_ask": {"close_dollars": ya}}
+    ca = [c(60, "0.40", "0.42"), c(1000, "0.41", "0.43")]
+    cb = [c(300, "0.55", "0.57"), c(400, "0.56", "0.58")]
+    q = candles_to_quotes("M", "M-A", "M-B", ca, cb, max_carry_s=300)
+    # t=300: A's close from t=60 is 240 s old → still carried
+    assert q_at(q, 300, "A")["ask"] == pytest.approx(0.42)
+    # t=400: A is 340 s old → dropped; only NO on B prices side A (1 - .56)
+    a = q_at(q, 400, "A")
+    assert a["ask"] == pytest.approx(0.44) and a["ask_source"] == "no:M-B"
+    assert q_at(q, 400, "B")["ask"] == pytest.approx(0.58)  # NO on A unavailable
+    # t=1000: B is 600 s old → side A only from its own YES ask
+    assert q_at(q, 1000, "A")["ask"] == pytest.approx(0.43) and q_at(q, 1000, "A")["ask_source"] == "yes:M-A"
+    # uncapped: the stale A leg would still price side B via NO on A at t=400
+    q2 = candles_to_quotes("M", "M-A", "M-B", ca, cb, max_carry_s=None)
+    assert q_at(q2, 400, "B")["ask"] == pytest.approx(0.58)
+    assert q_at(q2, 400, "A")["ask"] == pytest.approx(0.42)
