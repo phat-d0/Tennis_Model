@@ -276,3 +276,6 @@ the newest 200. Format changes go through the Lead (Scanner proposes, Dashboard 
 - 2026-10-24: `settle_a/settle_b` populated by the normalizer (phat-d0/Tennis_Model#25); 100 tests.
 - 2026-10-24: Swing backtest settles fair-price matches via `pnl_settled` (phat-d0/Tennis_Model#26);
   103 tests passing.
+- 2026-10-24: PRELIMINARY backtest on 2,000 recent ATP/WTA matches (candles, no depth): no edge
+  after fees. 25 one-candle true-arb episodes (likely stale quotes); every swing-lock rule negative
+  in sample; walk-forward FAIL (3 folds, 0 positive). Details: docs/WORK_PLAN.md "Findings so far".
