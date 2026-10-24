@@ -104,6 +104,8 @@ observations, 12% live; 161 fair-price settlements included via settle_a/b):**
   starts when the recorder runs, so record early.
 
 ## Next steps (in order)
+0. Data: finish group 1 (recent Challenger, ~4,600/8,339 at 23:26 UTC; ~12 h at the archive's ~0.2 req/s),
+   then full Challenger read. Group 2 (older/ITF) descoped; see CLAUDE.md Decisions.
 1. Data: backfill the most recent ~6 months of ATP + WTA first (batch candles for post-cutoff
    markets), then Challenger/ITF/older; re-normalize with the carry cap; publish to `data-store`
    once the repo is private. Restarted 10:20 UTC in the new order; recent ATP+WTA slice (~4–5k
