@@ -290,3 +290,5 @@ the newest 200. Format changes go through the Lead (Scanner proposes, Dashboard 
 - 2026-10-24: Group-0 read (4,686 ATP/WTA matches, 6 months): no edge. Swing WF FAIL 0/6 folds (OOS
   −$0.32/trade at 0¢); live-only and first-hour windows also 0/6. After-fee true arbs (≤ 98 episodes)
   are stale/carried quotes. Inventory merged (phat-d0/Tennis_Model#35).
+- 2026-10-24: Findings report v1 (`reports/backtest_findings.md`) + `arb_max_leg_age_s` merged
+  (phat-d0/Tennis_Model#37); 111 tests passing.

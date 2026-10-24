@@ -30,6 +30,7 @@ backtest:
   max_minutes_from_start: null  #   negative = pre-match). 0 and 60 = first hour of play only
   entry_phase: any              # any | live | pre
   min_minutes_to_close: null
+  arb_max_leg_age_s: null       # count a true arb only if both legs' asks changed within N s (stricter)
   walkforward:
     min_train_months: 1
     train_months: null          # null = expanding window; N = rolling last N months

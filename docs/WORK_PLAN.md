@@ -24,6 +24,7 @@ updates in their PR descriptions. Durable rules and facts are in `CLAUDE.md`.
 | 17 | Live score recording | Recorder logs set/game/point state every 60 s via `/live_data/batch`, A/B mapped, change-only | `docs/data_live_score.md`, phat-d0/Tennis_Model#20, #21 |
 | 18 | Backfill checkpoint | 1,000 recent ATP/WTA matches, 1.80 M quote rows; 3.9% not started (fair prices sum to $1) | `docs/data_inventory.md`, phat-d0/Tennis_Model#23 |
 | 19 | Fair-price settlement end to end | Normalizer fills settle_a/b (#25); backtest settles not-started matches at fair prices instead of dropping them (#26) | phat-d0/Tennis_Model#24, #25, #26 |
+| 20 | Findings report v1 + leg-age arb filter | `reports/backtest_findings.md` answers the owner's question (no edge on 6 months ATP/WTA); `arb_max_leg_age_s` for a stale-leg-free arb count | phat-d0/Tennis_Model#37 |
 | 6 | Team set up | 4 role sessions started 2026-10-24 on `team/*` branches (IDs in `docs/team/lead.md`) | phat-d0/Tennis_Model#1 |
 
 ## Findings so far (PRELIMINARY: 1-min candles, no depth; run locally by Data, aggregates only)
