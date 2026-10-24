@@ -52,5 +52,6 @@ scanner:
   episode_gap_seconds: 30       # an opportunity gone this long starts a new episode
 
 data:
+  max_carry_s: 300             # max age a candle leg is carried forward before it becomes NaN
   raw_dir: data/raw
   processed_dir: data/processed
