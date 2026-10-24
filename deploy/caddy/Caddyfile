@@ -1,0 +1,8 @@
+# HTTPS (automatic Let's Encrypt) + basic auth in front of the dashboard.
+# Generate the hash with: docker run --rm caddy:2.8 caddy hash-password --plaintext 'your-password'
+{$DASHBOARD_DOMAIN} {
+	basic_auth {
+		{$DASHBOARD_USER} {$DASHBOARD_PASSWORD_HASH}
+	}
+	reverse_proxy dashboard:8000
+}

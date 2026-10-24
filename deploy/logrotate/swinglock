@@ -1,0 +1,13 @@
+# Rotates the scanner's alert log (container stdout is rotated by Docker's json-file options).
+# Install: sudo cp deploy/logrotate/swinglock /etc/logrotate.d/swinglock
+/opt/swinglock/data/*.log {
+	weekly
+	rotate 12
+	maxsize 20M
+	compress
+	delaycompress
+	missingok
+	notifempty
+	copytruncate
+	su root root
+}
