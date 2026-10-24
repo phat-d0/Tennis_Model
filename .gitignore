@@ -13,3 +13,4 @@ positions.csv
 data/live/
 reports/*.csv
 *.egg-info/
+data/recorded/

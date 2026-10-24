@@ -100,3 +100,34 @@ candles only appeared on trade minutes, carrying a leg forward would pair stale 
   13 minutes). At a 1.0 s gap: 0 × 429 in the first 82 requests. Hence 1.0 s for the backfill.
 - `/milestones` without a date filter pages back to Feb 2025 (126 pages × 500); fine once, cached.
 - `limit` is required on `/milestones` (max 500).
+
+## Order-book recorder (`recorder.py`)
+```
+python -m swinglock.collectors.recorder                  # until SIGTERM/SIGINT (docker: --profile recorder)
+python -m swinglock.collectors.recorder --duration 300   # test run
+```
+- Discovery every 600 s: `GET /events?series_ticker=…&status=open&with_nested_markets=true&with_milestones=true`
+  per series in `scanner.series` (scheduled start from the embedded milestones).
+- Every `poll_s` (10 s): `GET /markets/orderbooks?tickers=…&depth=5`, 100 tickers (50 matches) per
+  call, both legs of a match in the same call and stamped with the same receive time.
+- One client throttle covers everything: `max_rps` (default 1.0). At 90 open matches that is
+  2 calls per poll, ~0.2 req/s, plus 6 discovery calls per 10 min.
+- Output under `data/recorded/kalshi/` (gitignored):
+  - `quotes/`: the schema `quotes` table (source `orderbook`, with sizes), via `orderbooks_to_quotes`;
+  - `depth/`: ts, match_id, ticker, book (yes|no bid list), level (0 = best), price, size; top 5
+    per list. YES ask levels = 1 − NO bid levels;
+  - `matches.parquet`: upserted on every flush.
+  Each flush (60 s) writes `<table>/<day>/part-HHMMSS.parquet`; past days are compacted to
+  `<table>/<day>.parquet`. `pd.read_parquet()` reads either.
+- A failed poll writes no rows (no half quotes). A match missing a leg in the response is skipped.
+- Settings come from config `recorder:` (`poll_s`, `discovery_s`, `flush_s`, `max_rps`, `depth`,
+  `out_dir`) with the defaults above; CLI flags override.
+
+Trial 2026-10-24 10:34 UTC (3 min, 15 s polls, 0.5 req/s cap, next to the running backfill):
+- 90 open matches (ITF 39, ATP 22, WTA 21, Challenger 8); 11 snapshots; 30 requests; 2 × 429.
+- 1,980 quote rows; 2.4 % NaN asks; 18,865 depth rows; 176 KB on disk.
+- Combined ask(A)+ask(B) over 953 two-sided observations: min 0.99, median 1.01; 12 at 0.99
+  (before fees, about 3.5¢ for a pair near 50/50, so not an arb), 101 at exactly 1.00.
+- Disk estimate at 10 s polls and ~90 matches: on the order of 100 MB/day of part files before
+  compaction. Check the compacted size on the VPS before publishing; day files may need splitting
+  under the 50 MB `data-store` limit.
