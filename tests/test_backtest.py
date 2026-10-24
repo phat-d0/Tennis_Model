@@ -86,9 +86,8 @@ def test_arb_episode_duration_and_profit():
 
 def test_arb_depth_capped_and_gap_splits_episode():
     q = path([(0, 0.45, 0.50), (30, 0.45, 0.50), (200, 0.45, 0.50)], size=500)
-    q = pd.concat([q, quotes([(100, "A", 0.45, 500), (100, "B", 0.50, 500)])])  # fresh data, still arb
-    eps, _ = scan_arb(align(q).query("ts != @t(100)"), matches("M1"), CFG)  # drop t=100 -> 170s gap
-    assert list(eps["n_obs"]) == [2, 1]
+    eps, _ = scan_arb(align(q), matches("M1"), CFG)
+    assert list(eps["n_obs"]) == [2, 1]             # 170s data gap > staleness splits the episode
     assert (eps["contracts"] == 100).all()          # execution.max_contracts_per_trade
 
 

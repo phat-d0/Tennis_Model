@@ -21,7 +21,7 @@ missed (pessimistic for short-lived locks).
 
 from __future__ import annotations
 
-from dataclasses import asdict, dataclass, fields
+from dataclasses import dataclass, fields
 from typing import Any
 
 import numpy as np
@@ -41,7 +41,7 @@ class MatchPath:
     tier: str
     winner: str
     fees: FeeModel
-    ts: pd.DatetimeIndex
+    ts: list[pd.Timestamp]
     ask: dict[str, np.ndarray]
     size: dict[str, np.ndarray]
     phase: np.ndarray
@@ -92,7 +92,7 @@ def match_paths(aligned: pd.DataFrame, matches: pd.DataFrame, cfg: dict[str, Any
         g = g.sort_values("ts", kind="stable")
         out.append(MatchPath(
             str(mid), tier if isinstance(tier, str) else "unknown", winner, fees[mid],
-            pd.DatetimeIndex(g["ts"]),
+            list(pd.DatetimeIndex(g["ts"])),
             {"A": g["ask_a"].to_numpy(float), "B": g["ask_b"].to_numpy(float)},
             {"A": g["size_a"].to_numpy(float), "B": g["size_b"].to_numpy(float)},
             g["phase"].to_numpy(object)))
@@ -156,5 +156,8 @@ def simulate(paths: list[MatchPath], x: float, y: float, cfg: dict[str, Any], mo
         raise ValueError(f"mode must be one of {MODES}, got {mode!r}")
     contracts = float(cfg["backtest"]["contracts_per_entry"])
     slip = float((cfg.get("execution") or {}).get("slippage", 0.0))
-    rows = [asdict(_trade(p, s, i, y, contracts, slip)) for p in paths for s, i in _entries(p, x, mode)]
-    return pd.DataFrame(rows, columns=TRADE_COLUMNS)
+    rows = [vars(_trade(p, s, i, y, contracts, slip)) for p in paths for s, i in _entries(p, x, mode)]
+    df = pd.DataFrame(rows, columns=TRADE_COLUMNS)
+    for c in ("entry_ts", "lock_ts", "settle_ts"):
+        df[c] = pd.to_datetime(df[c], utc=True)
+    return df

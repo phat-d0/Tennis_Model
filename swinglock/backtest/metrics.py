@@ -21,21 +21,25 @@ def max_drawdown(pnl: Sequence[float]) -> float:
     return float((peak - cum).max())
 
 
+def _secs(ts: pd.Series) -> np.ndarray:
+    """Epoch seconds (NaN for NaT); tolerates untyped all-NaT columns."""
+    v = ts if isinstance(ts.dtype, pd.DatetimeTZDtype) else pd.to_datetime(ts, utc=True)
+    ns = v.to_numpy(dtype="datetime64[ns]")
+    return np.where(np.isnat(ns), np.nan, ns.astype("int64") / 1e9)
+
+
 def capital_usage(trades: pd.DataFrame) -> tuple[float, float]:
     """(peak, time-weighted average) concurrent capital. Entry cost is tied up from entry,
     lock cost from the lock, and both are released at settlement."""
     if trades.empty:
         return 0.0, 0.0
-    lk = trades[trades["locked"].astype(bool)]
-    ev = pd.concat([
-        pd.DataFrame({"ts": trades["entry_ts"], "d": trades["entry_cost"]}),
-        pd.DataFrame({"ts": lk["lock_ts"], "d": lk["lock_cost"]}),
-        pd.DataFrame({"ts": trades["settle_ts"], "d": -trades["capital"]}),
-    ], ignore_index=True)
-    ev = ev.assign(order=-ev["d"]).sort_values(["ts", "order"], kind="stable")  # add before release
-    level = ev["d"].cumsum().to_numpy()
-    t = (ev["ts"] - ev["ts"].iloc[0]).dt.total_seconds().to_numpy()
-    span = t[-1]
+    lk = trades["locked"].to_numpy(bool)
+    t = np.concatenate([_secs(trades["entry_ts"]), _secs(trades["lock_ts"])[lk], _secs(trades["settle_ts"])])
+    d = np.concatenate([trades["entry_cost"].to_numpy(float), trades["lock_cost"].to_numpy(float)[lk],
+                        -trades["capital"].to_numpy(float)])
+    order = np.lexsort((-d, t))                    # by time; additions before releases on ties
+    t, level = t[order], np.cumsum(d[order])
+    span = t[-1] - t[0]
     avg = float((level[:-1] * np.diff(t)).sum() / span) if span > 0 else float(level.max())
     return float(level.max()), avg
 
@@ -48,7 +52,7 @@ def summarize(trades: pd.DataFrame) -> dict[str, float]:
     pnl = trades["pnl"].astype(float)
     unl = pnl[~locked]
     peak, avg = capital_usage(trades)
-    ordered = trades.sort_values("settle_ts", kind="stable")["pnl"]
+    ordered = pnl.to_numpy()[np.argsort(_secs(trades["settle_ts"]), kind="stable")]
     return dict(
         n_trades=len(trades),
         lock_rate=float(locked.mean()),

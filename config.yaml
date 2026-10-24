@@ -23,6 +23,7 @@ backtest:
   lock_thresholds: [0.90, 0.92, 0.94, 0.95, 0.96, 0.97, 0.98, 0.99]           # Y: lock when cost <= Y
   contracts_per_entry: 10
   min_arb_profit: 0.0           # dollars per matched contract, after fees
+  max_staleness_s: 60           # max age of the other side's quote in the A/B as-of join
 
 scanner:
   poll_seconds: 5
@@ -33,7 +34,6 @@ scanner:
     - KXATPMATCH
     - KXWTAMATCH
     - KXATPCHALLENGERMATCH
-    - KXCHALLENGERMATCH
     - KXWTACHALLENGERMATCH
     - KXITFMATCH
     - KXITFWMATCH
