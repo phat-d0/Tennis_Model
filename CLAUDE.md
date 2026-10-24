@@ -152,8 +152,15 @@ the newest 200. Format changes go through the Lead (Scanner proposes, Dashboard 
   `/historical/*`; historical candles drop the `_dollars`/`_fp` field suffixes. Not-started
   matches settle at a "fair price", not 0/1; a retirement after the first ball settles the
   retiring player's market to No.
+- Kalshi 1-min candles are **sparse** (minutes with no change are omitted; VanAssche–Musetti had
+  786 candles over 1,745 min). The collector carries each leg's last close forward, capped by
+  `data.max_carry_s`. Whether a quote-only change (no trade) always emits a candle is being
+  verified (Data); until then, treat candle-based arb counts as provisional.
+- Before 2025-11-15, KXATPMATCH/KXWTAMATCH matches are tagged fee_type `quadratic` (an assumption,
+  since the fee history only records the new value). Taker fees are the same either way.
 - Auth: REST market data is public; **every WebSocket connection needs a signed API key**.
-  Unauthenticated REST hit a 429 after ~8 rapid calls, so throttle hard (seen again on a single
+  Unauthenticated REST hit a 429 after ~8 rapid calls (backfill at a 0.5 s gap: 11×429 in 178
+  requests; at a 1.0 s gap: a burst of 16×429 at the start, then clean), so throttle hard (seen again on a single
   scanner pass on 2026-10-24; the scanner backs off and spaces requests ≥ 1 s).
 - **Kalshi Data Terms of Use** (kalshi-public-docs PDF) restrict "Kalshi Data" to personal
   non-commercial use and prohibit compiling databases, bulk script retrieval, redistribution,
@@ -169,7 +176,10 @@ the newest 200. Format changes go through the Lead (Scanner proposes, Dashboard 
   Details: docs/research/other_venues.md (some facts from search summaries; re-verify before coding).
 - The Odds API (the-odds-api.com): `draftkings` is the DraftKings **Sportsbook** (region `us`), not
   DK Predictions; region `us_ex` lists Kalshi, Polymarket, Novig, ProphetX, BetOpenly. Tennis sport
-  keys and credit costs: see docs/research/odds_api.md (Data role, to do). A sportsbook leg is a
+  keys and credit costs: docs/research/odds_api.md. **Tennis coverage is tour-level only** (one key
+  per tournament, e.g. `tennis_atp_us_open`; 47 keys; no Challenger/ITF and few 250s). `/odds` costs
+  markets × regions credits; `/sports` and `/events` are free. DraftKings voids walkovers and
+  retirements before set 1 is complete. A sportsbook leg is a
   bet, not a contract: equal-payout sizing is stake = N / decimal_odds, and retirement/void rules
   differ from Kalshi's, so a "lock" across them isn't risk-free when a player retires.
 - DraftKings Predictions: **no public/partner API**. ToU (2026-08-04) bans bots/scrapers and
@@ -214,3 +224,7 @@ the newest 200. Format changes go through the Lead (Scanner proposes, Dashboard 
 - 2026-10-24: Scanner v1 (phat-d0/Tennis_Model#3) and Dashboard v1 (phat-d0/Tennis_Model#5) merged;
   58 tests passing. Run: `python -m swinglock.scanner [--once]`,
   `python -m swinglock.dashboard --state data/live/state.json` (or `--sample`).
+- 2026-10-24: Dashboard filters merged (phat-d0/Tennis_Model#8); 61 tests passing.
+- 2026-10-24: Kalshi client, normalizer and resumable backfill merged (phat-d0/Tennis_Model#9);
+  81 tests passing. Run: `python -m swinglock.collectors.backfill`. Full backfill running in the Data
+  session at 1 req/s (settled events: ATP 5,029, WTA 5,034, Challenger 10,232 + 2,214, ITF next).
