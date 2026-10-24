@@ -287,3 +287,6 @@ the newest 200. Format changes go through the Lead (Scanner proposes, Dashboard 
   ~spread + fee at every X; both gate-valid filters still FAIL. See WORK_PLAN "Findings so far".
 - 2026-10-24: Entry window (`min/max_minutes_from_start`) + `entry_phase` filters (phat-d0/Tennis_Model#32);
   108 tests passing.
+- 2026-10-24: Group-0 read (4,686 ATP/WTA matches, 6 months): no edge. Swing WF FAIL 0/6 folds (OOS
+  −$0.32/trade at 0¢); live-only and first-hour windows also 0/6. After-fee true arbs (≤ 98 episodes)
+  are stale/carried quotes. Inventory merged (phat-d0/Tennis_Model#35).

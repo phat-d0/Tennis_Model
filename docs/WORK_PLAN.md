@@ -27,6 +27,23 @@ updates in their PR descriptions. Durable rules and facts are in `CLAUDE.md`.
 | 6 | Team set up | 4 role sessions started 2026-10-24 on `team/*` branches (IDs in `docs/team/lead.md`) | phat-d0/Tennis_Model#1 |
 
 ## Findings so far (PRELIMINARY: 1-min candles, no depth; run locally by Data, aggregates only)
+**2026-10-24, group 0 = 6 months of ATP+WTA (4,686 matches, closes 2026-04-24 → 10-24; 5.09 M aligned
+observations, 12% live; 161 fair-price settlements included via settle_a/b):**
+- **True arb:** combined < $1 before fees in 2.46% of observations (0.99: 109,629; 0.98: 13,821;
+  ≤ 0.95: 127). After fees: 98 episodes in 40 matches at 0¢ (26 in 18 at 1¢), median one candle, sum of
+  1-contract profits $2.49, depth unknown. The top ones are stale pre-match quotes (NAKBAE 21¢; PELMAN
+  13¢ used a *carried* leg; CHOVAN 13¢ with zero volume). **98 is an upper bound**: the 1800 s carry cap
+  can pair a stale leg with a fresh one. Read: no executable true arb.
+- **Swing grid:** every rule negative. Best X=0.20/Y=0.90: 4,509 trades, 48.8% locked, −$1,374 at 0¢
+  (−$0.30/trade), −$2,023 at 1¢.
+- **Walk-forward: FAIL, 0 of 6 folds positive** (May–Oct). OOS 4,432 trades: mean −$0.32/trade
+  (95% CI −0.37 to −0.28) at 0¢, −$0.47 (CI −0.52 to −0.43) at 1¢.
+- `entry_phase: live`: WF FAIL 0/6, OOS mean −$0.27 (0¢) / −$0.43 (1¢).
+  First hour of play only (window 0–60 min): WF FAIL 0/6, OOS mean −$0.27 / −$0.42; 3,108 OOS trades.
+- **Answer so far:** on 6 months of ATP/WTA candles, neither true arbs nor swing locks have an edge
+  after fees and the ask spread. The gate fails on sign, not just sample size.
+
+**Earlier read (superseded by the group-0 read above):**
 **2026-10-24, 2,000 recent ATP/WTA matches (closes 2026-08-03 → 10-24; 2.10 M aligned observations, 12% live):**
 - **True arb:** combined ask < $1 before fees in 2.0% of observations (almost all at 99¢; 0.98: 4,072;
   ≤ 0.95: 30). **After fees: 25 one-candle episodes in 14 matches** (11 at 1¢ slippage), depth unknown.
