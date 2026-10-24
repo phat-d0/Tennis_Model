@@ -184,7 +184,7 @@ Props in the same milestone: `KXATPSETWINNER`, `KXATPEXACTMATCH`, `KXATPGAMETOTA
 - MECNET collateral-return netting may free capital when holding YES on both legs (or NO on both). It does not change the P&L. [confirmed: event schema text; the effect on cash is unverified]
 
 **Settlement edge cases** [confirmed: live `rules_secondary` and series `product_metadata.important_info`]:
-- If the match never starts (no ball played: walkover, injury, cancellation), **both markets resolve to a "fair price"**, not 0/1. `settlement_value_dollars` can then be fractional. Whether the two fair prices sum to exactly $1 is **unverified**. Treat it as a small residual risk for locks.
+- If the match never starts (no ball played: walkover, injury, cancellation), **both markets resolve to a "fair price"**, not 0/1. `settlement_value_dollars` can then be fractional, with `result: "scalar"`. In 39 of 39 observed cases (Sep–Oct 2026) the two fair prices summed to exactly $1.00, so a held lock still pays $1. [confirmed: backfill 2026-10-24]
 - Retirement or forfeit after the first ball: the retiring player's market resolves **No** (the opponent's presumably Yes).
 - Postponed matches stay open up to about two weeks (the placeholder `close_time`).
 
@@ -205,7 +205,10 @@ Props in the same milestone: `KXATPSETWINNER`, `KXATPEXACTMATCH`, `KXATPGAMETOTA
 1. Exact official fee-schedule text (the 0.07 / 0.0175 constants, the PDF's rounding wording, and any tennis-specific rows). Kalshi's site blocks non-browser fetches. The user should open https://kalshi.com/fee-schedule in a browser and confirm the KXATPMATCH and KXWTAMATCH rows.
 2. Is the user a direct member ($0.0001 balance precision) or FCM-cleared ($0.01)? This decides the rounding model.
 3. Unauthenticated REST rate limit (observed about 8 rapid calls before a 429). Does signing public GETs give Basic-tier (200 tokens/s) limits?
-4. Do the fair-price settlements for not-started matches sum to $1 across both markets?
+4. ~~Do the fair-price settlements for not-started matches sum to $1 across both markets?~~ **Yes**:
+   all 39 such matches among the 1,000 most recent settled ATP/WTA matches (Sep–Oct 2026) have
+   `result: "scalar"` on both markets, with settlement values summing to exactly $1.00 (e.g. 0.40/0.60).
+   [confirmed: live API via the backfill, 2026-10-24; see docs/data_inventory.md]
 5. Developer Agreement content, and whether the Data ToU applies to API data for private, non-commercial backtesting and to AI-assisted analysis (see §8).
 6. Is there a read-only API key scope? None is documented.
 7. How far back do tennis match series go (when did KXATPMATCH start)? Paging `/historical/markets?series_ticker=KXATPMATCH` to the end will tell us. Do 1-minute historical candles exist for the oldest markets?
