@@ -37,6 +37,16 @@ updates in their PR descriptions. Durable rules and facts are in `CLAUDE.md`.
   Live entries lose more than pre-match ones (−$455 vs −$150).
 - **Walk-forward gate: FAIL**: 3 folds (need 4), 0/3 positive; OOS −$361 at 0¢ (mean −$0.36/trade,
   95% CI −0.45 to −0.27), −$537 at 1¢.
+- **Entry diagnostics (#29 re-runs, same 2,000 matches, Y=0.92):** losses are *not* from near-decided
+  entries: only 1–3% of entries are < 10¢ (and those are slightly positive). Entries ≥ 10¢ lose at
+  every X, more as X rises (P&L/trade −$0.33 at X=0.20 → −$1.09 at X=0.50; higher X enters earlier,
+  mostly pre-match). `min_entry_ask 0.10`: slightly worse (−$623, WF FAIL). `max_minutes_from_start 60`:
+  same −$0.36/trade (fewer trades; WF FAIL). Note: that filter caps entries *after* the start and
+  still allows pre-match ones.
+- **Interpretation (Lead):** the ~3–4¢/contract loss ≈ ask spread + taker fee, which is what fairly
+  priced markets cost you. The +$1.11 locked vs −$1.86 unlocked split is selection (trades that
+  happened to swing), not an edge. A swing lock = two taker round-trips; it only pays if prices
+  are predictable, and nothing so far says they are.
 - Not yet covered: older months, Challenger/ITF, real depth (needs the recorder), score-state splits,
   fair-price settlements (this checkpoint predates `settle_a/b`).
 
