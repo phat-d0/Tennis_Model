@@ -114,8 +114,8 @@ unchanged on the next month.
 ## 5. Challenger (INTERIM: 2 months, 0/2 folds)
 Same method on the first 3,000 Challenger matches: ATP Challenger 2,298 + WTA 125: 702, market close
 2026-08-24 → 2026-10-24; 1.25 M aligned observations, 29% live; 51 fair-price settlements.
-**Interim**: two months gives only 2 walk-forward folds (the gate needs ≥ 4), so this can't pass
-or fail the gate on its own. It is read for direction only.
+**Interim**: two months gives only 2 walk-forward folds (the gate needs ≥ 4), so it fails the gate
+on fold count alone; both folds were also negative. Read it for direction.
 
 | Metric | Value |
 |---|---|
