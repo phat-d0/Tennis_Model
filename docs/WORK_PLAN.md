@@ -20,6 +20,7 @@ updates in their PR descriptions. Durable rules and facts are in `CLAUDE.md`.
 | 13 | VPS deploy | Docker compose (scanner + dashboard; recorder and Caddy as profiles), systemd, logrotate; owner setup ~20 min | `deploy/`, `docs/scanner_deploy.md`, phat-d0/Tennis_Model#13 |
 | 14 | Backfill work order + batch candles | Recent ATP+WTA first; shared candle calls for post-cutoff markets (~3 matches/call; cap = requested candles) | phat-d0/Tennis_Model#15 |
 | 15 | Order-book recorder | 10 s snapshots of all open match books (top-5 depth), daily parquet; trial: 90 matches, min combined $0.99, nothing below fees | `swinglock/collectors/recorder.py`, phat-d0/Tennis_Model#17 |
+| 16 | Network-outage handling | Backfill pauses and retries instead of saving quote-less matches | phat-d0/Tennis_Model#19 |
 | 6 | Team set up | 4 role sessions started 2026-10-24 on `team/*` branches (IDs in `docs/team/lead.md`) | phat-d0/Tennis_Model#1 |
 
 ## Live configuration

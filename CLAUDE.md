@@ -256,3 +256,7 @@ the newest 200. Format changes go through the Lead (Scanner proposes, Dashboard 
   `/markets/orderbooks` every 10 s (50 matches per call), quotes + top-5 depth to daily parquet.
   Live trial 10:34 UTC: 90 open matches, combined ask min $0.99 / median $1.01, nothing below fees.
   91 tests passing.
+- 2026-10-24: Network-outage handling (phat-d0/Tennis_Model#19): network failures → KalshiError(0);
+  the backfill pauses 120 s and retries the match (gives up after ~30 min), the recorder skips one
+  snapshot. Full backfill work order: 4,670 recent ATP+WTA → 8,340 recent Challenger → 48,785 others
+  (61,795 total). 93 tests passing.
