@@ -38,9 +38,10 @@ def path(rows, match="M1", size=np.nan, source="orderbook") -> pd.DataFrame:
                   match, source)
 
 
-def matches(*ids, winner="B", start=None, tier="atp") -> pd.DataFrame:
+def matches(*ids, winner="B", start=None, tier="atp", settle=(np.nan, np.nan)) -> pd.DataFrame:
     return conform(pd.DataFrame([dict(match_id=m, winner=winner, tier=tier, fee_type="quadratic",
-                                      fee_multiplier=1.0, scheduled_start=start) for m in ids]), MATCH_COLUMNS)
+                                      fee_multiplier=1.0, scheduled_start=start, settle_a=settle[0],
+                                      settle_b=settle[1]) for m in ids]), MATCH_COLUMNS)
 
 
 def trades_for(q, m, x=0.40, y=0.97, mode="first", cfg=CFG):
@@ -160,6 +161,33 @@ def test_entry_size_limited_by_depth_and_modes():
 
 def test_unsettled_matches_skipped():
     assert trades_for(path(LOCK_PATH), matches("M1", winner=None)).empty
+    assert trades_for(path(LOCK_PATH), matches("M1", winner=None, settle=(0.4, np.nan))).empty
+
+
+# ---- settlement payouts (settle_a / settle_b) ---------------------------
+
+NO_LOCK_PATH = [(0, 0.60, 0.64), (10, 0.38, 0.64), (20, 0.36, 0.62), (30, 0.40, 0.60)]
+
+
+def test_fair_price_unlocked_trade():
+    # Match never started: no winner, A pays 0.40 and B 0.60 per contract.
+    r = trades_for(path(NO_LOCK_PATH), matches("M1", winner=None, settle=(0.40, 0.60))).iloc[0]
+    assert not r["locked"] and r["winner"] == "NA"
+    assert (r["settle_a"], r["settle_b"]) == (0.40, 0.60)
+    assert r["pnl"] == pytest.approx(10 * 0.40 - 3.97)
+
+
+def test_fair_price_locked_trade_pays_contracts():
+    # Equal counts on both sides pay $1 per pair whatever the fair price split.
+    r = trades_for(path(LOCK_PATH), matches("M1", winner=None, settle=(0.30, 0.70))).iloc[0]
+    assert r["locked"] and r["pnl"] == pytest.approx(10 - 3.97 - 4.68)
+
+
+def test_settle_columns_win_over_winner_and_fall_back_to_it():
+    r = trades_for(path(NO_LOCK_PATH), matches("M1", winner="B", settle=(1.0, 0.0))).iloc[0]
+    assert r["pnl"] == pytest.approx(10 - 3.97)          # payouts decide, winner label is ignored
+    r = trades_for(path(NO_LOCK_PATH), matches("M1", winner="A")).iloc[0]   # old file: NaN payouts
+    assert (r["settle_a"], r["settle_b"], r["pnl"]) == (1.0, 0.0, pytest.approx(10 - 3.97))
 
 
 # ---- metrics / grid ------------------------------------------------------

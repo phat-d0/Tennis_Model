@@ -23,7 +23,7 @@ from .align import align, staleness_s
 from .arb import scan_arb
 from .grid import KEYS, grid_metrics, grid_trades
 from .metrics import breakdown
-from .swing import MODES, match_paths
+from .swing import MODES, match_paths, settlement
 from .walkforward import WalkForward, slip_label, walk_forward
 
 CAVEATS = """\
@@ -78,13 +78,15 @@ def walkforward_md(wf: WalkForward) -> list[str]:
 
 
 def summary_md(data_dir, matches, quotes, aligned, episodes, by_match, grid, bd, stale, wf=None) -> str:
-    settled = matches["winner"].isin(["A", "B"]).sum()
+    settled = sum(settlement(r) is not None for _, r in matches.iterrows())
+    fair = int((matches["settle_a"].notna() & matches["settle_b"].notna()
+                & ~matches["settle_a"].isin([0.0, 1.0])).sum())
     src = quotes["source"].value_counts(dropna=False).to_dict()
     lines = [
         "# Backtest summary", "",
         f"Generated {datetime.now(timezone.utc):%Y-%m-%d %H:%M} UTC from `{data_dir}`.", "",
         "## Data",
-        f"- Matches: {len(matches)} ({settled} settled A/B); quotes: {len(quotes)} rows, sources {src}",
+        f"- Matches: {len(matches)} ({settled} settled, {fair} at a fair price); quotes: {len(quotes)} rows, sources {src}",
         f"- Quote span: {quotes['ts'].min()} to {quotes['ts'].max()}",
         f"- Aligned observations: {len(aligned)} (as-of join, max staleness {stale:g}s)", "",
         "## True arb (buy both sides at once)",
