@@ -441,3 +441,21 @@ def test_settle_values():
     assert np.isnan(open_row["settle_a"]) and np.isnan(open_row["settle_b"])
     df = matches_frame([open_row, row])
     assert df["settle_a"].dtype == "float64"
+
+
+def test_run_only_groups_skips_other_groups(tmp_path, monkeypatch):
+    """--groups: matches outside the selected work groups are neither fetched nor written."""
+    now = pd.Timestamp.now(tz="UTC")
+    items = [dict(_item(1, 0, 0, "atp"), close=now - pd.Timedelta(days=5)),
+             dict(_item(2, 0, 0, "challenger"), close=now - pd.Timedelta(days=5))]
+    for i, r in enumerate(items):
+        r.update(event={"event_ticker": f"E{i}"}, markets=[], series={}, fee_changes=[])
+    monkeypatch.setattr(backfill, "collect_series", lambda *a, **k: items if a[1] == "S" else [])
+    monkeypatch.setattr(backfill, "scheduled_starts", lambda *a, **k: {})
+    monkeypatch.setattr(backfill.KalshiClient, "historical_cutoff", lambda self: {"market_settled_ts": "2026-08-25T00:00:00Z"})
+    done = []
+    monkeypatch.setattr(backfill, "normalize_one_patiently",
+                        lambda c, r, *a, **k: (done.append(r["tier"]) or ({"match_id": r["event"]["event_ticker"]}, backfill.empty(backfill.QUOTE_COLUMNS))))
+    monkeypatch.setattr(backfill, "write_outputs", lambda out, rows, q: (backfill.matches_frame([]), backfill.empty(backfill.QUOTE_COLUMNS)))
+    backfill.run(["S"], tmp_path, tmp_path / "raw", only_groups=[1])
+    assert done == ["challenger"]
