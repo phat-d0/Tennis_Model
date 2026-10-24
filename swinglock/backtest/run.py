@@ -3,7 +3,8 @@
     python -m swinglock.backtest.run --data data/processed/kalshi --out reports/
 
 Writes arb_episodes.csv, arb_by_match.csv, grid_metrics.csv, grid_trades.csv,
-breakdowns.csv and backtest_summary.md to --out. Exits cleanly (code 0) with a message
+breakdowns.csv, walkforward_folds.csv, walkforward_trades.csv, walkforward_gate.csv and
+backtest_summary.md to --out. Exits cleanly (code 0) with a message
 when the data directory has no matches/quotes yet.
 """
 
@@ -23,6 +24,7 @@ from .arb import scan_arb
 from .grid import KEYS, grid_metrics, grid_trades
 from .metrics import breakdown
 from .swing import MODES, match_paths
+from .walkforward import WalkForward, slip_label, walk_forward
 
 CAVEATS = """\
 - Quotes from candles are sampled ask levels with no depth: fills are assumed at the sampled
@@ -31,7 +33,8 @@ CAVEATS = """\
 - Fills are at ask + configured slippage with Kalshi taker fees rounded up per order; no
   queue position, latency or partial fills are modelled.
 - Settlement time is each match's last aligned quote (capital/drawdown timing proxy).
-- The best grid row is chosen in-sample; treat it as a hypothesis, not an expected return."""
+- The best grid row is chosen in-sample; treat it as a hypothesis, not an expected return.
+  The walk-forward section is the headline: rules chosen on earlier months only."""
 
 
 def _fmt(v) -> str:
@@ -62,7 +65,19 @@ def load(data_dir: Path) -> tuple[pd.DataFrame, pd.DataFrame] | None:
     return matches, quotes
 
 
-def summary_md(data_dir, matches, quotes, aligned, episodes, by_match, grid, bd, stale) -> str:
+def walkforward_md(wf: WalkForward) -> list[str]:
+    verdict = "PASS" if wf.passed else "FAIL: " + "; ".join(wf.reasons)
+    lines = ["## Walk-forward gate (out of sample; the headline number)", "",
+             f"- Verdict: **{verdict}**",
+             "- Rule (mode, X, Y) chosen per fold on earlier months only (settled before the test month), "
+             "then run unchanged on the test month. CI: match-level bootstrap of mean P&L per trade.", "",
+             md_table(wf.gate.assign(slippage=wf.gate["slippage"].map(slip_label))), ""]
+    if len(wf.folds):
+        lines += [md_table(wf.folds), ""]
+    return lines
+
+
+def summary_md(data_dir, matches, quotes, aligned, episodes, by_match, grid, bd, stale, wf=None) -> str:
     settled = matches["winner"].isin(["A", "B"]).sum()
     src = quotes["source"].value_counts(dropna=False).to_dict()
     lines = [
@@ -84,7 +99,9 @@ def summary_md(data_dir, matches, quotes, aligned, episodes, by_match, grid, bd,
             f"depth known for {int(episodes['depth_known'].sum())} of {len(episodes)}", "",
             md_table(episodes.sort_values("profit", ascending=False).head(10)), "",
         ]
-    lines += ["## Swing-lock grid (top 10 by total P&L)", ""]
+    if wf is not None:
+        lines += walkforward_md(wf)
+    lines += ["## Swing-lock grid, in sample (top 10 by total P&L)", ""]
     cols = [*KEYS, "n_trades", "lock_rate", "avg_locked_pnl", "avg_unlocked_loss", "total_pnl",
             "avg_return", "hit_rate", "max_drawdown", "peak_capital"]
     traded = grid[grid["n_trades"] > 0].sort_values("total_pnl", ascending=False)
@@ -117,15 +134,18 @@ def main(argv: list[str] | None = None) -> int:
 
     aligned = align(quotes, matches, stale)
     episodes, by_match = scan_arb(aligned, matches, cfg)
-    trades = grid_trades(match_paths(aligned, matches, cfg), cfg, args.modes)
+    paths = match_paths(aligned, matches, cfg)
+    trades = grid_trades(paths, cfg, args.modes)
     grid = grid_metrics(trades, cfg, args.modes)
     bd = breakdown(trades, keys=KEYS)
+    wf = walk_forward(paths, cfg, args.modes)
 
     args.out.mkdir(parents=True, exist_ok=True)
     for name, df in [("arb_episodes", episodes), ("arb_by_match", by_match), ("grid_metrics", grid),
-                     ("grid_trades", trades), ("breakdowns", bd)]:
+                     ("grid_trades", trades), ("breakdowns", bd), ("walkforward_folds", wf.folds),
+                     ("walkforward_trades", wf.trades), ("walkforward_gate", wf.gate)]:
         df.to_csv(args.out / f"{name}.csv", index=False)
-    md = summary_md(args.data, matches, quotes, aligned, episodes, by_match, grid, bd, stale)
+    md = summary_md(args.data, matches, quotes, aligned, episodes, by_match, grid, bd, stale, wf)
     (args.out / "backtest_summary.md").write_text(md)
     print(md)
     return 0

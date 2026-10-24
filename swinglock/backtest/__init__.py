@@ -3,7 +3,8 @@
 from .align import align
 from .arb import scan_arb
 from .grid import grid_search
+from .walkforward import walk_forward
 from .metrics import breakdown, summarize
 from .swing import match_paths, simulate
 
-__all__ = ["align", "scan_arb", "grid_search", "breakdown", "summarize", "match_paths", "simulate"]
+__all__ = ["align", "scan_arb", "grid_search", "breakdown", "summarize", "match_paths", "simulate", "walk_forward"]
