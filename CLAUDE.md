@@ -158,6 +158,9 @@ the newest 200. Format changes go through the Lead (Scanner proposes, Dashboard 
   check: carried state matched the live best bid/ask in 140/144 leg-snapshots, misses = intra-minute
   moves). So carrying each leg's last close forward is valid. It's capped at `data.max_carry_s`
   (1800 s) only to guard against data gaps. Within a minute, the carried quote can lag up to 60 s.
+- Batch candles `GET /markets/candlesticks`: the 10,000 cap counts **requested** candles (tickers ×
+  window minutes), not returned ones; over the cap gives HTTP 400 (checked live). A match is listed
+  ~24 h, so one call covers ~3 same-day matches. Pre-cutoff (historical) markets need one call each.
 - Before 2025-11-15, KXATPMATCH/KXWTAMATCH matches are tagged fee_type `quadratic` (an assumption,
   since the fee history only records the new value). Taker fees are the same either way.
 - Auth: REST market data is public; **every WebSocket connection needs a signed API key**.
@@ -241,3 +244,6 @@ the newest 200. Format changes go through the Lead (Scanner proposes, Dashboard 
 - 2026-10-24: VPS deploy merged (phat-d0/Tennis_Model#13): Docker compose + systemd + logrotate;
   tested in the dev container (scanner ~25 MB, dashboard ~16 MB); Caddy, recorder and a real
   reboot are untested.
+- 2026-10-24: Backfill work order (recent 183 days ATP+WTA → recent Challenger → rest) + batched
+  candles for post-cutoff markets (phat-d0/Tennis_Model#15); 86 tests passing. Recent ATP+WTA slice
+  (~4–5k matches) ETA ~2.5–3 h from 10:20 UTC.
