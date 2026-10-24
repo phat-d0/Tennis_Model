@@ -12,6 +12,8 @@ updates in their PR descriptions. Durable rules and facts are in `CLAUDE.md`.
 | 4 | Backtest engine v1 (synthetic-data tests only) | Align, arb scan, swing sim, metrics, grid, CLI. Not yet run on real data | `swinglock/backtest/` |
 | 5 | Kalshi API research | see doc | `docs/research/kalshi_api.md` |
 | 7 | Walk-forward gate + findings skeleton | `walkforward.py` (monthly folds, purged expanding window, match-clustered bootstrap CI); 37 tests, synthetic only, not run on real data | `swinglock/backtest/walkforward.py`, `reports/backtest_findings.md`, phat-d0/Tennis_Model#2 |
+| 8 | Scanner v1 | REST polling, discovery (95–96 open matches across 6 series), effective ask/bid with depth, arb + lock alerts with dedup/re-alert, `state.json`, read-only test. Live pass 2026-10-24 09:14 UTC: best combined ask $1.00, no arb. ~0.22 req/s steady state | `swinglock/scanner/`, `docs/scanner_live.md`, phat-d0/Tennis_Model#3 |
+| 9 | Dashboard v1 | Stdlib server + static page (no CDN), alerts / markets / positions, stale + offline banners; Lead-verified at 390×844 and 1280×800 light/dark on real scanner output, no errors or overflow | `swinglock/dashboard/`, phat-d0/Tennis_Model#5 |
 | 6 | Team set up | 4 role sessions started 2026-10-24 on `team/*` branches (IDs in `docs/team/lead.md`) | phat-d0/Tennis_Model#1 |
 
 ## Live configuration
@@ -36,12 +38,13 @@ updates in their PR descriptions. Durable rules and facts are in `CLAUDE.md`.
 ## Next steps (in order)
 1. Data: Kalshi client + normalizer + backfill → `data-store`.
 2. Backtest: arb scan + swing grid on the backfill; then walk-forward gate; then findings report.
-3. Scanner: discovery + scan loop + alerts + positions + `state.json`.
-4. Dashboard: page from a sample `state.json`, then wired to the scanner.
-5. Data: order-book recorder; live score/state join; The Odds API (DraftKings Sportsbook tennis
+3. Data: order-book recorder; live score/state join; The Odds API (DraftKings Sportsbook tennis
    h2h) + Polymarket US collectors for the cross-venue check.
-6. Scanner: VPS deploy (Docker + systemd), cross-venue alerts.
-7. Lead: README covering how to run each part.
+4. Scanner: VPS deploy (`deploy/`: scanner, recorder, dashboard as services), then cross-venue
+   alerts. A WebSocket upgrade needs a read-scope Kalshi API key from the owner.
+5. Lead: consolidate the scanner's GET-only client (`swinglock/scanner/client.py`) with Data's
+   collector client once it lands.
+6. Lead: README covering how to run each part.
 
 ## How to continue in a new session
 Read `CLAUDE.md`, this file, and your brief in `docs/team/`. Check open PRs into `main` and the

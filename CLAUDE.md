@@ -97,7 +97,9 @@ published on the `data-store` branch):
 - Kalshi: a match event has one market per player. Effective ask(A) =
   min(YES ask on A's market, NO ask on B's market); collectors resolve it.
 
-**Live state** (`data/live/state.json`, written by Scanner, read by Dashboard):
+**Live state** (`data/live/state.json`, written atomically by Scanner, read by Dashboard;
+`combined_with_fees` = cost per matched contract incl. fees at the arb size; "live" opportunity
+= `arb_profit > 0` or `lock.locked_pnl > 0`):
 ```json
 {"generated_at": "ISO-8601 UTC", "poll_seconds": 5, "venue": "kalshi",
  "matches": [{"match_id": "", "series": "", "tier": "", "player_a": "", "player_b": "",
@@ -140,6 +142,9 @@ the newest 200. Format changes go through the Lead (Scanner proposes, Dashboard 
   Orderbook returns **bids only** (ascending; best = last). YES ask = 1 − best NO bid;
   NO ask = 1 − best YES bid. ask(A) = min(YES ask on A, NO ask on B). YES_A+YES_B and NO_A+NO_B
   both pay exactly $1. `GET /markets/orderbooks` fetches both legs in one call.
+- `GET /events?with_milestones=true` returns a top-level `milestones` list mapped to events by
+  `primary_event_tickers` (start dates without per-event calls). Scanner A/B convention: A = the
+  market ticker that sorts first.
 - Tournament name: `event.product_metadata.competition`. Tour/round/best_of/scheduled start:
   `GET /milestones?related_event_ticker=`. Live score: `GET /live_data/milestone/{id}` (current
   snapshot only, no history).
@@ -148,7 +153,8 @@ the newest 200. Format changes go through the Lead (Scanner proposes, Dashboard 
   matches settle at a "fair price", not 0/1; a retirement after the first ball settles the
   retiring player's market to No.
 - Auth: REST market data is public; **every WebSocket connection needs a signed API key**.
-  Unauthenticated REST hit a 429 after ~8 rapid calls, so throttle hard.
+  Unauthenticated REST hit a 429 after ~8 rapid calls, so throttle hard (seen again on a single
+  scanner pass on 2026-10-24; the scanner backs off and spaces requests ≥ 1 s).
 - **Kalshi Data Terms of Use** (kalshi-public-docs PDF) restrict "Kalshi Data" to personal
   non-commercial use and prohibit compiling databases, bulk script retrieval, redistribution,
   and ML/AI use. Status of our collection: see Owner's standing rules / WORK_PLAN open items.
@@ -205,3 +211,6 @@ the newest 200. Format changes go through the Lead (Scanner proposes, Dashboard 
 - 2026-10-24: Team set up (CLAUDE.md Team section, WORK_PLAN.md, role briefs, team/* branches),
   merged in phat-d0/Tennis_Model#1; Data, Backtest, Scanner, Dashboard sessions started.
 - 2026-10-24: Walk-forward gate merged (phat-d0/Tennis_Model#2); 37 tests passing.
+- 2026-10-24: Scanner v1 (phat-d0/Tennis_Model#3) and Dashboard v1 (phat-d0/Tennis_Model#5) merged;
+  58 tests passing. Run: `python -m swinglock.scanner [--once]`,
+  `python -m swinglock.dashboard --state data/live/state.json` (or `--sample`).
