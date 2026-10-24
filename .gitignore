@@ -10,4 +10,5 @@ positions.csv
 .env
 *.pem
 *.key
+data/live/
 reports/*.csv
