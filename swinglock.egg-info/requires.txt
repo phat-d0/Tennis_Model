@@ -1,9 +1,0 @@
-requests
-pandas
-pyarrow
-pyyaml
-cryptography
-websockets
-
-[dev]
-pytest
