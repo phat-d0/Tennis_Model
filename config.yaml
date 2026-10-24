@@ -45,6 +45,11 @@ scanner:
     - KXITFMATCH
     - KXITFWMATCH
   alert_log: data/alerts.log
+  discovery_seconds: 300        # how often to re-list open matches
+  min_request_interval: 1.0     # seconds between Kalshi requests
+  realert_min_improvement: 0.05 # dollars of extra edge before re-alerting an open episode
+  realert_min_improvement_pct: 0.25
+  episode_gap_seconds: 30       # an opportunity gone this long starts a new episode
 
 data:
   raw_dir: data/raw
