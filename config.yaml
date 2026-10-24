@@ -26,7 +26,9 @@ backtest:
   max_staleness_s: 60           # max age of the other side's quote in the A/B as-of join
   # Entry filters (null = off). min_minutes_to_close is LOOKAHEAD: diagnostic only, never gate-valid.
   min_entry_ask: null           # skip entries quoted below this (near-decided matches)
-  max_minutes_from_start: null  # only enter up to N minutes after scheduled start (known live)
+  min_minutes_from_start: null  # entry window after scheduled start, in minutes (known live;
+  max_minutes_from_start: null  #   negative = pre-match). 0 and 60 = first hour of play only
+  entry_phase: any              # any | live | pre
   min_minutes_to_close: null
   walkforward:
     min_train_months: 1
