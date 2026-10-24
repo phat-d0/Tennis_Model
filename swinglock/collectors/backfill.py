@@ -27,12 +27,12 @@ import pandas as pd
 
 from ..config import load_config
 from ..schema import MATCH_COLUMNS, QUOTE_COLUMNS, empty, validate_quotes
-from .kalshi import KalshiClient, KalshiError
-from .kalshi_normalize import DEFAULT_MAX_CARRY_S, candles_to_quotes, match_row, matches_frame, ts
+from .kalshi import KalshiClient, KalshiError, batch_candle_params
+from .kalshi_normalize import DEFAULT_MAX_CARRY_S, candles_to_quotes, match_row, matches_frame, order_markets, tier, ts
 
 log = logging.getLogger("swinglock.backfill")
 
-CHUNK_MIN = 4900   # minutes per candle request: 2 legs × 4900 < the 10,000-candle cap
+CHUNK_MIN = 4900   # minutes per candle request: 2 legs × 4,901 requested candles ≤ 10,000
 PAD_S = 60
 
 
@@ -52,6 +52,84 @@ def fetch_candles(client: KalshiClient, tickers: list[str], start, end, historic
             for t, cs in client.batch_candles(tickers, a, b).items():
                 out.setdefault(t, []).extend(cs)
     return out
+
+
+# GET /markets/candlesticks rejects (HTTP 400) a request whose *requested* candles,
+# tickers × window minutes, exceed 10,000 ("requested candlesticks across all markets:
+# 10002, max candlesticks: 10000"; checked live 2026-10-24). Returned candles don't matter.
+BATCH_CANDLE_CAP = 10_000
+MAX_TICKERS = 100
+
+
+def _span(r: dict) -> tuple[int, int]:
+    return int(r["open"].timestamp()) - PAD_S, int(r["close"].timestamp()) + PAD_S
+
+
+def requested_candles(n_tickers: int, lo: int, hi: int, period_s: int = 60) -> int:
+    return n_tickers * ((hi - lo) // period_s + 1)
+
+
+def plan_batches(items: list[dict]) -> list[list[dict]]:
+    """Group live (post-cutoff) matches, in open-time order, into shared candle requests:
+    ≤ 100 tickers and tickers × union-window minutes within the 10,000 cap. Matches that
+    open and close close together share a request (typically 2-3 same-day matches)."""
+    out, cur, lo, hi = [], [], None, None
+    for r in sorted(items, key=lambda r: (r["open"], r["close"])):
+        a, b = _span(r)
+        if cur:
+            n, lo2, hi2 = 2 * (len(cur) + 1), min(lo, a), max(hi, b)
+            if n > MAX_TICKERS or requested_candles(n, lo2, hi2) > BATCH_CANDLE_CAP:
+                out.append(cur)
+                cur = []
+        if not cur:
+            cur, lo, hi = [r], a, b
+        else:
+            cur.append(r)
+            lo, hi = min(lo, a), max(hi, b)
+    if cur:
+        out.append(cur)
+    return out
+
+
+def prefetch_batch(client: KalshiClient, batch: list[dict], stats: dict) -> None:
+    """Fetch candles for several live matches in one call and store each match's share in the
+    cache under the exact per-match request fetch_candles() makes, so it becomes a cache hit
+    (and reruns stay cache hits even if the matches are grouped differently)."""
+    todo = []
+    for r in batch:
+        w = windows(r["open"], r["close"])
+        if len(w) == 1 and not client.has_cached(
+                "/markets/candlesticks", batch_candle_params(r["tickers"], *w[0])):
+            todo.append(r)
+    if len(todo) < 2:
+        return  # nothing to gain; fetch_candles does the single request
+    lo = min(_span(r)[0] for r in todo)
+    hi = max(_span(r)[1] for r in todo)
+    tickers = [t for r in todo for t in r["tickers"]]
+    try:
+        d = client.get("/markets/candlesticks", batch_candle_params(tickers, lo, hi), cache=False)
+    except KalshiError as err:
+        stats["group_errors"] += 1
+        log.warning("group of %d matches failed (%s); falling back to per-match", len(todo), str(err)[:200])
+        return
+    got = {m["market_ticker"]: m.get("candlesticks") or [] for m in d.get("markets") or []}
+    stats["grouped_matches"] += len(todo)
+    for r in todo:
+        a, b = windows(r["open"], r["close"])[0]
+        markets = [{"market_ticker": t,
+                    "candlesticks": [c for c in got.get(t, []) if a <= c["end_period_ts"] <= b]}
+                   for t in r["tickers"]]
+        client.store("/markets/candlesticks", batch_candle_params(r["tickers"], a, b), {"markets": markets})
+
+
+def priority(r: dict, now: pd.Timestamp, recent_days: int) -> int:
+    """0: recent ATP/WTA · 1: recent Challenger · 2: everything else (older, ITF)."""
+    recent = r["close"] >= now - pd.Timedelta(days=recent_days)
+    if recent and r["tier"] in ("atp", "wta"):
+        return 0
+    if recent and r["tier"] == "challenger":
+        return 1
+    return 2
 
 
 def scheduled_starts(client: KalshiClient, since: str | None) -> dict[str, str]:
@@ -94,9 +172,11 @@ def collect_series(client: KalshiClient, series: str, cutoff: pd.Timestamp, sinc
         settled = [ts(m.get("settlement_ts")) for m in mk]
         if not is_hist and all(pd.notna(s) and s < cutoff for s in settled):
             is_hist = True
+        a, b = order_markets(e["event_ticker"], mk)
         out.append({"event": e, "markets": mk, "historical": is_hist, "series": meta,
-                    "fee_changes": fee_changes})
-    out.sort(key=lambda r: max(ts(m.get("close_time")) for m in r["markets"]), reverse=True)
+                    "fee_changes": fee_changes, "tier": tier(series), "close": close,
+                    "open": min(ts(m.get("open_time")) for m in mk), "tickers": [a["ticker"], b["ticker"]]})
+    out.sort(key=lambda r: r["close"], reverse=True)
     return out[:max_matches] if max_matches else out
 
 
@@ -129,27 +209,61 @@ def write_outputs(out_dir: Path, rows: list[dict], quotes: list[pd.DataFrame]):
 
 def run(series_list: list[str], out_dir: Path, raw_dir: Path, since: str | None = None,
         max_matches: int | None = None, min_interval_s: float = 0.5,
-        max_carry_s: float | None = DEFAULT_MAX_CARRY_S) -> dict:
+        max_carry_s: float | None = DEFAULT_MAX_CARRY_S, recent_days: int = 183,
+        checkpoint_every: int = 1000) -> dict:
+    """Work order: recent (≤ recent_days) ATP+WTA, then recent Challenger, then the rest,
+    newest first within each group. Outputs are rewritten after each group and every
+    `checkpoint_every` matches, so the finished part is usable while the rest runs."""
     client = KalshiClient(raw_dir=raw_dir, min_interval_s=min_interval_s)
     t0 = time.time()
+    now = pd.Timestamp.now(tz="UTC")
     cutoff = ts(client.historical_cutoff()["market_settled_ts"])
     since_ts = ts(since) if since else None
-    stats: dict = {"events_listed": {}, "skipped": defaultdict(int)}
+    stats: dict = {"events_listed": {}, "skipped": defaultdict(int), "group_errors": 0,
+                   "grouped_matches": 0}
     starts = scheduled_starts(client, since)
-    rows, quotes = [], []
+    todo = []
     for s in series_list:
-        todo = collect_series(client, s, cutoff, since_ts, max_matches, stats)
-        log.info("%s: %d settled matches to normalize", s, len(todo))
-        for i, r in enumerate(todo, 1):
-            row, q = normalize_one(client, r, starts, stats, max_carry_s)
+        found = collect_series(client, s, cutoff, since_ts, max_matches, stats)
+        log.info("%s: %d settled matches listed", s, len(found))
+        todo += found
+    for r in todo:
+        r["prio"] = priority(r, now, recent_days)
+    todo.sort(key=lambda r: (r["prio"], -r["close"].timestamp()))
+    groups = defaultdict(int)
+    for r in todo:
+        groups[r["prio"]] += 1
+    log.info("work order: %s matches by priority group (0 recent ATP/WTA, 1 recent Challenger, 2 rest)",
+             dict(groups))
+
+    rows, quotes = [], []
+    matches, q = matches_frame([]), empty(QUOTE_COLUMNS)
+    i = 0
+    for prio in sorted(groups):
+        part = [r for r in todo if r["prio"] == prio]
+        # Live matches go in batches of several per candle request; archived ones can't.
+        batches = plan_batches([r for r in part if not r["historical"]])
+        batch_of = {id(r): bt for bt in batches for r in bt}
+        done_batches: set[int] = set()
+        for r in part:
+            bt = batch_of.get(id(r))
+            if bt is not None and id(bt) not in done_batches:
+                prefetch_batch(client, bt, stats)
+                done_batches.add(id(bt))
+            row, qq = normalize_one(client, r, starts, stats, max_carry_s)
             rows.append(row)
-            quotes.append(q)
+            quotes.append(qq)
+            i += 1
             if i % 50 == 0:
-                log.info("%s %d/%d matches, %d requests (%d cached, %d 429s)", s, i, len(todo),
-                         client.requests_made, client.cache_hits, client.rate_limited)
-        # Checkpoint after each series so finished series are usable while later ones run.
+                log.info("group %d: %d/%d matches overall, %d requests (%d cached, %d 429s, %d grouped)",
+                         prio, i, len(todo), client.requests_made, client.cache_hits,
+                         client.rate_limited, stats["grouped_matches"])
+            if i % checkpoint_every == 0:
+                matches, q = write_outputs(out_dir, rows, quotes)
+                log.info("checkpoint: wrote %d matches, %d quote rows", len(matches), len(q))
         matches, q = write_outputs(out_dir, rows, quotes)
-        log.info("%s done: wrote %d matches, %d quote rows", s, len(matches), len(q))
+        log.info("group %d done: wrote %d matches, %d quote rows (%d requests so far)",
+                 prio, len(matches), len(q), client.requests_made)
 
     summary = summarize(matches, q, cutoff)
     summary.update({
@@ -157,6 +271,7 @@ def run(series_list: list[str], out_dir: Path, raw_dir: Path, since: str | None 
         "series": series_list, "since": since, "max_carry_s": max_carry_s,
         "events_listed": stats["events_listed"],
         "skipped": dict(stats["skipped"]), "requests": client.requests_made,
+        "grouped_matches": stats["grouped_matches"], "group_errors": stats["group_errors"],
         "cache_hits": client.cache_hits, "rate_limited_429": client.rate_limited,
         "final_min_interval_s": client.min_interval_s, "elapsed_s": round(time.time() - t0),
     })
@@ -191,10 +306,12 @@ def main(argv: list[str] | None = None) -> None:
     ap.add_argument("--out", type=Path, default=Path(cfg["data"]["processed_dir"]) / "kalshi")
     ap.add_argument("--raw", type=Path, default=Path(cfg["data"]["raw_dir"]) / "kalshi")
     ap.add_argument("--min-interval", type=float, default=0.5, help="seconds between requests")
+    ap.add_argument("--recent-days", type=int, default=183, help="'recent' window for the work order")
     a = ap.parse_args(argv)
     logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
     carry = (cfg.get("data") or {}).get("max_carry_s", DEFAULT_MAX_CARRY_S)
-    print(json.dumps(run(a.series, a.out, a.raw, a.since, a.max_matches, a.min_interval, carry),
+    print(json.dumps(run(a.series, a.out, a.raw, a.since, a.max_matches, a.min_interval, carry,
+                         a.recent_days),
                      indent=1, default=str))
 
 

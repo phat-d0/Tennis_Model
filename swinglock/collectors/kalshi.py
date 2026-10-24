@@ -35,6 +35,11 @@ class KalshiError(RuntimeError):
         self.status = status
 
 
+def batch_candle_params(tickers: list[str], start_ts: int, end_ts: int, period: int = 1) -> dict:
+    return {"market_tickers": ",".join(tickers), "start_ts": int(start_ts), "end_ts": int(end_ts),
+            "period_interval": period}
+
+
 class KalshiClient:
     def __init__(self, base_url: str = BASE_URL, raw_dir: str | Path | None = "data/raw/kalshi",
                  min_interval_s: float = 0.5, max_interval_s: float = 5.0, max_retries: int = 6,
@@ -85,6 +90,14 @@ class KalshiClient:
         with gzip.open(tmp, "wt") as f:
             json.dump(env, f)
         tmp.replace(p)  # atomic, so an interrupted run never leaves a half file
+
+    def has_cached(self, path: str, params: dict[str, Any] | None) -> bool:
+        p = self.cache_path(path, params)
+        return p is not None and p.exists()
+
+    def store(self, path: str, params: dict[str, Any] | None, data: dict) -> None:
+        """Write `data` into the cache as if it were the response to GET path?params."""
+        self._write_cache(self.cache_path(path, params), self.base_url + path, params, data)
 
     # -- network -----------------------------------------------------------------------
     def _throttle(self) -> None:
@@ -186,9 +199,7 @@ class KalshiClient:
     def batch_candles(self, tickers: list[str], start_ts: int, end_ts: int,
                       period: int = 1) -> dict[str, list[dict]]:
         """Live (post-cutoff) markets, several tickers per call. Max 10,000 candles total."""
-        d = self.get("/markets/candlesticks", {"market_tickers": ",".join(tickers),
-                                               "start_ts": int(start_ts), "end_ts": int(end_ts),
-                                               "period_interval": period})
+        d = self.get("/markets/candlesticks", batch_candle_params(tickers, start_ts, end_ts, period))
         return {m["market_ticker"]: m.get("candlesticks") or [] for m in d.get("markets") or []}
 
     def historical_candles(self, ticker: str, start_ts: int, end_ts: int,
