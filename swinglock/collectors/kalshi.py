@@ -30,6 +30,8 @@ log = logging.getLogger(__name__)
 
 
 class KalshiError(RuntimeError):
+    """HTTP error from Kalshi; status 0 means the network failed (connection/proxy/timeout)."""
+
     def __init__(self, status: int, url: str, body: str = ""):
         super().__init__(f"HTTP {status} for {url}: {body[:300]}")
         self.status = status
@@ -123,7 +125,7 @@ class KalshiClient:
                 r = self.session.get(url, params=params, timeout=self.timeout_s)
             except requests.RequestException as e:
                 if attempt == self.max_retries:
-                    raise
+                    raise KalshiError(0, url, f"network error: {e}") from e
                 log.warning("network error on %s (%s); retry in %.0fs", path, e, backoff)
                 self._sleep(backoff)
                 backoff = min(backoff * 2, 60)
