@@ -421,3 +421,23 @@ def test_score_row_refuses_unmapped_competitors():
     assert score_row("M", live, {}, "2026-10-24") is None
     c1 = live["details"]["competitor1_id"]
     assert score_row("M", live, {c1: "A"}, "2026-10-24") is None
+
+
+def test_settle_values():
+    row = match_row(VANMUS, VANMUS["markets"], SERIES, FEE_CHANGES)
+    assert (row["settle_a"], row["settle_b"]) == (0.0, 1.0)        # Musetti (B) won
+    hist = load("historical_markets_atp_match_2026-08-24.json")["markets"]
+    ev = {"event_ticker": "KXATPMATCH-26AUG24SONHER", "series_ticker": "KXATPMATCH"}
+    row = match_row(ev, hist, SERIES, FEE_CHANGES)
+    assert (row["settle_a"], row["settle_b"]) == (1.0, 0.0)        # Sonego (A) won
+    # not-started match: both legs settle "scalar" at a fair price (synthesized from the
+    # pattern seen in 39/39 backfilled cases, e.g. KXATPMATCH-26SEP29MOLRIN 0.40/0.60)
+    ma, mb = (dict(m) for m in VANMUS["markets"])
+    ma.update(result="scalar", settlement_value_dollars="0.4000")
+    mb.update(result="scalar", settlement_value_dollars="0.6000")
+    row = match_row(VANMUS, [ma, mb], SERIES, FEE_CHANGES)
+    assert (row["settle_a"], row["settle_b"]) == (0.4, 0.6) and pd.isna(row["winner"])
+    open_row = match_row(FARBRU, FARBRU["markets"], SERIES, FEE_CHANGES)
+    assert np.isnan(open_row["settle_a"]) and np.isnan(open_row["settle_b"])
+    df = matches_frame([open_row, row])
+    assert df["settle_a"].dtype == "float64"
