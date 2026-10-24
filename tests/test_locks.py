@@ -98,3 +98,14 @@ def test_max_lock_price():
     assert edge == pytest.approx(0.0, abs=1e-6)
     assert 0.55 < p < 0.573
     assert max_lock_price(1.0, KALSHI) == 0.0
+
+
+def test_pnl_settled_fair_price():
+    h = _example()
+    assert h.pnl_settled(1.0, 0.0) == pytest.approx(h.pnl_if("A"))
+    assert h.pnl_settled(0.0, 1.0) == pytest.approx(h.pnl_if("B"))
+    # not-started match settled at fair prices 0.43 / 0.57: an unlocked position is neither win nor loss
+    assert h.pnl_settled(0.43, 0.57) == pytest.approx(11.44 * 0.43 + 27.62 * 0.57 - h.total_cost)
+    # a locked (balanced) holding still pays exactly its contract count, since fair prices sum to $1
+    locked = Holding.from_avg(10, 0.45, 10, 0.50)
+    assert locked.pnl_settled(0.43, 0.57) == pytest.approx(10 - locked.total_cost)

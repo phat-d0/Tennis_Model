@@ -30,6 +30,8 @@ MATCH_COLUMNS = {
     "open_time": "datetime64[ns, UTC]",
     "close_time": "datetime64[ns, UTC]",
     "winner": "string",            # "A" | "B" | <NA> if unsettled/void
+    "settle_a": "float64",         # dollars paid per side-A contract at settlement: 1/0 normally,
+    "settle_b": "float64",         # a fair price for not-started matches (a+b = 1), NaN if unsettled
     "fee_type": "string",
     "fee_multiplier": "float64",
 }

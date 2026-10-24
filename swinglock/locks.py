@@ -101,6 +101,11 @@ class Holding:
         """Settlement P&L if `winner` wins."""
         return self.contracts(winner) - self.total_cost
 
+    def pnl_settled(self, pay_a: float, pay_b: float) -> float:
+        """Settlement P&L when each side pays `pay_a` / `pay_b` per contract (1/0 for a normal
+        result; Kalshi's fair prices for a match that never started, which sum to $1)."""
+        return self.contracts_a * pay_a + self.contracts_b * pay_b - self.total_cost
+
     @property
     def locked_pnl(self) -> float:
         """Worst-case settlement P&L (positive => already locked)."""
