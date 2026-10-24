@@ -1,0 +1,77 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="color-scheme" content="light dark">
+<title>Swing-Lock Scanner</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<header class="top">
+  <div class="top-row">
+    <h1>Swing-Lock <span class="venue" id="venue"></span></h1>
+    <span class="pill" id="status" role="status">Loading…</span>
+  </div>
+  <div class="top-row meta">
+    <span id="stamp">No data yet</span>
+    <label class="theme">Theme
+      <select id="theme" aria-label="Colour theme">
+        <option value="auto">Auto</option>
+        <option value="light">Light</option>
+        <option value="dark">Dark</option>
+      </select>
+    </label>
+  </div>
+</header>
+
+<div class="banner" id="banner" hidden></div>
+
+<main>
+  <section class="summary" id="summary" aria-label="Summary"></section>
+
+  <section aria-labelledby="h-alerts">
+    <div class="sec-head"><h2 id="h-alerts">Alerts</h2><span class="hint">newest first</span></div>
+    <ol class="alerts" id="alerts"></ol>
+  </section>
+
+  <section aria-labelledby="h-markets">
+    <div class="sec-head">
+      <h2 id="h-markets">Markets</h2>
+      <label class="sort">Sort
+        <select id="sort" aria-label="Sort markets">
+          <option value="cwf">Combined + fees</option>
+          <option value="combined">Combined</option>
+          <option value="arb">Arb profit</option>
+          <option value="tier">Tier</option>
+          <option value="phase">Phase</option>
+        </select>
+      </label>
+    </div>
+    <table class="grid markets">
+      <thead><tr>
+        <th>Match</th><th class="num">Ask A</th><th class="num">Ask B</th>
+        <th class="num">Depth A / B</th><th class="num">Combined</th>
+        <th class="num">+ fees</th><th class="num">Arb</th>
+      </tr></thead>
+      <tbody id="markets"></tbody>
+    </table>
+  </section>
+
+  <section aria-labelledby="h-pos">
+    <div class="sec-head"><h2 id="h-pos">Positions</h2><span class="hint">lock = buy the short side to equal counts</span></div>
+    <table class="grid positions">
+      <thead><tr>
+        <th>Match</th><th class="num">Held A</th><th class="num">Held B</th>
+        <th class="num">P&amp;L if A</th><th class="num">P&amp;L if B</th>
+        <th class="num">Contracts to buy</th><th class="num">Cost</th><th class="num">Locked P&amp;L</th>
+      </tr></thead>
+      <tbody id="positions"></tbody>
+    </table>
+  </section>
+
+  <p class="foot">Read-only view of the scanner's <code>state.json</code>. Prices are asks; costs include fees. No orders are placed from here.</p>
+</main>
+<script src="app.js"></script>
+</body>
+</html>
