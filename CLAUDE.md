@@ -197,4 +197,5 @@ the newest 200. Format changes go through the Lead (Scanner proposes, Dashboard 
 - 2026-10-24: Venue research done (DK: no sanctioned access; Polymarket intl + US read APIs public).
 - 2026-10-24: Kalshi API research done (docs/research/kalshi_api.md, 13 fixtures).
 - 2026-10-24: Backtest module v1 (align, arb, swing, metrics, grid, CLI); 28 tests passing.
-- 2026-10-24: Team set up (CLAUDE.md Team section, WORK_PLAN.md, role briefs, team/* branches).
+- 2026-10-24: Team set up (CLAUDE.md Team section, WORK_PLAN.md, role briefs, team/* branches),
+  merged in phat-d0/Tennis_Model#1; Data, Backtest, Scanner, Dashboard sessions started.
