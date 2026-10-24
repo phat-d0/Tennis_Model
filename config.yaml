@@ -24,6 +24,13 @@ backtest:
   contracts_per_entry: 10
   min_arb_profit: 0.0           # dollars per matched contract, after fees
   max_staleness_s: 60           # max age of the other side's quote in the A/B as-of join
+  walkforward:
+    min_train_months: 1
+    train_months: null          # null = expanding window; N = rolling last N months
+    min_train_trades: 10
+    objective: total_pnl        # or mean_pnl
+    select_slippage: 0.01       # choose rules on training data at 1c slippage
+    slippages: [0.0, 0.01]      # out-of-sample evaluation
 
 scanner:
   poll_seconds: 5

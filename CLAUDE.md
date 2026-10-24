@@ -190,6 +190,11 @@ the newest 200. Format changes go through the Lead (Scanner proposes, Dashboard 
 - 2026-10-24: Backtest: as-of join with 60s max staleness (`backtest.max_staleness_s`);
   settlement time = last aligned quote; default swing mode = first side to trigger; arb profit =
   one fill at the best observation's depth (1 contract if depth unknown, so fees are cent-heavy).
+- 2026-10-24: Walk-forward: monthly folds by each match's first observation; expanding window;
+  select on total P&L at 1¢ slippage with ≥ 10 training trades; training trades must settle before
+  the test month; positive-folds check at the worst slippage, and total OOS P&L > 0 at every
+  slippage; CI = match-clustered bootstrap. Per-trade CSVs in `reports/` are gitignored (Kalshi
+  data is private); only markdown write-ups are committed.
 
 ## Changelog
 - 2026-10-24: Project scaffold, core math + tests (12 passing), config, schema, CLAUDE.md.
@@ -197,4 +202,6 @@ the newest 200. Format changes go through the Lead (Scanner proposes, Dashboard 
 - 2026-10-24: Venue research done (DK: no sanctioned access; Polymarket intl + US read APIs public).
 - 2026-10-24: Kalshi API research done (docs/research/kalshi_api.md, 13 fixtures).
 - 2026-10-24: Backtest module v1 (align, arb, swing, metrics, grid, CLI); 28 tests passing.
-- 2026-10-24: Team set up (CLAUDE.md Team section, WORK_PLAN.md, role briefs, team/* branches).
+- 2026-10-24: Team set up (CLAUDE.md Team section, WORK_PLAN.md, role briefs, team/* branches),
+  merged in phat-d0/Tennis_Model#1; Data, Backtest, Scanner, Dashboard sessions started.
+- 2026-10-24: Walk-forward gate merged (phat-d0/Tennis_Model#2); 37 tests passing.

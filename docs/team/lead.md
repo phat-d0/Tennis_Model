@@ -12,10 +12,10 @@ All tagged `tennis-team`. Message a role with `send_message` to its session ID.
 | Role | Session ID | Branch |
 |---|---|---|
 | Lead | session_01VUWuRjDpFjU45QtmYNdZnn | `team/lead` |
-| Data | (pending) | `team/data` |
-| Backtest | (pending) | `team/backtest` |
-| Scanner | (pending) | `team/scanner` |
-| Dashboard | (pending) | `team/ui` |
+| Data | session_012UqmiYsmGYagVio6B9yTWW | `team/data` |
+| Backtest | session_011TMahQYKejjndRUutywyxf | `team/backtest` |
+| Scanner | session_01BktfhyVLRfRy1pPtSyFLWZ | `team/scanner` |
+| Dashboard | session_01W1DSUJuc7wQcHRTpWk2cX2 | `team/ui` |
 
 ## Review checklist (every PR)
 1. The diff stays in the role's files; shared-file changes are minimal and flagged.
