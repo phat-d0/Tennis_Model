@@ -46,7 +46,13 @@ observations, 12% live; 161 fair-price settlements included via settle_a/b):**
   (95% CI −0.37 to −0.28) at 0¢, −$0.47 (CI −0.52 to −0.43) at 1¢.
 - `entry_phase: live`: WF FAIL 0/6, OOS mean −$0.27 (0¢) / −$0.43 (1¢).
   First hour of play only (window 0–60 min): WF FAIL 0/6, OOS mean −$0.27 / −$0.42; 3,108 OOS trades.
-- **Answer so far:** on 6 months of ATP/WTA candles, neither true arbs nor swing locks have an edge
+- **INTERIM Challenger (3,000 matches: ATP Challenger 2,298 + WTA 125 702; closes 2026-08-24 → 10-24;
+  1.25 M aligned obs, 29% live; 51 fair-price settlements):** combined < $1 before fees in 1.97% of obs.
+  After fees: 31 episodes in 15 matches at 0¢ ($0.71 total 1-contract profit, best 6¢ live); 17 at 1¢
+  ($0.23); leg-age 60 s: 18 episodes, all live, $0.34. No 20¢ stale outliers like ATP/WTA. Swing grid:
+  every rule negative (best first/0.20/0.96: 2,934 trades, 58% locked, −$1,067 at 0¢). Walk-forward FAIL
+  0/2 folds (default −$0.38/trade, live-only −$0.32, first hour −$0.31 at 0¢). Same picture as ATP/WTA.
+- **Answer so far:** on 6 months of ATP/WTA candles (and an interim 2 months of Challenger), neither true arbs nor swing locks have an edge
   after fees and the ask spread. The gate fails on sign, not just sample size.
 
 **Earlier read (superseded by the group-0 read above):**
