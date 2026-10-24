@@ -91,7 +91,8 @@ tests/                      pytest; fixtures/ holds trimmed real API responses
 **Historical/normalized data** (`swinglock/schema.py`, parquet under `data/processed/<venue>/`,
 published on the `data-store` branch):
 - `matches`: match_id, venue, series, tier, tournament, player_a/b, instrument_a/b,
-  scheduled_start, open/close_time, winner (A/B/NA), fee_type, fee_multiplier.
+  scheduled_start, open/close_time, winner (A/B/NA), settle_a/settle_b (dollars paid per contract:
+  1/0, or the fair price for a not-started match; NaN if unsettled), fee_type, fee_multiplier.
 - `quotes`: ts, match_id, venue, side (A/B), ask, ask_size, bid, bid_size, ask_source,
   source (orderbook|candle|ticker|manual). Prices in dollars.
 - Kalshi: a match event has one market per player. Effective ask(A) =
@@ -154,8 +155,9 @@ the newest 200. Format changes go through the Lead (Scanner proposes, Dashboard 
   snapshot only, no history).
 - Markets settled before `GET /historical/cutoff` (2026-08-25 as of 2026-10-24) are only in
   `/historical/*`; historical candles drop the `_dollars`/`_fp` field suffixes. Not-started
-  matches settle at a "fair price", not 0/1; a retirement after the first ball settles the
-  retiring player's market to No.
+  matches settle at a "fair price", not 0/1 (**the two legs' fair prices sum to exactly $1**: 39/39
+  checked, so a held lock still pays $1; 3.9% of recent ATP/WTA matches); a retirement after the
+  first ball settles the retiring player's market to No.
 - Kalshi 1-min candles are **sparse** (minutes with no change are omitted; VanAssche–Musetti had
   786 candles over 1,745 min). **Verified 2026-10-24 (phat-d0/Tennis_Model#11): candles are written
   on quote changes, not only on trades** (26,786 zero-volume candles with a changed bid/ask; live
@@ -226,6 +228,8 @@ the newest 200. Format changes go through the Lead (Scanner proposes, Dashboard 
 - 2026-10-24: Backtest: as-of join with 60s max staleness (`backtest.max_staleness_s`);
   settlement time = last aligned quote; default swing mode = first side to trigger; arb profit =
   one fill at the best observation's depth (1 contract if depth unknown, so fees are cent-heavy).
+- 2026-10-24: Not-started matches stay in the backtest: positions settle at `settle_a/settle_b`
+  via `Holding.pnl_settled`, not dropped (dropping them would bias unlocked P&L).
 - 2026-10-24: Walk-forward: monthly folds by each match's first observation; expanding window;
   select on total P&L at 1¢ slippage with ≥ 10 training trades; training trades must settle before
   the test month; positive-folds check at the worst slippage, and total OOS P&L > 0 at every
@@ -266,3 +270,6 @@ the newest 200. Format changes go through the Lead (Scanner proposes, Dashboard 
   (61,795 total). 93 tests passing.
 - 2026-10-24: Live-score design (phat-d0/Tennis_Model#20) and recording (phat-d0/Tennis_Model#21)
   merged; `recorder.score_poll_s: 60`. 98 tests passing.
+- 2026-10-24: Data checkpoint (phat-d0/Tennis_Model#23): 1,000 recent matches (WTA 577, ATP 423;
+  closes 2026-09-06 → 10-24), 1.80 M quote rows, 0.37% NaN asks. Schema: `settle_a/settle_b` added;
+  `Holding.pnl_settled`. 99 tests passing.

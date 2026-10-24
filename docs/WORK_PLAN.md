@@ -22,6 +22,7 @@ updates in their PR descriptions. Durable rules and facts are in `CLAUDE.md`.
 | 15 | Order-book recorder | 10 s snapshots of all open match books (top-5 depth), daily parquet; trial: 90 matches, min combined $0.99, nothing below fees | `swinglock/collectors/recorder.py`, phat-d0/Tennis_Model#17 |
 | 16 | Network-outage handling | Backfill pauses and retries instead of saving quote-less matches | phat-d0/Tennis_Model#19 |
 | 17 | Live score recording | Recorder logs set/game/point state every 60 s via `/live_data/batch`, A/B mapped, change-only | `docs/data_live_score.md`, phat-d0/Tennis_Model#20, #21 |
+| 18 | Backfill checkpoint | 1,000 recent ATP/WTA matches, 1.80 M quote rows; 3.9% not started (fair prices sum to $1) | `docs/data_inventory.md`, phat-d0/Tennis_Model#23 |
 | 6 | Team set up | 4 role sessions started 2026-10-24 on `team/*` branches (IDs in `docs/team/lead.md`) | phat-d0/Tennis_Model#1 |
 
 ## Live configuration
