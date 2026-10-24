@@ -10,6 +10,12 @@ limit splits it). Duration runs from first to last arb observation, so it is a l
 dollar profit is ONE fill at the best observation's depth (resting liquidity can't be
 assumed to refill). Sampled candle asks overstate fillability and miss arbs that open and
 close between samples.
+
+Stale legs: `leg_age_s` is the older leg's age (seconds its effective ask has gone unchanged,
+see align). With config `backtest.arb_max_leg_age_s` set (default off), an observation only
+counts as an arb when both legs are at most that old, which screens out a carried, stale leg
+paired with a fresh one. Unchanged isn't proof of stale (candles are written on quote changes,
+so a quiet leg can be a real resting offer), so this is a stricter count, not the true one.
 """
 
 from __future__ import annotations
@@ -24,7 +30,7 @@ from ..locks import true_arb
 from .align import match_fees, staleness_s
 
 EPISODE_COLUMNS = ["match_id", "start", "end", "duration_s", "n_obs", "phase", "best_edge",
-                   "min_combined", "contracts", "profit", "depth_known"]
+                   "min_combined", "contracts", "profit", "depth_known", "leg_age_s"]
 SUMMARY_COLUMNS = ["match_id", "n_obs", "n_arb", "frac_arb", "n_episodes", "best_edge",
                    "min_combined", "episode_profit"]
 
@@ -34,7 +40,9 @@ def arb_observations(aligned: pd.DataFrame, matches: pd.DataFrame, cfg: dict[str
     ex = cfg.get("execution") or {}
     slip = float(ex.get("slippage", 0.0))
     cap = ex.get("max_contracts_per_trade")
-    min_edge = float((cfg.get("backtest") or {}).get("min_arb_profit", 0.0))
+    bt = cfg.get("backtest") or {}
+    min_edge = float(bt.get("min_arb_profit", 0.0))
+    max_age = bt.get("arb_max_leg_age_s")
     fees, default = match_fees(matches, cfg), kalshi_fees(cfg)
 
     df = aligned.sort_values(["match_id", "ts"], kind="stable").reset_index(drop=True)
@@ -52,8 +60,16 @@ def arb_observations(aligned: pd.DataFrame, matches: pd.DataFrame, cfg: dict[str
         else:
             r = true_arb(ask_a[i], ask_b[i], fm, max_contracts=1.0, slippage=slip)
         contracts[i], profit[i], edge[i] = r.contracts, r.profit, r.edge_per_contract
+    is_arb = (contracts > 0) & (profit > 0) & (edge >= min_edge)
+    age = np.fmax(_col(df, "age_a"), _col(df, "age_b"))   # older leg; NaN if both unknown
+    if max_age is not None:
+        is_arb &= ~np.isnan(age) & (age <= float(max_age))
     return df.assign(combined=ask_a + ask_b, contracts=contracts, profit=profit, edge=edge,
-                     depth_known=known, is_arb=(contracts > 0) & (profit > 0) & (edge >= min_edge))
+                     depth_known=known, leg_age_s=age, is_arb=is_arb)
+
+
+def _col(df: pd.DataFrame, name: str) -> np.ndarray:
+    return df[name].to_numpy(float) if name in df else np.full(len(df), np.nan)
 
 
 def scan_arb(aligned: pd.DataFrame, matches: pd.DataFrame, cfg: dict[str, Any]) -> tuple[pd.DataFrame, pd.DataFrame]:
@@ -76,7 +92,7 @@ def scan_arb(aligned: pd.DataFrame, matches: pd.DataFrame, cfg: dict[str, Any]) 
                         duration_s=(end - start).total_seconds(), n_obs=len(g), phase=g["phase"].iloc[0],
                         best_edge=g["edge"].max(), min_combined=g["combined"].min(),
                         contracts=best["contracts"], profit=best["profit"],
-                        depth_known=bool(g["depth_known"].all())))
+                        depth_known=bool(g["depth_known"].all()), leg_age_s=best["leg_age_s"]))
     episodes = pd.DataFrame(eps, columns=EPISODE_COLUMNS)
 
     summary = df.groupby("match_id", sort=True).agg(

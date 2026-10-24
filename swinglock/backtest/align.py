@@ -5,6 +5,11 @@ with the latest A quote), provided that quote is at most `max_staleness_s` old. 
 therefore uses only data already observed at its timestamp (no lookahead). Rows where
 either side has no fresh ask are dropped.
 
+Leg age (`age_a`, `age_b`, seconds): how long each side's effective ask (price and source
+market, `ask_source`) has gone unchanged as of the row, using only quotes at or before it.
+Candle quotes are emitted on a shared grid with each leg carried forward, so a quote's own
+`ts` is always fresh; the time since the price last changed is the usable staleness signal.
+
 Fill-realism caveat: candle-sourced quotes are sampled ask levels (e.g. one per minute)
 with no depth. Anything between samples is invisible and the sampled level may not have
 been fillable in size, so downstream results are optimistic about fills and pessimistic
@@ -22,7 +27,8 @@ from ..config import kalshi_fees
 from ..fees import FeeModel
 
 DEFAULT_STALENESS_S = 60.0
-ALIGNED_COLUMNS = ["match_id", "ts", "ask_a", "ask_b", "size_a", "size_b", "bid_a", "bid_b", "phase"]
+ALIGNED_COLUMNS = ["match_id", "ts", "ask_a", "ask_b", "size_a", "size_b", "bid_a", "bid_b", "phase",
+                   "age_a", "age_b"]
 
 
 def staleness_s(cfg: dict[str, Any]) -> float:
@@ -41,8 +47,18 @@ def match_fees(matches: pd.DataFrame, cfg: dict[str, Any]) -> dict[str, FeeModel
 
 def _side(q: pd.DataFrame, side: str) -> pd.DataFrame:
     s = side.lower()
-    cols = {"ask": f"ask_{s}", "ask_size": f"size_{s}", "bid": f"bid_{s}"}
+    cols = {"ask": f"ask_{s}", "ask_size": f"size_{s}", "bid": f"bid_{s}", "since": f"since_{s}"}
     return q.loc[q["side"] == side, ["match_id", "ts", *cols]].rename(columns=cols)
+
+
+def _since(q: pd.DataFrame) -> pd.Series:
+    """Per row: ts at which this (match, side)'s ask and ask_source took their current values.
+    `q` must be sorted by ts."""
+    src = q["ask_source"].astype(object).where(q["ask_source"].notna(), "")
+    key = q["ask"].astype(float).astype(str) + "|" + src.astype(str)
+    grp = [q["match_id"], q["side"]]
+    changed = key.ne(key.groupby(grp).shift())
+    return q["ts"].where(changed).groupby(grp).ffill()
 
 
 def align(quotes: pd.DataFrame, matches: pd.DataFrame | None = None,
@@ -50,6 +66,7 @@ def align(quotes: pd.DataFrame, matches: pd.DataFrame | None = None,
     """As-of join of A and B quotes per match, plus phase: pre / live / unknown (no start time)."""
     q = quotes.dropna(subset=["ts"]).sort_values("ts", kind="stable")
     q = q.drop_duplicates(["match_id", "side", "ts"], keep="last")
+    q = q.assign(since=_since(q))
     a, b = _side(q, "A"), _side(q, "B")
     if a.empty or b.empty:
         return pd.DataFrame(columns=ALIGNED_COLUMNS)
@@ -66,4 +83,6 @@ def align(quotes: pd.DataFrame, matches: pd.DataFrame | None = None,
     pre = np.zeros(len(rows), bool)
     pre[known] = (rows["ts"][known] < start[known]).to_numpy()
     rows["phase"] = np.where(~known, "unknown", np.where(pre, "pre", "live"))
+    for c in ("a", "b"):
+        rows[f"age_{c}"] = (rows["ts"] - rows[f"since_{c}"]).dt.total_seconds()
     return rows[ALIGNED_COLUMNS]

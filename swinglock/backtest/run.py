@@ -78,7 +78,7 @@ def walkforward_md(wf: WalkForward) -> list[str]:
 
 
 def summary_md(data_dir, matches, quotes, aligned, episodes, by_match, grid, bd, stale, wf=None,
-               entries=None, filters=None) -> str:
+               entries=None, filters=None, arb_age=None) -> str:
     settled = sum(settlement(r) is not None for _, r in matches.iterrows())
     fair = int((matches["settle_a"].notna() & matches["settle_b"].notna()
                 & ~matches["settle_a"].isin([0.0, 1.0])).sum())
@@ -99,7 +99,10 @@ def summary_md(data_dir, matches, quotes, aligned, episodes, by_match, grid, bd,
             f"{frac:.2%} of observations in arb",
             f"- Median duration: {_fmt(float(episodes['duration_s'].median())) if len(episodes) else '-'}s; "
             f"sum of one-fill profits: ${episodes['profit'].sum():.2f}; "
-            f"depth known for {int(episodes['depth_known'].sum())} of {len(episodes)}", "",
+            f"depth known for {int(episodes['depth_known'].sum())} of {len(episodes)}",
+            f"- Leg-age filter (backtest.arb_max_leg_age_s): {_fmt(arb_age) if arb_age is not None else 'off'}; "
+            f"median older-leg age at the best observation: "
+            f"{_fmt(float(episodes['leg_age_s'].median())) if len(episodes) else '-'}s", "",
             md_table(episodes.sort_values("profit", ascending=False).head(10)), "",
         ]
     if wf is not None:
@@ -159,7 +162,7 @@ def main(argv: list[str] | None = None) -> int:
                      ("walkforward_trades", wf.trades), ("walkforward_gate", wf.gate)]:
         df.to_csv(args.out / f"{name}.csv", index=False)
     md = summary_md(args.data, matches, quotes, aligned, episodes, by_match, grid, bd, stale, wf,
-                    entries, entry_filters(cfg))
+                    entries, entry_filters(cfg), (cfg.get("backtest") or {}).get("arb_max_leg_age_s"))
     (args.out / "backtest_summary.md").write_text(md)
     print(md)
     return 0
