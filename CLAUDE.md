@@ -283,3 +283,5 @@ the newest 200. Format changes go through the Lead (Scanner proposes, Dashboard 
   after fees. 25 one-candle true-arb episodes (likely stale quotes); every swing-lock rule negative
   in sample; walk-forward FAIL (3 folds, 0 positive). Details: docs/WORK_PLAN.md "Findings so far".
 - 2026-10-24: Entry diagnostics + filters merged (phat-d0/Tennis_Model#29); 107 tests passing.
+- 2026-10-24: Entry-diagnostic re-runs: losses aren't from near-decided entries; ≥10¢ entries lose
+  ~spread + fee at every X; both gate-valid filters still FAIL. See WORK_PLAN "Findings so far".
