@@ -285,3 +285,5 @@ the newest 200. Format changes go through the Lead (Scanner proposes, Dashboard 
 - 2026-10-24: Entry diagnostics + filters merged (phat-d0/Tennis_Model#29); 107 tests passing.
 - 2026-10-24: Entry-diagnostic re-runs: losses aren't from near-decided entries; ≥10¢ entries lose
   ~spread + fee at every X; both gate-valid filters still FAIL. See WORK_PLAN "Findings so far".
+- 2026-10-24: Entry window (`min/max_minutes_from_start`) + `entry_phase` filters (phat-d0/Tennis_Model#32);
+  108 tests passing.
