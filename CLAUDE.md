@@ -145,6 +145,10 @@ the newest 200. Format changes go through the Lead (Scanner proposes, Dashboard 
 - `GET /events?with_milestones=true` returns a top-level `milestones` list mapped to events by
   `primary_event_tickers` (start dates without per-event calls). Scanner A/B convention: A = the
   market ticker that sorts first.
+- Live score: `GET /live_data/batch` (public; up to 100 milestone_ids per call). Points are literal
+  0/15/30/40; `server`/`advantage`/`winner` are competitor UUIDs, mapped to A/B via each market's
+  `custom_strike.tennis_competitor`; status not_started → started → live → closed. The recorder logs a
+  change-only `score/` table (phat-d0/Tennis_Model#21), which is our only source of score-state history.
 - Tournament name: `event.product_metadata.competition`. Tour/round/best_of/scheduled start:
   `GET /milestones?related_event_ticker=`. Live score: `GET /live_data/milestone/{id}` (current
   snapshot only, no history).
@@ -256,3 +260,9 @@ the newest 200. Format changes go through the Lead (Scanner proposes, Dashboard 
   `/markets/orderbooks` every 10 s (50 matches per call), quotes + top-5 depth to daily parquet.
   Live trial 10:34 UTC: 90 open matches, combined ask min $0.99 / median $1.01, nothing below fees.
   91 tests passing.
+- 2026-10-24: Network-outage handling (phat-d0/Tennis_Model#19): network failures → KalshiError(0);
+  the backfill pauses 120 s and retries the match (gives up after ~30 min), the recorder skips one
+  snapshot. Full backfill work order: 4,670 recent ATP+WTA → 8,340 recent Challenger → 48,785 others
+  (61,795 total). 93 tests passing.
+- 2026-10-24: Live-score design (phat-d0/Tennis_Model#20) and recording (phat-d0/Tennis_Model#21)
+  merged; `recorder.score_poll_s: 60`. 98 tests passing.
