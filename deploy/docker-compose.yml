@@ -1,0 +1,66 @@
+# Swing-lock services on one small VPS. Read-only: nothing here places orders.
+#   docker compose -f deploy/docker-compose.yml up -d --build                 # scanner + dashboard
+#   docker compose -f deploy/docker-compose.yml --profile recorder up -d      # + Data's recorder
+#   docker compose -f deploy/docker-compose.yml --profile public up -d        # + Caddy basic-auth proxy
+# See docs/scanner_deploy.md.
+
+x-common: &common
+  build:
+    context: ..
+    dockerfile: deploy/Dockerfile
+  image: swinglock:latest
+  restart: unless-stopped            # restart on failure and after reboot
+  env_file:
+    - path: .env                     # deploy/.env (gitignored); see deploy/env.example
+      required: false
+  volumes:
+    - ../data:/app/data              # shared: state.json, alerts.log, recorder output, positions.json
+    - ../config.yaml:/app/config.yaml:ro
+  logging:
+    driver: json-file
+    options: {max-size: "10m", max-file: "5"}
+
+services:
+  scanner:
+    <<: *common
+    command: ["python", "-m", "swinglock.scanner", "--positions", "data/positions.json"]
+
+  dashboard:
+    <<: *common
+    # Binds 0.0.0.0 inside the container only; the host publishes it on 127.0.0.1, so it is
+    # reachable over an SSH tunnel (or the Caddy profile below), never directly from the internet.
+    command: ["python", "-m", "swinglock.dashboard", "--state", "data/live/state.json",
+              "--host", "0.0.0.0", "--port", "8000"]
+    ports:
+      - "127.0.0.1:8000:8000"
+    volumes:
+      - ../data:/app/data:ro
+      - ../config.yaml:/app/config.yaml:ro
+
+  recorder:
+    # Placeholder for Data's order-book recorder (swinglock/collectors/recorder.py, not written yet).
+    # Off by default; enable with --profile recorder once the module exists.
+    <<: *common
+    profiles: ["recorder"]
+    command: ["python", "-m", "swinglock.collectors.recorder"]
+
+  caddy:
+    # Optional HTTPS + basic-auth front for the dashboard. Needs DASHBOARD_DOMAIN, DASHBOARD_USER
+    # and DASHBOARD_PASSWORD_HASH in deploy/.env, and ports 80/443 open. Off by default.
+    image: caddy:2.8
+    profiles: ["public"]
+    restart: unless-stopped
+    env_file:
+      - path: .env
+        required: false
+    ports: ["80:80", "443:443"]
+    volumes:
+      - ./caddy/Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+    depends_on: [dashboard]
+    logging:
+      driver: json-file
+      options: {max-size: "10m", max-file: "5"}
+
+volumes:
+  caddy_data:
