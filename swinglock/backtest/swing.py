@@ -7,6 +7,13 @@ Lock: first strictly later timestamp where
 and the other side's depth (when known) covers the position; the fill itself comes from
 `lock_quote`. Otherwise the position is held to settlement.
 
+Entry filters (config backtest.*, all off by default) also require, at the entry row:
+- `min_entry_ask`: ask >= this (skips near-decided matches quoted at a few cents);
+- `max_minutes_from_start`: at most this many minutes after scheduled_start (known live);
+- `min_minutes_to_close`: at least this many minutes before the match's last observation.
+  LOOKAHEAD: the end time isn't known live, so this one is a diagnostic only and results
+  using it don't count for the gate.
+
 Modes: "first" (default) takes one entry per match on whichever side triggers first (tie:
 cheaper ask); "both" treats each side as an independent candidate entry.
 
@@ -36,6 +43,14 @@ from ..locks import SIDES, Holding, buy_cost, lock_quote, other
 from .align import match_fees
 
 MODES = ("first", "both")
+ENTRY_FILTERS = ("min_entry_ask", "max_minutes_from_start", "min_minutes_to_close")
+LOOKAHEAD_FILTERS = ("min_minutes_to_close",)
+
+
+def entry_filters(cfg: dict[str, Any]) -> dict[str, float]:
+    """Active entry filters from config backtest.* (unset or null = off)."""
+    bt = cfg.get("backtest") or {}
+    return {k: float(bt[k]) for k in ENTRY_FILTERS if bt.get(k) is not None}
 
 
 @dataclass
@@ -51,6 +66,7 @@ class MatchPath:
     ask: dict[str, np.ndarray]
     size: dict[str, np.ndarray]
     phase: np.ndarray
+    start: pd.Timestamp = pd.NaT    # scheduled_start (NaT if unknown)
 
     @property
     def settle_ts(self) -> pd.Timestamp:
@@ -81,6 +97,8 @@ class Trade:
     capital: float            # total dollars spent (entry + lock)
     hold_s: float             # seconds exposed: entry -> lock, or entry -> settlement
     depth_known: bool
+    minutes_to_close: float   # entry -> settlement proxy (last observation)
+    minutes_from_start: float # scheduled_start -> entry (negative pre-match; NaN if unknown)
 
 
 TRADE_COLUMNS = [f.name for f in fields(Trade)]
@@ -98,6 +116,7 @@ def match_paths(aligned: pd.DataFrame, matches: pd.DataFrame, cfg: dict[str, Any
         if pay is None:
             continue
         winner, tier = m.at[mid, "winner"], m.at[mid, "tier"]
+        start = m.at[mid, "scheduled_start"] if "scheduled_start" in m.columns else pd.NaT
         winner = winner if isinstance(winner, str) and winner in SIDES else "NA"
         g = g.sort_values("ts", kind="stable")
         out.append(MatchPath(
@@ -105,7 +124,7 @@ def match_paths(aligned: pd.DataFrame, matches: pd.DataFrame, cfg: dict[str, Any
             list(pd.DatetimeIndex(g["ts"])),
             {"A": g["ask_a"].to_numpy(float), "B": g["ask_b"].to_numpy(float)},
             {"A": g["size_a"].to_numpy(float), "B": g["size_b"].to_numpy(float)},
-            g["phase"].to_numpy(object)))
+            g["phase"].to_numpy(object), pd.Timestamp(start) if pd.notna(start) else pd.NaT))
     return out
 
 
@@ -121,14 +140,44 @@ def settlement(row: pd.Series) -> tuple[float, float] | None:
     return None
 
 
-def _first_trigger(p: MatchPath, side: str, x: float) -> int | None:
+def _minutes(p: MatchPath) -> tuple[np.ndarray, np.ndarray]:
+    """(minutes to the last observation, minutes since scheduled_start) per row."""
+    ts = pd.DatetimeIndex(p.ts)
+    to_close = (p.settle_ts - ts).total_seconds().to_numpy() / 60
+    from_start = ((ts - p.start).total_seconds().to_numpy() / 60 if pd.notna(p.start)
+                  else np.full(len(ts), np.nan))
+    return to_close, from_start
+
+
+def _allowed(p: MatchPath, filters: dict[str, float]) -> np.ndarray | None:
+    """Rows where entry filters pass (None = no filters). Unknown start time fails a
+    max_minutes_from_start filter."""
+    if not filters:
+        return None
+    to_close, from_start = _minutes(p)
+    ok = np.ones(len(p.ts), bool)
+    if "max_minutes_from_start" in filters:
+        ok &= ~np.isnan(from_start) & (from_start <= filters["max_minutes_from_start"])
+    if "min_minutes_to_close" in filters:
+        ok &= to_close >= filters["min_minutes_to_close"]
+    return ok
+
+
+def _first_trigger(p: MatchPath, side: str, x: float, filters: dict[str, float] | None = None,
+                   allowed: np.ndarray | None = None) -> int | None:
     ask, size = p.ask[side], p.size[side]
-    hit = np.flatnonzero((ask <= x) & (ask > 0) & (np.isnan(size) | (size > 0)))
+    ok = (ask <= x) & (ask > 0) & (np.isnan(size) | (size > 0))
+    if filters and "min_entry_ask" in filters:
+        ok &= ask >= filters["min_entry_ask"]
+    if allowed is not None:
+        ok &= allowed
+    hit = np.flatnonzero(ok)
     return int(hit[0]) if hit.size else None
 
 
-def _entries(p: MatchPath, x: float, mode: str) -> list[tuple[str, int]]:
-    hits = [(s, i) for s in SIDES if (i := _first_trigger(p, s, x)) is not None]
+def _entries(p: MatchPath, x: float, mode: str, filters: dict[str, float] | None = None) -> list[tuple[str, int]]:
+    allowed = _allowed(p, filters or {})
+    hits = [(s, i) for s in SIDES if (i := _first_trigger(p, s, x, filters, allowed)) is not None]
     if mode == "both" or not hits:
         return hits
     if mode != "first":
@@ -162,6 +211,7 @@ def _trade(p: MatchPath, side: str, i: int, y: float, contracts: float, slip: fl
 
     locked = hits.size > 0
     end = lock_ts if locked else p.settle_ts
+    from_start = (p.ts[i] - p.start).total_seconds() / 60 if pd.notna(p.start) else np.nan
     return Trade(
         match_id=p.match_id, tier=p.tier, side=side,
         role="favorite" if ask_i > 0.5 else "underdog",
@@ -170,7 +220,8 @@ def _trade(p: MatchPath, side: str, i: int, y: float, contracts: float, slip: fl
         locked=bool(locked), lock_ts=lock_ts, lock_ask=lock_ask, lock_cost=lock_cost,
         settle_ts=p.settle_ts, winner=p.winner, settle_a=p.pay_a, settle_b=p.pay_b,
         pnl=held.pnl_settled(p.pay_a, p.pay_b),
-        capital=held.total_cost, hold_s=(end - p.ts[i]).total_seconds(), depth_known=bool(known))
+        capital=held.total_cost, hold_s=(end - p.ts[i]).total_seconds(), depth_known=bool(known),
+        minutes_to_close=(p.settle_ts - p.ts[i]).total_seconds() / 60, minutes_from_start=from_start)
 
 
 def simulate(paths: list[MatchPath], x: float, y: float, cfg: dict[str, Any], mode: str = "first") -> pd.DataFrame:
@@ -179,7 +230,8 @@ def simulate(paths: list[MatchPath], x: float, y: float, cfg: dict[str, Any], mo
         raise ValueError(f"mode must be one of {MODES}, got {mode!r}")
     contracts = float(cfg["backtest"]["contracts_per_entry"])
     slip = float((cfg.get("execution") or {}).get("slippage", 0.0))
-    rows = [vars(_trade(p, s, i, y, contracts, slip)) for p in paths for s, i in _entries(p, x, mode)]
+    filters = entry_filters(cfg)
+    rows = [vars(_trade(p, s, i, y, contracts, slip)) for p in paths for s, i in _entries(p, x, mode, filters)]
     df = pd.DataFrame(rows, columns=TRADE_COLUMNS)
     for c in ("entry_ts", "lock_ts", "settle_ts"):
         df[c] = pd.to_datetime(df[c], utc=True)

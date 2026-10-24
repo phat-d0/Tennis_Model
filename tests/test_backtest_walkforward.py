@@ -174,3 +174,11 @@ def test_cli_writes_walkforward(tmp_path):
         assert (out / f).exists()
     md = (out / "backtest_summary.md").read_text()
     assert "Walk-forward gate" in md and "FAIL" in md and "need >= 30" in md
+
+
+def test_lookahead_filter_fails_the_gate():
+    m, q = monthly_data()
+    cfg = {**CFG, "backtest": {**CFG["backtest"], "min_minutes_to_close": 0,
+                               "walkforward": {"min_train_trades": 5}}}
+    wf = walk_forward(match_paths(align(q, m), m, cfg), cfg)
+    assert not wf.passed and any("lookahead" in r for r in wf.reasons)

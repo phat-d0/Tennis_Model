@@ -6,7 +6,7 @@ import pytest
 
 from swinglock.backtest.align import align
 from swinglock.backtest.arb import scan_arb
-from swinglock.backtest.grid import grid_search
+from swinglock.backtest.grid import entry_diagnostics, grid_search, grid_trades
 from swinglock.backtest.metrics import breakdown, capital_usage, max_drawdown, summarize
 from swinglock.backtest.run import main
 from swinglock.backtest.swing import match_paths, simulate
@@ -239,5 +239,51 @@ def test_cli_end_to_end(tmp_path):
     path(LOCK_PATH).to_parquet(data / "quotes.parquet")
     assert main(["--data", str(data), "--out", str(tmp_path / "out")]) == 0
     for f in ("arb_episodes.csv", "arb_by_match.csv", "grid_metrics.csv", "grid_trades.csv",
-              "breakdowns.csv", "backtest_summary.md"):
+              "breakdowns.csv", "grid_entries.csv", "backtest_summary.md"):
         assert (tmp_path / "out" / f).exists()
+
+
+# ---- entry diagnostics and filters ------------------------------------------
+# B dips to 0.38 ten minutes in; A collapses to 4c and 3c late (a near-decided match).
+
+LATE_PATH = [(0, 0.60, 0.42), (600, 0.62, 0.38), (1200, 0.04, 0.97), (1800, 0.03, 0.98)]
+
+
+def cfg_with(**bt):
+    return {**CFG, "backtest": {**CFG["backtest"], **bt}}
+
+
+def test_entry_timing_fields():
+    m = matches("M1", winner="A", start=t(0))
+    r = trades_for(path(LATE_PATH), m, x=0.20).iloc[0]
+    assert (r["side"], r["entry_ask"]) == ("A", 0.04)
+    assert r["minutes_to_close"] == pytest.approx(10) and r["minutes_from_start"] == pytest.approx(20)
+    r = trades_for(path(LATE_PATH), matches("M1", winner="A"), x=0.40).iloc[0]
+    assert (r["side"], r["minutes_to_close"]) == ("B", pytest.approx(20)) and np.isnan(r["minutes_from_start"])
+
+
+def test_entry_filters():
+    q, m = path(LATE_PATH), matches("M1", winner="A", start=t(0))
+    assert len(trades_for(q, m, x=0.20, cfg=cfg_with(min_entry_ask=None))) == 1      # null = off
+    assert trades_for(q, m, x=0.20, cfg=cfg_with(min_entry_ask=0.05)).empty         # 4c and 3c skipped
+    assert trades_for(q, m, x=0.40, cfg=cfg_with(min_entry_ask=0.05)).iloc[0]["side"] == "B"
+    # minutes after scheduled start (known live): B at +10 min passes 15, A at +20 doesn't
+    assert trades_for(q, m, x=0.40, cfg=cfg_with(max_minutes_from_start=15)).iloc[0]["side"] == "B"
+    assert trades_for(q, m, x=0.20, cfg=cfg_with(max_minutes_from_start=15)).empty
+    assert trades_for(q, matches("M1", winner="A"), x=0.40, cfg=cfg_with(max_minutes_from_start=15)).empty
+    # minutes to the last observation (lookahead diagnostic): B entry is 20 min before the end
+    assert trades_for(q, m, x=0.40, cfg=cfg_with(min_minutes_to_close=15)).iloc[0]["side"] == "B"
+    assert trades_for(q, m, x=0.40, cfg=cfg_with(min_minutes_to_close=25)).empty
+
+
+def test_entry_diagnostics_per_rule():
+    q = pd.concat([path(LATE_PATH, "M1"), path(LATE_PATH, "M2")])
+    m = pd.concat([matches("M1", winner="A", start=t(0)), matches("M2", winner="A", start=t(0))])
+    d = entry_diagnostics(grid_trades(match_paths(align(q, m), m, CFG), CFG), CFG).set_index(["x", "y"])
+    late, swing = d.loc[(0.30, 0.97)], d.loc[(0.40, 0.97)]
+    assert late["n_trades"] == 2 and late["ask_p50"] == pytest.approx(0.04)
+    assert late["frac_ask_lt_5c"] == 1 and late["mtc_p50"] == pytest.approx(10) and late["frac_live"] == 1
+    assert late["pnl_ask_lt_10c"] > 0 and np.isnan(late["pnl_ask_ge_10c"])     # A wins from 4c: +$9.57
+    assert swing["ask_p50"] == pytest.approx(0.38) and swing["frac_ask_lt_10c"] == 0
+    assert swing["mtc_p50"] == pytest.approx(20)
+    assert swing["pnl_ask_ge_10c"] == pytest.approx(10 - 3.97 - 0.43)              # B 0.38 locked by A at 4c

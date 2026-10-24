@@ -3,7 +3,7 @@
     python -m swinglock.backtest.run --data data/processed/kalshi --out reports/
 
 Writes arb_episodes.csv, arb_by_match.csv, grid_metrics.csv, grid_trades.csv,
-breakdowns.csv, walkforward_folds.csv, walkforward_trades.csv, walkforward_gate.csv and
+breakdowns.csv, grid_entries.csv, walkforward_folds.csv, walkforward_trades.csv, walkforward_gate.csv and
 backtest_summary.md to --out. Exits cleanly (code 0) with a message
 when the data directory has no matches/quotes yet.
 """
@@ -21,9 +21,9 @@ from ..config import load_config
 from ..schema import MATCH_COLUMNS, QUOTE_COLUMNS, conform, validate_quotes
 from .align import align, staleness_s
 from .arb import scan_arb
-from .grid import KEYS, grid_metrics, grid_trades
+from .grid import KEYS, entry_diagnostics, grid_metrics, grid_trades
 from .metrics import breakdown
-from .swing import MODES, match_paths, settlement
+from .swing import LOOKAHEAD_FILTERS, MODES, entry_filters, match_paths, settlement
 from .walkforward import WalkForward, slip_label, walk_forward
 
 CAVEATS = """\
@@ -77,7 +77,8 @@ def walkforward_md(wf: WalkForward) -> list[str]:
     return lines
 
 
-def summary_md(data_dir, matches, quotes, aligned, episodes, by_match, grid, bd, stale, wf=None) -> str:
+def summary_md(data_dir, matches, quotes, aligned, episodes, by_match, grid, bd, stale, wf=None,
+               entries=None, filters=None) -> str:
     settled = sum(settlement(r) is not None for _, r in matches.iterrows())
     fair = int((matches["settle_a"].notna() & matches["settle_b"].notna()
                 & ~matches["settle_a"].isin([0.0, 1.0])).sum())
@@ -108,6 +109,14 @@ def summary_md(data_dir, matches, quotes, aligned, episodes, by_match, grid, bd,
             "avg_return", "hit_rate", "max_drawdown", "peak_capital"]
     traded = grid[grid["n_trades"] > 0].sort_values("total_pnl", ascending=False)
     lines += [md_table(traded[cols].head(10)), ""]
+    filt = ", ".join(f"{k}={v:g}" for k, v in (filters or {}).items()) or "none"
+    look = [k for k in (filters or {}) if k in LOOKAHEAD_FILTERS]
+    lines += [f"Entry filters: {filt}" + (f" (**{', '.join(look)} uses lookahead: diagnostic only**)" if look else ""),
+              ""]
+    if entries is not None and len(traded):
+        top = traded[KEYS].head(10).merge(entries, on=KEYS, how="left")
+        lines += ["## Where entries happen (same rules; ask in $, mtc = minutes entry -> last observation)", "",
+                  md_table(top), ""]
     if len(traded):
         best = traded.iloc[0]
         sel = (bd["mode"] == best["mode"]) & (bd["x"] == best["x"]) & (bd["y"] == best["y"])
@@ -140,14 +149,17 @@ def main(argv: list[str] | None = None) -> int:
     trades = grid_trades(paths, cfg, args.modes)
     grid = grid_metrics(trades, cfg, args.modes)
     bd = breakdown(trades, keys=KEYS)
+    entries = entry_diagnostics(trades, cfg, args.modes)
     wf = walk_forward(paths, cfg, args.modes)
 
     args.out.mkdir(parents=True, exist_ok=True)
     for name, df in [("arb_episodes", episodes), ("arb_by_match", by_match), ("grid_metrics", grid),
-                     ("grid_trades", trades), ("breakdowns", bd), ("walkforward_folds", wf.folds),
+                     ("grid_trades", trades), ("breakdowns", bd), ("grid_entries", entries),
+                     ("walkforward_folds", wf.folds),
                      ("walkforward_trades", wf.trades), ("walkforward_gate", wf.gate)]:
         df.to_csv(args.out / f"{name}.csv", index=False)
-    md = summary_md(args.data, matches, quotes, aligned, episodes, by_match, grid, bd, stale, wf)
+    md = summary_md(args.data, matches, quotes, aligned, episodes, by_match, grid, bd, stale, wf,
+                    entries, entry_filters(cfg))
     (args.out / "backtest_summary.md").write_text(md)
     print(md)
     return 0
