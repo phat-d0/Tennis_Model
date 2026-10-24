@@ -235,10 +235,11 @@ def write_outputs(out_dir: Path, rows: list[dict], quotes: list[pd.DataFrame]):
 def run(series_list: list[str], out_dir: Path, raw_dir: Path, since: str | None = None,
         max_matches: int | None = None, min_interval_s: float = 0.5,
         max_carry_s: float | None = DEFAULT_MAX_CARRY_S, recent_days: int = 183,
-        checkpoint_every: int = 1000) -> dict:
+        checkpoint_every: int = 1000, only_groups: list[int] | None = None) -> dict:
     """Work order: recent (≤ recent_days) ATP+WTA, then recent Challenger, then the rest,
-    newest first within each group. Outputs are rewritten after each group and every
-    `checkpoint_every` matches, so the finished part is usable while the rest runs."""
+    newest first within each group; `only_groups` runs a subset (give each subset its own
+    out_dir). Outputs are rewritten after each group and every `checkpoint_every` matches,
+    so the finished part is usable while the rest runs."""
     client = KalshiClient(raw_dir=raw_dir, min_interval_s=min_interval_s)
     t0 = time.time()
     now = pd.Timestamp.now(tz="UTC")
@@ -264,7 +265,7 @@ def run(series_list: list[str], out_dir: Path, raw_dir: Path, since: str | None 
     rows, quotes = [], []
     matches, q = matches_frame([]), empty(QUOTE_COLUMNS)
     i = 0
-    for prio in sorted(groups):
+    for prio in sorted(g for g in groups if only_groups is None or g in only_groups):
         part = [r for r in todo if r["prio"] == prio]
         # Live matches go in batches of several per candle request; archived ones can't.
         batches = plan_batches([r for r in part if not r["historical"]])
@@ -333,11 +334,13 @@ def main(argv: list[str] | None = None) -> None:
     ap.add_argument("--raw", type=Path, default=Path(cfg["data"]["raw_dir"]) / "kalshi")
     ap.add_argument("--min-interval", type=float, default=0.5, help="seconds between requests")
     ap.add_argument("--recent-days", type=int, default=183, help="'recent' window for the work order")
+    ap.add_argument("--groups", type=int, nargs="*", help="only these work groups (0 recent ATP/WTA, "
+                    "1 recent Challenger, 2 rest); use a separate --out per group set")
     a = ap.parse_args(argv)
     logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
     carry = (cfg.get("data") or {}).get("max_carry_s", DEFAULT_MAX_CARRY_S)
     print(json.dumps(run(a.series, a.out, a.raw, a.since, a.max_matches, a.min_interval, carry,
-                         a.recent_days),
+                         a.recent_days, only_groups=a.groups),
                      indent=1, default=str))
 
 
