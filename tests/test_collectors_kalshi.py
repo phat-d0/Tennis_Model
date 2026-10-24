@@ -346,3 +346,34 @@ def test_work_order_priority():
     assert backfill.priority(it("challenger", recent), now, 183) == 1
     assert backfill.priority(it("itf", recent), now, 183) == 2
     assert backfill.priority(it("atp", old), now, 183) == 2
+
+
+def test_network_failure_becomes_kalshi_error_status_0(tmp_path):
+    import requests
+
+    class Down(FakeSession):
+        def get(self, url, params=None, timeout=None):
+            self.calls.append(url)
+            raise requests.ConnectionError("proxy closed")
+    c = KalshiClient(raw_dir=tmp_path, session=Down([]), sleep=lambda s: None, clock=lambda: 0.0, max_retries=2)
+    with pytest.raises(KalshiError) as e:
+        c.get("/x")
+    assert e.value.status == 0 and len(c.session.calls) == 3
+
+
+def test_backfill_pauses_on_outage_instead_of_dropping_quotes(monkeypatch):
+    calls, sleeps = [], []
+
+    def flaky(client, r, starts, stats, max_carry_s, raise_network=False):
+        calls.append(raise_network)
+        if len(calls) < 3:
+            raise KalshiError(0, "u", "network error")
+        return {"match_id": "M"}, "quotes"
+    monkeypatch.setattr(backfill, "normalize_one", flaky)
+    stats = {"network_pauses": 0}
+    assert backfill.normalize_one_patiently(None, {}, {}, stats, 300, sleep=sleeps.append) == ({"match_id": "M"}, "quotes")
+    assert stats["network_pauses"] == 2 and sleeps == [backfill.NETWORK_PAUSE_S] * 2 and all(calls)
+    monkeypatch.setattr(backfill, "normalize_one",
+                        lambda *a, **k: (_ for _ in ()).throw(KalshiError(404, "u")))
+    with pytest.raises(KalshiError):            # non-network errors are not retried here
+        backfill.normalize_one_patiently(None, {}, {}, stats, 300, sleep=sleeps.append)

@@ -109,6 +109,8 @@ def prefetch_batch(client: KalshiClient, batch: list[dict], stats: dict) -> None
     try:
         d = client.get("/markets/candlesticks", batch_candle_params(tickers, lo, hi), cache=False)
     except KalshiError as err:
+        if err.status == 0:
+            return  # network: let the per-match path (with its outage pauses) handle it
         stats["group_errors"] += 1
         log.warning("group of %d matches failed (%s); falling back to per-match", len(todo), str(err)[:200])
         return
@@ -181,13 +183,16 @@ def collect_series(client: KalshiClient, series: str, cutoff: pd.Timestamp, sinc
 
 
 def normalize_one(client: KalshiClient, r: dict, starts: dict, stats: dict,
-                  max_carry_s: float | None = DEFAULT_MAX_CARRY_S) -> tuple[dict, pd.DataFrame]:
+                  max_carry_s: float | None = DEFAULT_MAX_CARRY_S,
+                  raise_network: bool = False) -> tuple[dict, pd.DataFrame]:
     e, mk = r["event"], r["markets"]
     row = match_row(e, mk, r["series"], r["fee_changes"], starts.get(e["event_ticker"]))
     try:
         c = fetch_candles(client, [row["instrument_a"], row["instrument_b"]],
                           row["open_time"], row["close_time"], r["historical"])
     except KalshiError as err:
+        if raise_network and err.status == 0:
+            raise
         log.warning("%s: candles failed (%s); match kept without quotes", e["event_ticker"], err)
         stats["skipped"]["candle error"] += 1
         c = {}
@@ -195,6 +200,26 @@ def normalize_one(client: KalshiClient, r: dict, starts: dict, stats: dict,
                           c.get(row["instrument_a"], []), c.get(row["instrument_b"], []),
                           until=row["close_time"], max_carry_s=max_carry_s)
     return row, q
+
+
+NETWORK_PAUSE_S = 120
+NETWORK_MAX_PAUSES = 15
+
+
+def normalize_one_patiently(client: KalshiClient, r: dict, starts: dict, stats: dict,
+                            max_carry_s: float | None, sleep=time.sleep) -> tuple[dict, pd.DataFrame]:
+    """normalize_one, but a network outage (KalshiError status 0) pauses and retries the match
+    instead of recording it without quotes; gives up (raises) after ~30 min of outage."""
+    for attempt in range(NETWORK_MAX_PAUSES + 1):
+        try:
+            return normalize_one(client, r, starts, stats, max_carry_s, raise_network=True)
+        except KalshiError as err:
+            if err.status != 0 or attempt == NETWORK_MAX_PAUSES:
+                raise
+            stats["network_pauses"] += 1
+            log.warning("network down (%s); pausing %ds", str(err)[:120], NETWORK_PAUSE_S)
+            sleep(NETWORK_PAUSE_S)
+    raise AssertionError("unreachable")
 
 
 def write_outputs(out_dir: Path, rows: list[dict], quotes: list[pd.DataFrame]):
@@ -220,7 +245,7 @@ def run(series_list: list[str], out_dir: Path, raw_dir: Path, since: str | None 
     cutoff = ts(client.historical_cutoff()["market_settled_ts"])
     since_ts = ts(since) if since else None
     stats: dict = {"events_listed": {}, "skipped": defaultdict(int), "group_errors": 0,
-                   "grouped_matches": 0}
+                   "grouped_matches": 0, "network_pauses": 0}
     starts = scheduled_starts(client, since)
     todo = []
     for s in series_list:
@@ -250,7 +275,7 @@ def run(series_list: list[str], out_dir: Path, raw_dir: Path, since: str | None 
             if bt is not None and id(bt) not in done_batches:
                 prefetch_batch(client, bt, stats)
                 done_batches.add(id(bt))
-            row, qq = normalize_one(client, r, starts, stats, max_carry_s)
+            row, qq = normalize_one_patiently(client, r, starts, stats, max_carry_s)
             rows.append(row)
             quotes.append(qq)
             i += 1
@@ -272,6 +297,7 @@ def run(series_list: list[str], out_dir: Path, raw_dir: Path, since: str | None 
         "events_listed": stats["events_listed"],
         "skipped": dict(stats["skipped"]), "requests": client.requests_made,
         "grouped_matches": stats["grouped_matches"], "group_errors": stats["group_errors"],
+        "network_pauses": stats["network_pauses"],
         "cache_hits": client.cache_hits, "rate_limited_429": client.rate_limited,
         "final_min_interval_s": client.min_interval_s, "elapsed_s": round(time.time() - t0),
     })
