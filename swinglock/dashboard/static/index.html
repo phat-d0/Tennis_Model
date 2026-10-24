@@ -38,7 +38,19 @@
   <section aria-labelledby="h-markets">
     <div class="sec-head">
       <h2 id="h-markets">Markets</h2>
-      <label class="sort">Sort
+      <span class="hint" id="m-count"></span>
+    </div>
+    <div class="filters">
+      <input type="search" id="q" placeholder="Search player, tier, ticker" aria-label="Search markets" autocomplete="off" spellcheck="false">
+      <label>Phase
+        <select id="phase" aria-label="Filter by phase">
+          <option value="all">All</option>
+          <option value="live">Live</option>
+          <option value="pre">Pre-match</option>
+          <option value="unknown">Unknown</option>
+        </select>
+      </label>
+      <label>Sort
         <select id="sort" aria-label="Sort markets">
           <option value="cwf">Combined + fees</option>
           <option value="combined">Combined</option>
@@ -56,6 +68,10 @@
       </tr></thead>
       <tbody id="markets"></tbody>
     </table>
+    <details class="nomarket" id="nomarket" hidden>
+      <summary id="nomarket-sum">No market</summary>
+      <ul id="nomarket-list"></ul>
+    </details>
   </section>
 
   <section aria-labelledby="h-pos">
