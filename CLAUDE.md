@@ -214,3 +214,4 @@ the newest 200. Format changes go through the Lead (Scanner proposes, Dashboard 
 - 2026-10-24: Scanner v1 (phat-d0/Tennis_Model#3) and Dashboard v1 (phat-d0/Tennis_Model#5) merged;
   58 tests passing. Run: `python -m swinglock.scanner [--once]`,
   `python -m swinglock.dashboard --state data/live/state.json` (or `--sample`).
+- 2026-10-24: Dashboard filters merged (phat-d0/Tennis_Model#8); 61 tests passing.
