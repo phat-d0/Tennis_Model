@@ -24,6 +24,10 @@ backtest:
   contracts_per_entry: 10
   min_arb_profit: 0.0           # dollars per matched contract, after fees
   max_staleness_s: 60           # max age of the other side's quote in the A/B as-of join
+  # Entry filters (null = off). min_minutes_to_close is LOOKAHEAD: diagnostic only, never gate-valid.
+  min_entry_ask: null           # skip entries quoted below this (near-decided matches)
+  max_minutes_from_start: null  # only enter up to N minutes after scheduled start (known live)
+  min_minutes_to_close: null
   walkforward:
     min_train_months: 1
     train_months: null          # null = expanding window; N = rolling last N months

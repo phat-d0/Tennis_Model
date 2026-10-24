@@ -230,6 +230,9 @@ the newest 200. Format changes go through the Lead (Scanner proposes, Dashboard 
   one fill at the best observation's depth (1 contract if depth unknown, so fees are cent-heavy).
 - 2026-10-24: Not-started matches stay in the backtest: positions settle at `settle_a/settle_b`
   via `Holding.pnl_settled`, not dropped (dropping them would bias unlocked P&L).
+- 2026-10-24: Swing entry filters `min_entry_ask` / `max_minutes_from_start` are gate-valid;
+  `min_minutes_to_close` uses the match end (lookahead), so it's diagnostic only and walk-forward
+  refuses to PASS with it on (phat-d0/Tennis_Model#29).
 - 2026-10-24: Walk-forward: monthly folds by each match's first observation; expanding window;
   select on total P&L at 1¢ slippage with ≥ 10 training trades; training trades must settle before
   the test month; positive-folds check at the worst slippage, and total OOS P&L > 0 at every
@@ -279,3 +282,4 @@ the newest 200. Format changes go through the Lead (Scanner proposes, Dashboard 
 - 2026-10-24: PRELIMINARY backtest on 2,000 recent ATP/WTA matches (candles, no depth): no edge
   after fees. 25 one-candle true-arb episodes (likely stale quotes); every swing-lock rule negative
   in sample; walk-forward FAIL (3 folds, 0 positive). Details: docs/WORK_PLAN.md "Findings so far".
+- 2026-10-24: Entry diagnostics + filters merged (phat-d0/Tennis_Model#29); 107 tests passing.
