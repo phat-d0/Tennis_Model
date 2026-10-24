@@ -1,0 +1,183 @@
+{
+  "generated_at": "2026-10-24T08:30:00Z",
+  "poll_seconds": 5,
+  "venue": "kalshi",
+  "matches": [
+    {
+      "match_id": "KXATPMATCH-26OCT24KRULI",
+      "series": "KXATPMATCH",
+      "tier": "ATP",
+      "player_a": "Mitchell Krueger",
+      "player_b": "Li Tu",
+      "phase": "live",
+      "quote_ts": "2026-10-24T08:29:58Z",
+      "ask_a": 0.427,
+      "ask_b": 0.6,
+      "size_a": 40.0,
+      "size_b": 120.0,
+      "bid_a": 0.41,
+      "bid_b": 0.57,
+      "combined": 1.027,
+      "combined_with_fees": 1.06125,
+      "arb_contracts": 40.0,
+      "arb_profit": 0.0
+    },
+    {
+      "match_id": "KXATPMATCH-26OCT24FARBRU",
+      "series": "KXATPMATCH",
+      "tier": "ATP",
+      "player_a": "Jaime Faria",
+      "player_b": "Nicolas Brunold",
+      "phase": "live",
+      "quote_ts": "2026-10-24T08:29:58Z",
+      "ask_a": 0.45,
+      "ask_b": 0.5,
+      "size_a": 50.0,
+      "size_b": 80.0,
+      "bid_a": 0.44,
+      "bid_b": 0.49,
+      "combined": 0.95,
+      "combined_with_fees": 0.985,
+      "arb_contracts": 50.0,
+      "arb_profit": 0.75
+    },
+    {
+      "match_id": "KXWTAMATCH-26OCT24SWIPAO",
+      "series": "KXWTAMATCH",
+      "tier": "WTA",
+      "player_a": "Iga Swiatek",
+      "player_b": "Jasmine Paolini",
+      "phase": "pre",
+      "quote_ts": "2026-10-24T08:29:58Z",
+      "ask_a": 0.71,
+      "ask_b": 0.31,
+      "size_a": 150.0,
+      "size_b": 200.0,
+      "bid_a": 0.69,
+      "bid_b": 0.29,
+      "combined": 1.02,
+      "combined_with_fees": 1.0495,
+      "arb_contracts": 100.0,
+      "arb_profit": 0.0
+    },
+    {
+      "match_id": "KXATPCHALLENGERMATCH-26OCT24MOROGU",
+      "series": "KXATPCHALLENGERMATCH",
+      "tier": "ATP Challenger",
+      "player_a": "Juan Moro",
+      "player_b": "Kaito Oguchi",
+      "phase": "live",
+      "quote_ts": "2026-10-24T08:29:58Z",
+      "ask_a": 0.55,
+      "ask_b": 0.47,
+      "size_a": 25.0,
+      "size_b": 30.0,
+      "bid_a": 0.52,
+      "bid_b": 0.44,
+      "combined": 1.02,
+      "combined_with_fees": 1.0552,
+      "arb_contracts": 25.0,
+      "arb_profit": 0.0
+    },
+    {
+      "match_id": "KXITFWMATCH-26OCT24KIMSAN",
+      "series": "KXITFWMATCH",
+      "tier": "ITF W",
+      "player_a": "Ha-eun Kim",
+      "player_b": "Lucia Santos",
+      "phase": "unknown",
+      "quote_ts": "2026-10-24T08:29:58Z",
+      "ask_a": 0.12,
+      "ask_b": null,
+      "size_a": 500.0,
+      "size_b": 0.0,
+      "bid_a": 0.1,
+      "bid_b": null,
+      "combined": null,
+      "combined_with_fees": null,
+      "arb_contracts": 0.0,
+      "arb_profit": 0.0
+    }
+  ],
+  "positions": [
+    {
+      "match_id": "KXATPMATCH-26OCT24KRULI",
+      "player_a": "Mitchell Krueger",
+      "player_b": "Li Tu",
+      "contracts_a": 11.44,
+      "avg_a": 0.427,
+      "contracts_b": 27.62,
+      "avg_b": 0.543,
+      "pnl_if_a": -8.44254,
+      "pnl_if_b": 7.73746,
+      "lock": {
+        "side_to_buy": "A",
+        "contracts_to_buy": 16.18,
+        "ask": 0.427,
+        "cost": 7.18886,
+        "locked_pnl": 0.5486,
+        "depth_ok": true
+      }
+    },
+    {
+      "match_id": "KXWTAMATCH-26OCT24SWIPAO",
+      "player_a": "Iga Swiatek",
+      "player_b": "Jasmine Paolini",
+      "contracts_a": 0.0,
+      "avg_a": 0.0,
+      "contracts_b": 20.0,
+      "avg_b": 0.3,
+      "pnl_if_a": -6.0,
+      "pnl_if_b": 14.0,
+      "lock": {
+        "side_to_buy": "A",
+        "contracts_to_buy": 20.0,
+        "ask": 0.71,
+        "cost": 14.49,
+        "locked_pnl": -0.49,
+        "depth_ok": true
+      }
+    },
+    {
+      "match_id": "KXATPCHALLENGERMATCH-26OCT24MOROGU",
+      "player_a": "Juan Moro",
+      "player_b": "Kaito Oguchi",
+      "contracts_a": 10.0,
+      "avg_a": 0.5,
+      "contracts_b": 10.0,
+      "avg_b": 0.4,
+      "pnl_if_a": 1.0,
+      "pnl_if_b": 1.0,
+      "lock": null
+    }
+  ],
+  "alerts": [
+    {
+      "ts": "2026-10-24T08:29:58Z",
+      "type": "arb",
+      "match_id": "KXATPMATCH-26OCT24FARBRU",
+      "message": "True arb: Faria 45.0c + Brunold 50.0c = 98.5c with fees, 50 contracts",
+      "contracts": 50.0,
+      "cost": 49.25,
+      "locked_pnl": 0.75
+    },
+    {
+      "ts": "2026-10-24T08:27:12Z",
+      "type": "lock",
+      "match_id": "KXATPMATCH-26OCT24KRULI",
+      "message": "Lock: buy 16.18 Krueger @ 42.7c, locks +$0.55",
+      "contracts": 16.18,
+      "cost": 7.18886,
+      "locked_pnl": 0.5486
+    },
+    {
+      "ts": "2026-10-24T07:58:40Z",
+      "type": "cross_venue",
+      "match_id": "KXWTAMATCH-26OCT24SWIPAO",
+      "message": "Cross-venue: Kalshi Paolini 31c vs Polymarket US Swiatek 66c (check walkover rules)",
+      "contracts": 10.0,
+      "cost": 9.85,
+      "locked_pnl": 0.15
+    }
+  ]
+}
