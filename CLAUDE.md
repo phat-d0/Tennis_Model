@@ -294,3 +294,5 @@ the newest 200. Format changes go through the Lead (Scanner proposes, Dashboard 
   (phat-d0/Tennis_Model#37); 111 tests passing.
 - 2026-10-24: Leg-age arb counts on group 0: 35 episodes / $1.32 at 60 s (0¢); 19 / $0.77 at 1¢.
   Remaining top hits are wide stale offers. Conclusion unchanged.
+- 2026-10-24: INTERIM Challenger read (3,000 matches, Aug 24 → Oct 24): no edge; after-fee arbs
+  $0.71 total (1 contract); swing −$0.31 to −$0.38/trade OOS, WF FAIL 0/2. Group 1 ETA ~08:00 UTC 10-25.
