@@ -1,0 +1,55 @@
+{
+ "candlesticks": [
+  {
+   "end_period_ts": 1787604000,
+   "open_interest": "277238.67",
+   "price": {
+    "close": "0.7000",
+    "high": "0.7300",
+    "low": "0.6100",
+    "mean": "0.6687",
+    "open": "0.6400",
+    "previous": "0.6500"
+   },
+   "volume": "8662.59",
+   "yes_ask": {
+    "close": "0.7200",
+    "high": "0.7300",
+    "low": "0.6400",
+    "open": "0.6400"
+   },
+   "yes_bid": {
+    "close": "0.5300",
+    "high": "0.6400",
+    "low": "0.5300",
+    "open": "0.6300"
+   }
+  },
+  {
+   "end_period_ts": 1787604060,
+   "open_interest": "277979.83",
+   "price": {
+    "close": "0.7300",
+    "high": "0.7300",
+    "low": "0.7100",
+    "mean": "0.7262",
+    "open": "0.7200",
+    "previous": "0.7000"
+   },
+   "volume": "4050.64",
+   "yes_ask": {
+    "close": "0.7300",
+    "high": "0.7300",
+    "low": "0.7100",
+    "open": "0.7200"
+   },
+   "yes_bid": {
+    "close": "0.5800",
+    "high": "0.5800",
+    "low": "0.5300",
+    "open": "0.5300"
+   }
+  }
+ ],
+ "ticker": "KXATPMATCH-26AUG24SONHER-SON"
+}

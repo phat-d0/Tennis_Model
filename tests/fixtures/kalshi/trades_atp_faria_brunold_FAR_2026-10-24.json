@@ -1,0 +1,65 @@
+{
+ "cursor": "EhIKEAck2UvhMaHt7tF-ibdeqgQaDAiy3vHWBhCYmr3OAw",
+ "trades": [
+  {
+   "count_fp": "623.00",
+   "created_time": "2026-10-24T08:41:55.163389Z",
+   "is_block_trade": false,
+   "no_price_dollars": "0.4600",
+   "taker_book_side": "bid",
+   "taker_outcome_side": "yes",
+   "taker_side": "yes",
+   "ticker": "KXATPMATCH-26OCT24FARBRU-FAR",
+   "trade_id": "0724d8be-8951-9698-02f9-94f08cd3505d",
+   "yes_price_dollars": "0.5400"
+  },
+  {
+   "count_fp": "193.00",
+   "created_time": "2026-10-24T08:41:55.163389Z",
+   "is_block_trade": false,
+   "no_price_dollars": "0.4600",
+   "taker_book_side": "bid",
+   "taker_outcome_side": "yes",
+   "taker_side": "yes",
+   "ticker": "KXATPMATCH-26OCT24FARBRU-FAR",
+   "trade_id": "0724d8b6-d669-9375-0861-797355bdc295",
+   "yes_price_dollars": "0.5400"
+  },
+  {
+   "count_fp": "21.15",
+   "created_time": "2026-10-24T08:41:23.070321Z",
+   "is_block_trade": false,
+   "no_price_dollars": "0.4700",
+   "taker_book_side": "ask",
+   "taker_outcome_side": "no",
+   "taker_side": "no",
+   "ticker": "KXATPMATCH-26OCT24FARBRU-FAR",
+   "trade_id": "0724d94b-f091-9b19-87d8-06179e809664",
+   "yes_price_dollars": "0.5300"
+  },
+  {
+   "count_fp": "100.00",
+   "created_time": "2026-10-24T08:41:23.024778Z",
+   "is_block_trade": false,
+   "no_price_dollars": "0.4700",
+   "taker_book_side": "ask",
+   "taker_outcome_side": "no",
+   "taker_side": "no",
+   "ticker": "KXATPMATCH-26OCT24FARBRU-FAR",
+   "trade_id": "0724d94b-f091-a4cd-dddd-118dc2531f38",
+   "yes_price_dollars": "0.5300"
+  },
+  {
+   "count_fp": "97.00",
+   "created_time": "2026-10-24T08:41:22.969887Z",
+   "is_block_trade": false,
+   "no_price_dollars": "0.4700",
+   "taker_book_side": "ask",
+   "taker_outcome_side": "no",
+   "taker_side": "no",
+   "ticker": "KXATPMATCH-26OCT24FARBRU-FAR",
+   "trade_id": "0724d94b-e131-a1ed-eed1-7e89b75eaa04",
+   "yes_price_dollars": "0.5300"
+  }
+ ]
+}

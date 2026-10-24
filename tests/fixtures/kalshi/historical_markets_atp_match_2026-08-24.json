@@ -1,0 +1,113 @@
+{
+ "cursor": "CgsIq4my1AYQgM76IhIcS1hBVFBNQVRDSC0yNkFVRzI0U09OSEVSLUhFUg",
+ "markets": [
+  {
+   "can_close_early": true,
+   "close_time": "2026-08-24T20:56:03Z",
+   "created_time": "2026-08-24T17:51:39.073312Z",
+   "custom_strike": {
+    "tennis_competitor": "43c2b946-1697-433c-9085-9574239063b0"
+   },
+   "early_close_condition": "This market will close and expire after a winner is declared.",
+   "event_ticker": "KXATPMATCH-26AUG24SONHER",
+   "exchange_index": 3,
+   "expected_expiration_time": "2026-08-24T21:00:00Z",
+   "expiration_time": "2026-09-07T18:00:00Z",
+   "expiration_value": "Lorenzo Sonego",
+   "last_price_dollars": "0.9900",
+   "latest_expiration_time": "2026-09-07T18:00:00Z",
+   "market_type": "binary",
+   "no_ask_dollars": "1.0000",
+   "no_bid_dollars": "0.0000",
+   "no_sub_title": "Lorenzo Sonego",
+   "notional_value_dollars": "1.0000",
+   "occurrence_datetime": "2026-08-24T21:00:00Z",
+   "open_interest_fp": "0.00",
+   "open_time": "2026-08-24T17:55:00Z",
+   "previous_price_dollars": "0.9900",
+   "previous_yes_ask_dollars": "1.0000",
+   "previous_yes_bid_dollars": "0.0000",
+   "price_level_structure": "linear_cent",
+   "price_ranges": [
+    {
+     "end": "1.0000",
+     "start": "0.0000",
+     "step": "0.0100"
+    }
+   ],
+   "result": "yes",
+   "rules_primary": "If Lorenzo Sonego wins the Sonego vs Herbert professional tennis match in the 2026 ATP Winston Salem Round Of 64 after a ball has been played, then the market resolves to Yes.",
+   "rules_secondary": "The following market refers to the Sonego vs Herbert professional tennis match in the 2026 ATP Winston Salem Round Of 64 after a ball has been played. If the match does not occur (signaled by a ball being played) due to a player injury, walkover, forfeiture, or any other cancellation (all before the match starts), the market will resolve to a fair price in accordance with the rules. If this match is postponed or delayed, the market will remain open and close after the rescheduled match has finished (within two weeks).\n\nKalshi is not affiliated, associated, authorized, endorsed by, or in any way officially connected with the Governing League. All trademarks, logos, and brand names are the property of their respective owners.",
+   "settlement_bounds_type": "default",
+   "settlement_timer_seconds": 60,
+   "settlement_ts": "2026-08-24T20:58:06.999315Z",
+   "settlement_value_dollars": "1.0000",
+   "status": "finalized",
+   "strike_type": "structured",
+   "ticker": "KXATPMATCH-26AUG24SONHER-SON",
+   "title": "Lorenzo Sonego wins",
+   "updated_time": "2026-08-24T20:58:07.052633Z",
+   "volume_24h_fp": "0.00",
+   "volume_fp": "438690.76",
+   "yes_ask_dollars": "1.0000",
+   "yes_ask_size_fp": "0.00",
+   "yes_bid_dollars": "0.0000",
+   "yes_bid_size_fp": "0.00",
+   "yes_sub_title": "Lorenzo Sonego"
+  },
+  {
+   "can_close_early": true,
+   "close_time": "2026-08-24T20:56:03Z",
+   "created_time": "2026-08-24T17:51:39.073312Z",
+   "custom_strike": {
+    "tennis_competitor": "d80691bc-d375-4abb-96e2-8c109ae44ffc"
+   },
+   "early_close_condition": "This market will close and expire after a winner is declared.",
+   "event_ticker": "KXATPMATCH-26AUG24SONHER",
+   "exchange_index": 3,
+   "expected_expiration_time": "2026-08-24T21:00:00Z",
+   "expiration_time": "2026-09-07T18:00:00Z",
+   "expiration_value": "Lorenzo Sonego",
+   "last_price_dollars": "0.0100",
+   "latest_expiration_time": "2026-09-07T18:00:00Z",
+   "market_type": "binary",
+   "no_ask_dollars": "1.0000",
+   "no_bid_dollars": "0.0000",
+   "no_sub_title": "Pierre-Hugues Herbert",
+   "notional_value_dollars": "1.0000",
+   "occurrence_datetime": "2026-08-24T21:00:00Z",
+   "open_interest_fp": "0.00",
+   "open_time": "2026-08-24T17:55:00Z",
+   "previous_price_dollars": "0.0100",
+   "previous_yes_ask_dollars": "1.0000",
+   "previous_yes_bid_dollars": "0.0000",
+   "price_level_structure": "linear_cent",
+   "price_ranges": [
+    {
+     "end": "1.0000",
+     "start": "0.0000",
+     "step": "0.0100"
+    }
+   ],
+   "result": "no",
+   "rules_primary": "If Pierre-Hugues Herbert wins the Sonego vs Herbert professional tennis match in the 2026 ATP Winston Salem Round Of 64 after a ball has been played, then the market resolves to Yes.",
+   "rules_secondary": "The following market refers to the Sonego vs Herbert professional tennis match in the 2026 ATP Winston Salem Round Of 64 after a ball has been played. If the match does not occur (signaled by a ball being played) due to a player injury, walkover, forfeiture, or any other cancellation (all before the match starts), the market will resolve to a fair price in accordance with the rules. If this match is postponed or delayed, the market will remain open and close after the rescheduled match has finished (within two weeks).\n\nKalshi is not affiliated, associated, authorized, endorsed by, or in any way officially connected with the Governing League. All trademarks, logos, and brand names are the property of their respective owners.",
+   "settlement_bounds_type": "default",
+   "settlement_timer_seconds": 60,
+   "settlement_ts": "2026-08-24T20:58:06.999315Z",
+   "settlement_value_dollars": "0.0000",
+   "status": "finalized",
+   "strike_type": "structured",
+   "ticker": "KXATPMATCH-26AUG24SONHER-HER",
+   "title": "Pierre-Hugues Herbert wins",
+   "updated_time": "2026-08-24T20:58:07.052633Z",
+   "volume_24h_fp": "0.00",
+   "volume_fp": "392540.03",
+   "yes_ask_dollars": "1.0000",
+   "yes_ask_size_fp": "0.00",
+   "yes_bid_dollars": "0.0000",
+   "yes_bid_size_fp": "0.00",
+   "yes_sub_title": "Pierre-Hugues Herbert"
+  }
+ ]
+}

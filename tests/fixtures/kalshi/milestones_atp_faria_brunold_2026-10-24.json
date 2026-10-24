@@ -1,0 +1,41 @@
+{
+ "cursor": "",
+ "milestones": [
+  {
+   "category": "Sports",
+   "details": {
+    "best_of": "3",
+    "first_competitor_id": "667e04df-9b7e-46af-9e6f-03822430836a",
+    "gender": "men",
+    "main_game_event_ticker": "KXATPMATCH-26OCT24FARBRU",
+    "round": "Qualification Round 1",
+    "second_competitor_id": "5127a62a-542d-4dc3-b408-bdfa4bcc9729",
+    "status": "not_started",
+    "tour": "ATP",
+    "tournament_name": "ATP Basel"
+   },
+   "id": "ed49f25c-2db2-4d80-a576-664955e73499",
+   "last_updated_ts": "2026-10-23T18:03:32.406877Z",
+   "notification_message": "The match is about to begin.",
+   "primary_event_tickers": [
+    "KXATPMATCH-26OCT24FARBRU",
+    "KXATPSETWINNER-26OCT24FARBRU-1",
+    "KXATPSETWINNER-26OCT24FARBRU-2",
+    "KXATPEXACTMATCH-26OCT24FARBRU"
+   ],
+   "related_event_tickers": [
+    "KXATPMATCH-26OCT24FARBRU",
+    "KXATPSETWINNER-26OCT24FARBRU-1",
+    "KXATPSETWINNER-26OCT24FARBRU-2",
+    "KXATPEXACTMATCH-26OCT24FARBRU"
+   ],
+   "source_id": "sr:sport_event:75953174",
+   "source_ids": {
+    "source_3_id": "sr:sport_event:75953174"
+   },
+   "start_date": "2026-10-24T10:10:00Z",
+   "title": "Faria vs Brunold",
+   "type": "tennis_tournament_singles"
+  }
+ ]
+}

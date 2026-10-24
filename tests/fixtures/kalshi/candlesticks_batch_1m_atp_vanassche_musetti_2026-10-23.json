@@ -1,0 +1,114 @@
+{
+ "markets": [
+  {
+   "candlesticks": [
+    {
+     "end_period_ts": 1792789200,
+     "open_interest_fp": "604401.92",
+     "price": {
+      "close_dollars": "0.2000",
+      "high_dollars": "0.2000",
+      "low_dollars": "0.1200",
+      "mean_dollars": "0.1683",
+      "open_dollars": "0.1500",
+      "previous_dollars": "0.1400"
+     },
+     "volume_fp": "19144.78",
+     "yes_ask": {
+      "close_dollars": "0.2100",
+      "high_dollars": "0.2100",
+      "low_dollars": "0.1400",
+      "open_dollars": "0.1500"
+     },
+     "yes_bid": {
+      "close_dollars": "0.2000",
+      "high_dollars": "0.2000",
+      "low_dollars": "0.1200",
+      "open_dollars": "0.1400"
+     }
+    },
+    {
+     "end_period_ts": 1792789260,
+     "open_interest_fp": "611068.74",
+     "price": {
+      "close_dollars": "0.1700",
+      "high_dollars": "0.2400",
+      "low_dollars": "0.1700",
+      "mean_dollars": "0.2152",
+      "open_dollars": "0.2100",
+      "previous_dollars": "0.2000"
+     },
+     "volume_fp": "9191.58",
+     "yes_ask": {
+      "close_dollars": "0.1800",
+      "high_dollars": "0.2400",
+      "low_dollars": "0.1800",
+      "open_dollars": "0.2100"
+     },
+     "yes_bid": {
+      "close_dollars": "0.1700",
+      "high_dollars": "0.2100",
+      "low_dollars": "0.1700",
+      "open_dollars": "0.2000"
+     }
+    }
+   ],
+   "market_ticker": "KXATPMATCH-26OCT23VANMUS-VAN"
+  },
+  {
+   "candlesticks": [
+    {
+     "end_period_ts": 1792789200,
+     "open_interest_fp": "596330.30",
+     "price": {
+      "close_dollars": "0.7900",
+      "high_dollars": "0.8800",
+      "low_dollars": "0.7900",
+      "mean_dollars": "0.8279",
+      "open_dollars": "0.8600",
+      "previous_dollars": "0.8600"
+     },
+     "volume_fp": "5132.74",
+     "yes_ask": {
+      "close_dollars": "0.7900",
+      "high_dollars": "0.8800",
+      "low_dollars": "0.7900",
+      "open_dollars": "0.8600"
+     },
+     "yes_bid": {
+      "close_dollars": "0.7800",
+      "high_dollars": "0.8500",
+      "low_dollars": "0.7800",
+      "open_dollars": "0.8500"
+     }
+    },
+    {
+     "end_period_ts": 1792789260,
+     "open_interest_fp": "616045.58",
+     "price": {
+      "close_dollars": "0.8300",
+      "high_dollars": "0.8300",
+      "low_dollars": "0.7800",
+      "mean_dollars": "0.7945",
+      "open_dollars": "0.7900",
+      "previous_dollars": "0.7900"
+     },
+     "volume_fp": "24306.19",
+     "yes_ask": {
+      "close_dollars": "0.8300",
+      "high_dollars": "0.8300",
+      "low_dollars": "0.7900",
+      "open_dollars": "0.7900"
+     },
+     "yes_bid": {
+      "close_dollars": "0.8200",
+      "high_dollars": "0.8200",
+      "low_dollars": "0.7800",
+      "open_dollars": "0.7800"
+     }
+    }
+   ],
+   "market_ticker": "KXATPMATCH-26OCT23VANMUS-MUS"
+  }
+ ]
+}
