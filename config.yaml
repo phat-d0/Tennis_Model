@@ -1,0 +1,41 @@
+# Swing-Lock scanner configuration. All prices in dollars (0.43 == 43c).
+
+fees:
+  kalshi:
+    # fee = round_up(multiplier * rate * C * P * (1 - P)); see docs/research/kalshi_api.md
+    taker_rate: 0.07
+    maker_rate: 0.0175          # only on series with fee_type quadratic_with_maker_fees
+    default_multiplier: 1.0     # overridden per series by the API's fee_multiplier
+    rounding_increment: 0.01    # retail accounts round fees up to the cent per order
+  polymarket:
+    taker_rate: 0.0             # TODO: confirm from docs/research/other_venues.md
+    rounding_increment: 0.0
+
+execution:
+  slippage: 0.0                 # dollars added to every ask fill (0.01 = 1c worse)
+  max_contracts_per_trade: 100  # cap on arb size even when the book is deeper
+
+backtest:
+  entry_thresholds: [0.20, 0.25, 0.30, 0.35, 0.40, 0.45, 0.50, 0.55, 0.60]   # X: buy A at ask <= X
+  lock_thresholds: [0.90, 0.92, 0.94, 0.95, 0.96, 0.97, 0.98, 0.99]           # Y: lock when cost <= Y
+  contracts_per_entry: 10
+  min_arb_profit: 0.0           # dollars per matched contract, after fees
+
+scanner:
+  poll_seconds: 5
+  min_arb_profit_per_contract: 0.005
+  min_lock_profit: 0.05         # dollars, total, for a swing-lock alert
+  positions_file: positions.json
+  series:                       # tennis match-winner series to watch
+    - KXATPMATCH
+    - KXWTAMATCH
+    - KXATPCHALLENGERMATCH
+    - KXCHALLENGERMATCH
+    - KXWTACHALLENGERMATCH
+    - KXITFMATCH
+    - KXITFWMATCH
+  alert_log: data/alerts.log
+
+data:
+  raw_dir: data/raw
+  processed_dir: data/processed

@@ -1,0 +1,12 @@
+[project]
+name = "swinglock"
+version = "0.1.0"
+description = "Read-only arbitrage / swing-lock research and scanning for binary sports markets"
+requires-python = ">=3.11"
+dependencies = ["requests", "pandas", "pyarrow", "pyyaml", "cryptography", "websockets"]
+
+[project.optional-dependencies]
+dev = ["pytest"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]

@@ -1,0 +1,12 @@
+__pycache__/
+*.pyc
+.pytest_cache/
+data/raw/
+data/processed/
+data/*.log
+data/*.db
+positions.json
+positions.csv
+.env
+*.pem
+*.key
