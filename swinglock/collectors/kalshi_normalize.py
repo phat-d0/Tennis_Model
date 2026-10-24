@@ -110,6 +110,19 @@ def winner(ma: dict, mb: dict) -> Any:
     return pd.NA
 
 
+def settle_value(m: dict) -> float:
+    """Dollars a YES contract on this market paid: settlement_value_dollars when settled
+    (1/0, or the fair price for a not-started match), 1/0 from `result` if the value is
+    missing, NaN while unsettled."""
+    result = m.get("result") or ""
+    if result not in ("yes", "no", "scalar"):
+        return math.nan
+    v = num(m.get("settlement_value_dollars"))
+    if math.isnan(v) and result != "scalar":
+        v = 1.0 if result == "yes" else 0.0
+    return v
+
+
 def match_row(event: dict, markets: list[dict], series: dict, fee_changes: list[dict] = (),
               scheduled_start: Any = None) -> dict:
     ma, mb = order_markets(event["event_ticker"], markets)
@@ -130,6 +143,8 @@ def match_row(event: dict, markets: list[dict], series: dict, fee_changes: list[
         "open_time": open_t,
         "close_time": close_t,
         "winner": winner(ma, mb),
+        "settle_a": settle_value(ma),
+        "settle_b": settle_value(mb),
         "fee_type": fee_type,
         "fee_multiplier": mult,
     }
