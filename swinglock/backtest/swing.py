@@ -10,8 +10,12 @@ and the other side's depth (when known) covers the position; the fill itself com
 Modes: "first" (default) takes one entry per match on whichever side triggers first (tie:
 cheaper ask); "both" treats each side as an independent candidate entry.
 
+Settlement: each side pays matches.settle_a / settle_b per contract (1/0 normally; Kalshi's
+fair price, summing to $1, for a match that never started). Files without those columns fall
+back to winner -> 1/0; matches with neither are unsettled and skipped.
+
 No lookahead: decisions at a row use only that row (built from quotes at or before its
-timestamp); the winner is only used to settle. Settlement time is the match's last aligned
+timestamp); the outcome is only used to settle. Settlement time is the match's last aligned
 observation (a proxy for when the market resolves).
 
 Fill-realism caveat: candle data gives sampled ask levels without depth, so fills are
@@ -39,7 +43,9 @@ class MatchPath:
     """Pre-extracted arrays for one settled match (built once, reused across the grid)."""
     match_id: str
     tier: str
-    winner: str
+    winner: str               # "A" | "B" | "NA" (fair-price settlement with no winner)
+    pay_a: float              # dollars paid per side-A contract at settlement
+    pay_b: float
     fees: FeeModel
     ts: list[pd.Timestamp]
     ask: dict[str, np.ndarray]
@@ -69,6 +75,8 @@ class Trade:
     lock_cost: float
     settle_ts: pd.Timestamp
     winner: str
+    settle_a: float           # payout per contract used to settle (1/0, or a fair price)
+    settle_b: float
     pnl: float
     capital: float            # total dollars spent (entry + lock)
     hold_s: float             # seconds exposed: entry -> lock, or entry -> settlement
@@ -79,24 +87,38 @@ TRADE_COLUMNS = [f.name for f in fields(Trade)]
 
 
 def match_paths(aligned: pd.DataFrame, matches: pd.DataFrame, cfg: dict[str, Any]) -> list[MatchPath]:
-    """One MatchPath per match with a settled winner (A/B) and aligned quotes."""
+    """One MatchPath per settled match (payouts or an A/B winner) with aligned quotes."""
     fees = match_fees(matches, cfg)
     m = matches.drop_duplicates("match_id").set_index("match_id")
     out = []
     for mid, g in aligned.groupby("match_id", sort=True):
         if mid not in m.index:
             continue
-        winner, tier = m.at[mid, "winner"], m.at[mid, "tier"]
-        if not (isinstance(winner, str) and winner in SIDES):
+        pay = settlement(m.loc[mid])
+        if pay is None:
             continue
+        winner, tier = m.at[mid, "winner"], m.at[mid, "tier"]
+        winner = winner if isinstance(winner, str) and winner in SIDES else "NA"
         g = g.sort_values("ts", kind="stable")
         out.append(MatchPath(
-            str(mid), tier if isinstance(tier, str) else "unknown", winner, fees[mid],
+            str(mid), tier if isinstance(tier, str) else "unknown", winner, *pay, fees[mid],
             list(pd.DatetimeIndex(g["ts"])),
             {"A": g["ask_a"].to_numpy(float), "B": g["ask_b"].to_numpy(float)},
             {"A": g["size_a"].to_numpy(float), "B": g["size_b"].to_numpy(float)},
             g["phase"].to_numpy(object)))
     return out
+
+
+def settlement(row: pd.Series) -> tuple[float, float] | None:
+    """(pay_a, pay_b) per contract: settle_a/settle_b when both are present, else winner -> 1/0,
+    else None (unsettled)."""
+    a, b = row.get("settle_a"), row.get("settle_b")
+    if a is not None and b is not None and not (pd.isna(a) or pd.isna(b)):
+        return float(a), float(b)
+    w = row.get("winner")
+    if isinstance(w, str) and w in SIDES:
+        return (1.0, 0.0) if w == "A" else (0.0, 1.0)
+    return None
 
 
 def _first_trigger(p: MatchPath, side: str, x: float) -> int | None:
@@ -146,7 +168,8 @@ def _trade(p: MatchPath, side: str, i: int, y: float, contracts: float, slip: fl
         entry_ts=p.ts[i], entry_phase=str(p.phase[i]), entry_ask=ask_i,
         entry_all_in=entry_cost / n, contracts=n, entry_cost=entry_cost,
         locked=bool(locked), lock_ts=lock_ts, lock_ask=lock_ask, lock_cost=lock_cost,
-        settle_ts=p.settle_ts, winner=p.winner, pnl=held.pnl_if(p.winner),
+        settle_ts=p.settle_ts, winner=p.winner, settle_a=p.pay_a, settle_b=p.pay_b,
+        pnl=held.pnl_settled(p.pay_a, p.pay_b),
         capital=held.total_cost, hold_s=(end - p.ts[i]).total_seconds(), depth_known=bool(known))
 
 
