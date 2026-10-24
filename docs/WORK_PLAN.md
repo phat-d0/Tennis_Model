@@ -35,6 +35,11 @@ observations, 12% live; 161 fair-price settlements included via settle_a/b):**
   1-contract profits $2.49, depth unknown. The top ones are stale pre-match quotes (NAKBAE 21¢; PELMAN
   13¢ used a *carried* leg; CHOVAN 13¢ with zero volume). **98 is an upper bound**: the 1800 s carry cap
   can pair a stale leg with a fresh one. Read: no executable true arb.
+- **Stricter arb count (`arb_max_leg_age_s`, both legs' asks changed within N s):** 0¢: 98 → 40
+  episodes (300 s) → 35 in 26 matches (60 s), $1.32 total 1-contract profit; 1¢: 19 in 15 matches
+  ($0.77) at either setting. All single-candle, depth unknown. It removes carried-leg cases (PELMAN)
+  but not wide stale offers that tick by 1¢ (NAKBAE 21¢, CHOVAN 13¢: zero volume, 3 days pre-match).
+  Conclusion unchanged: ~$1 of one-contract profit in 6 months of ATP/WTA is not a tradeable edge.
 - **Swing grid:** every rule negative. Best X=0.20/Y=0.90: 4,509 trades, 48.8% locked, −$1,374 at 0¢
   (−$0.30/trade), −$2,023 at 1¢.
 - **Walk-forward: FAIL, 0 of 6 folds positive** (May–Oct). OOS 4,432 trades: mean −$0.32/trade
