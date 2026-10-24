@@ -11,3 +11,4 @@ positions.csv
 *.pem
 *.key
 data/live/
+reports/*.csv
