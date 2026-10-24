@@ -21,6 +21,7 @@ updates in their PR descriptions. Durable rules and facts are in `CLAUDE.md`.
 | 14 | Backfill work order + batch candles | Recent ATP+WTA first; shared candle calls for post-cutoff markets (~3 matches/call; cap = requested candles) | phat-d0/Tennis_Model#15 |
 | 15 | Order-book recorder | 10 s snapshots of all open match books (top-5 depth), daily parquet; trial: 90 matches, min combined $0.99, nothing below fees | `swinglock/collectors/recorder.py`, phat-d0/Tennis_Model#17 |
 | 16 | Network-outage handling | Backfill pauses and retries instead of saving quote-less matches | phat-d0/Tennis_Model#19 |
+| 17 | Live score recording | Recorder logs set/game/point state every 60 s via `/live_data/batch`, A/B mapped, change-only | `docs/data_live_score.md`, phat-d0/Tennis_Model#20, #21 |
 | 6 | Team set up | 4 role sessions started 2026-10-24 on `team/*` branches (IDs in `docs/team/lead.md`) | phat-d0/Tennis_Model#1 |
 
 ## Live configuration
@@ -53,7 +54,7 @@ updates in their PR descriptions. Durable rules and facts are in `CLAUDE.md`.
    once the repo is private. Restarted 10:20 UTC in the new order; recent ATP+WTA slice (~4–5k
    matches) ETA ~13:00–13:30 UTC.
 2. Backtest: arb scan + swing grid on the backfill; then walk-forward gate; then findings report.
-3. Data: live score/state join; The Odds API (DraftKings Sportsbook tennis
+3. Data: The Odds API (DraftKings Sportsbook tennis
    h2h) + Polymarket US collectors for the cross-venue check.
 4. Scanner: cross-venue alerts once Data's Odds API / Polymarket US collectors exist. A
    WebSocket upgrade needs a read-scope Kalshi API key from the owner.
