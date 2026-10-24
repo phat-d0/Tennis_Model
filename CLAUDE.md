@@ -197,7 +197,12 @@ the newest 200. Format changes go through the Lead (Scanner proposes, Dashboard 
   behind `--profile recorder`, optional Caddy HTTPS + basic auth behind `--profile public`. Secrets in
   `deploy/.env` (gitignored); holdings in `data/positions.json` (gitignored). **Scanner and recorder
   share the VPS IP and therefore Kalshi's unauthenticated rate limit**: the scanner uses ~0.22 req/s,
-  so size the recorder within Data's ½ share.
+  so size the recorder within Data's ½ share. The recorder measured ~0.17 req/s (30 requests in
+  3 min, 90 matches). **Never run a backfill on the same IP as scanner + recorder**: in a trial,
+  recorder + backfill together set off a run of 429s.
+- Recorded order books (~100 MB/day before compaction) stay on the VPS disk under
+  `data/recorded/kalshi/`. They don't go to `data-store`, which is too big for git; Backtest gets
+  extracts on request.
 - Cloud sessions are ephemeral: commit and push work before stopping. A long-running
   recorder or scanner can't live in a cloud session; it needs the owner's machine or a server.
 - The environment's network policy must allow api.elections.kalshi.com, docs.kalshi.com and
@@ -247,3 +252,7 @@ the newest 200. Format changes go through the Lead (Scanner proposes, Dashboard 
 - 2026-10-24: Backfill work order (recent 183 days ATP+WTA → recent Challenger → rest) + batched
   candles for post-cutoff markets (phat-d0/Tennis_Model#15); 86 tests passing. Recent ATP+WTA slice
   (~4–5k matches) ETA ~2.5–3 h from 10:20 UTC.
+- 2026-10-24: Order-book recorder merged (phat-d0/Tennis_Model#17): open matches every 600 s,
+  `/markets/orderbooks` every 10 s (50 matches per call), quotes + top-5 depth to daily parquet.
+  Live trial 10:34 UTC: 90 open matches, combined ask min $0.99 / median $1.01, nothing below fees.
+  91 tests passing.

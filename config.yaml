@@ -51,6 +51,14 @@ scanner:
   realert_min_improvement_pct: 0.25
   episode_gap_seconds: 30       # an opportunity gone this long starts a new episode
 
+recorder:                       # python -m swinglock.collectors.recorder (deploy: --profile recorder)
+  poll_s: 10                    # order-book snapshot interval
+  discovery_s: 600              # re-list open matches
+  flush_s: 60                   # write a parquet part file
+  max_rps: 1.0                  # cap on all recorder requests (shares the VPS IP with the scanner)
+  depth: 5                      # bid levels kept per book side
+  out_dir: data/recorded/kalshi
+
 data:
   max_carry_s: 1800            # max age a candle leg is carried forward before it becomes NaN.
                                 # Candles are written on quote changes, so an unchanged quote stays valid;

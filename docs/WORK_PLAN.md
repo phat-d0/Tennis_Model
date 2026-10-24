@@ -19,6 +19,7 @@ updates in their PR descriptions. Durable rules and facts are in `CLAUDE.md`.
 | 12 | Candle carry-forward check | Valid: candles are written on quote changes (live check 140/144 matches); `data.max_carry_s` cap = 1800 s | phat-d0/Tennis_Model#11 |
 | 13 | VPS deploy | Docker compose (scanner + dashboard; recorder and Caddy as profiles), systemd, logrotate; owner setup ~20 min | `deploy/`, `docs/scanner_deploy.md`, phat-d0/Tennis_Model#13 |
 | 14 | Backfill work order + batch candles | Recent ATP+WTA first; shared candle calls for post-cutoff markets (~3 matches/call; cap = requested candles) | phat-d0/Tennis_Model#15 |
+| 15 | Order-book recorder | 10 s snapshots of all open match books (top-5 depth), daily parquet; trial: 90 matches, min combined $0.99, nothing below fees | `swinglock/collectors/recorder.py`, phat-d0/Tennis_Model#17 |
 | 6 | Team set up | 4 role sessions started 2026-10-24 on `team/*` branches (IDs in `docs/team/lead.md`) | phat-d0/Tennis_Model#1 |
 
 ## Live configuration
@@ -32,8 +33,9 @@ updates in their PR descriptions. Durable rules and facts are in `CLAUDE.md`.
 - **The Odds API budget:** the owner's key is shared with their soccer and baseball apps. We need the
   monthly credit budget, a floor, and the key added as `ODDS_API_KEY` in the cloud environment's
   secrets. Until then, Data does docs research only (free endpoints like `/sports` don't cost credits).
-- **VPS:** ready to deploy. The owner provisions a 1 vCPU / 1 GB Ubuntu server and follows
-  `docs/scanner_deploy.md` (~20 min). The recorder service turns on once Data writes it.
+- **VPS:** ready to deploy, recorder included (`--profile recorder`). The owner provisions a
+  1 vCPU / 1 GB Ubuntu server (≥ 20 GB disk for ~100 MB/day of recorded books) and follows
+  `docs/scanner_deploy.md` (~20 min). **Every day without the recorder is order-book history lost.**
 - **Fee constants:** the owner should confirm the KXATPMATCH / KXWTAMATCH rows at
   kalshi.com/fee-schedule (the site blocks scripts), and say whether the account is direct or via
   an FCM (this sets fee-rounding precision).
@@ -50,7 +52,7 @@ updates in their PR descriptions. Durable rules and facts are in `CLAUDE.md`.
    once the repo is private. Restarted 10:20 UTC in the new order; recent ATP+WTA slice (~4–5k
    matches) ETA ~13:00–13:30 UTC.
 2. Backtest: arb scan + swing grid on the backfill; then walk-forward gate; then findings report.
-3. Data: order-book recorder; live score/state join; The Odds API (DraftKings Sportsbook tennis
+3. Data: live score/state join; The Odds API (DraftKings Sportsbook tennis
    h2h) + Polymarket US collectors for the cross-venue check.
 4. Scanner: cross-venue alerts once Data's Odds API / Polymarket US collectors exist. A
    WebSocket upgrade needs a read-scope Kalshi API key from the owner.
