@@ -18,6 +18,7 @@ their candle times.
 
 from __future__ import annotations
 
+import json
 import math
 from datetime import datetime, timezone
 from typing import Any, Iterable
@@ -255,3 +256,80 @@ def orderbooks_to_quotes(match_id: str, ticker_a: str, ticker_b: str, book_a: di
     return effective_quotes(match_id, ticker_a, ticker_b, [at], [yb_a], [1 - nb_a], [yb_b], [1 - nb_b],
                             size={"yb_a": [s_yb_a], "ya_a": [s_nb_a], "yb_b": [s_yb_b], "ya_b": [s_nb_b]},
                             source="orderbook")
+
+
+# -- live score (GET /live_data/batch, type tennis_tournament_singles) -----------------
+SCORE_COLUMNS = {
+    "ts": "datetime64[ns, UTC]",
+    "match_id": "string",
+    "milestone_id": "string",
+    "status": "string",         # not_started | started | live | closed (details.status)
+    "match_status": "string",   # "" | 1st_set | 2nd_set | ... | ended
+    "delayed": "boolean",       # details.live_data_delayed (False when absent; not always set)
+    "sets_a": "Int64", "sets_b": "Int64",       # sets won
+    "games_a": "Int64", "games_b": "Int64",     # games in the current (last listed) set
+    "tb_a": "Int64", "tb_b": "Int64",           # that set's tiebreak points, if any
+    "points_a": "Int64", "points_b": "Int64",   # current game: 0/15/30/40 as given
+    "server": "string",         # "A" | "B" | <NA>
+    "advantage": "string",      # "A" | "B" | <NA> (player with AD at deuce)
+    "set_scores": "string",     # "6-7(5) 7-6(9) 4-6", A first
+    "winner": "string",         # "A" | "B" | <NA>
+    "raw": "string",            # details JSON without statistics, for re-deriving later
+}
+SCORE_KEY = ("status", "match_status", "sets_a", "sets_b", "games_a", "games_b", "tb_a", "tb_b",
+             "points_a", "points_b", "server", "advantage", "winner")
+
+
+def competitor_sides(market_a: dict, market_b: dict) -> dict[str, str]:
+    """competitor id → 'A'/'B' from each market's custom_strike.tennis_competitor."""
+    out = {}
+    for side, m in (("A", market_a), ("B", market_b)):
+        cid = (m.get("custom_strike") or {}).get("tennis_competitor")
+        if cid:
+            out[cid] = side
+    return out
+
+
+def _int(x) -> Any:
+    try:
+        return pd.NA if x is None or x == "" else int(x)
+    except (TypeError, ValueError):
+        return pd.NA
+
+
+def score_row(match_id: str, live: dict, sides: dict[str, str], at: Any) -> dict | None:
+    """One live_data entry → a score row with competitor 1/2 mapped to sides A/B.
+    None when the competitors can't be mapped (we never guess the orientation)."""
+    d = live.get("details") or {}
+    c1, c2 = d.get("competitor1_id"), d.get("competitor2_id")
+    if sides.get(c1) not in ("A", "B") or sides.get(c2) not in ("A", "B") or sides[c1] == sides[c2]:
+        return None
+    n = {sides[c1]: "1", sides[c2]: "2"}  # side → competitor number
+
+    def comp(side, field):
+        return d.get(f"competitor{n[side]}_{field}")
+
+    rounds = {s: comp(s, "round_scores") or [] for s in "AB"}
+    last = {s: (rounds[s][-1] if rounds[s] else {}) for s in "AB"}
+    sets_txt = []
+    for ra, rb in zip(rounds["A"], rounds["B"]):
+        txt = f"{ra.get('score')}-{rb.get('score')}"
+        tb = [r.get("tiebreak_score") for r in (ra, rb) if r.get("tiebreak_score") is not None]
+        if tb:
+            txt += f"({min(tb)})"
+        sets_txt.append(txt)
+    raw = {k: v for k, v in d.items() if "statistics" not in k}
+    return {
+        "ts": ts(at), "match_id": match_id, "milestone_id": live.get("milestone_id"),
+        "status": d.get("status") or "", "match_status": d.get("match_status") or "",
+        "delayed": bool(d.get("live_data_delayed") or False),
+        "sets_a": _int(comp("A", "overall_score")), "sets_b": _int(comp("B", "overall_score")),
+        "games_a": _int(last["A"].get("score")), "games_b": _int(last["B"].get("score")),
+        "tb_a": _int(last["A"].get("tiebreak_score")), "tb_b": _int(last["B"].get("tiebreak_score")),
+        "points_a": _int(comp("A", "current_round_score")), "points_b": _int(comp("B", "current_round_score")),
+        "server": sides.get(d.get("server")) or pd.NA,
+        "advantage": sides.get(d.get("advantage")) or pd.NA,
+        "set_scores": " ".join(sets_txt),
+        "winner": sides.get(d.get("winner")) or pd.NA,
+        "raw": json.dumps(raw, sort_keys=True),
+    }

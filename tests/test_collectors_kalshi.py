@@ -377,3 +377,47 @@ def test_backfill_pauses_on_outage_instead_of_dropping_quotes(monkeypatch):
                         lambda *a, **k: (_ for _ in ()).throw(KalshiError(404, "u")))
     with pytest.raises(KalshiError):            # non-network errors are not retried here
         backfill.normalize_one_patiently(None, {}, {}, stats, 300, sleep=sleeps.append)
+
+
+# -- live score -----------------------------------------------------------------------
+def test_score_row_ended_match_maps_competitors_to_sides():
+    from swinglock.collectors.kalshi_normalize import competitor_sides, score_row
+    ld = load("live_data_atp_vanassche_musetti_ended_2026-10-23.json")["live_data"]
+    a, b = order_markets(VANMUS["event_ticker"], VANMUS["markets"])
+    sides = competitor_sides(a, b)                    # VAN market → A, MUS market → B
+    row = score_row("KXATPMATCH-26OCT23VANMUS", ld, sides, "2026-10-23T23:21:00Z")
+    assert (row["status"], row["match_status"]) == ("closed", "ended")
+    assert (row["sets_a"], row["sets_b"]) == (1, 2)
+    assert (row["games_a"], row["games_b"]) == (4, 6)   # last set
+    assert row["set_scores"] == "6-7(5) 7-6(7) 4-6"
+    assert row["winner"] == "B"                         # Musetti won, as the markets settled
+    assert "statistics" not in row["raw"]
+
+
+def test_score_row_live_formats():
+    """Live batch fixture (2026-10-24): points are 0/15/30/40 as given; server and advantage
+    are competitor ids."""
+    from swinglock.collectors.kalshi_normalize import score_row
+    lives = load("live_data_batch_tennis_live_2026-10-24.json")["live_datas"]
+    deuce = lives[1]["details"]
+    sides = {deuce["competitor1_id"]: "A", deuce["competitor2_id"]: "B"}
+    row = score_row("M", lives[1], sides, "2026-10-24T10:42:00Z")
+    assert (row["status"], row["match_status"]) == ("started", "")
+    assert (row["points_a"], row["points_b"]) == (40, 40)
+    assert row["advantage"] == "B" and row["server"] == "B"
+    assert (row["games_a"], row["games_b"], row["sets_a"], row["sets_b"]) == (3, 5, 0, 0)
+    assert pd.isna(row["winner"]) and row["delayed"] is False
+    # swapped orientation: competitor1 is side B
+    flipped = score_row("M", lives[1], {k: ("B" if v == "A" else "A") for k, v in sides.items()}, "2026-10-24")
+    assert (flipped["games_a"], flipped["games_b"], flipped["advantage"]) == (5, 3, "A")
+    not_started = lives[3]["details"]
+    ns = score_row("M", lives[3], {not_started["competitor1_id"]: "A", not_started["competitor2_id"]: "B"}, "2026-10-24")
+    assert ns["status"] == "not_started" and pd.isna(ns["games_a"]) and pd.isna(ns["server"]) and ns["set_scores"] == ""
+
+
+def test_score_row_refuses_unmapped_competitors():
+    from swinglock.collectors.kalshi_normalize import score_row
+    live = load("live_data_batch_tennis_live_2026-10-24.json")["live_datas"][0]
+    assert score_row("M", live, {}, "2026-10-24") is None
+    c1 = live["details"]["competitor1_id"]
+    assert score_row("M", live, {c1: "A"}, "2026-10-24") is None
