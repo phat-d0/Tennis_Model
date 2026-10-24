@@ -26,6 +26,20 @@ updates in their PR descriptions. Durable rules and facts are in `CLAUDE.md`.
 | 19 | Fair-price settlement end to end | Normalizer fills settle_a/b (#25); backtest settles not-started matches at fair prices instead of dropping them (#26) | phat-d0/Tennis_Model#24, #25, #26 |
 | 6 | Team set up | 4 role sessions started 2026-10-24 on `team/*` branches (IDs in `docs/team/lead.md`) | phat-d0/Tennis_Model#1 |
 
+## Findings so far (PRELIMINARY: 1-min candles, no depth; run locally by Data, aggregates only)
+**2026-10-24, 2,000 recent ATP/WTA matches (closes 2026-08-03 → 10-24; 2.10 M aligned observations, 12% live):**
+- **True arb:** combined ask < $1 before fees in 2.0% of observations (almost all at 99¢; 0.98: 4,072;
+  ≤ 0.95: 30). **After fees: 25 one-candle episodes in 14 matches** (11 at 1¢ slippage), depth unknown.
+  The biggest (21¢, NAKBAE, 3 days pre-match, zero volume) was a stale offer in a thin book. Read:
+  no tradeable true arb in recent ATP/WTA candles; the after-fee hits look like stale-quote artefacts.
+- **Swing-lock grid (in sample): every rule loses.** Best: X=0.20, Y=0.92 → 1,910 trades, 51.6% locked,
+  −$605 total (−$0.41/trade) at 0¢; −$900 at 1¢. Locked trades average +$1.11, unlocked −$1.86.
+  Live entries lose more than pre-match ones (−$455 vs −$150).
+- **Walk-forward gate: FAIL**: 3 folds (need 4), 0/3 positive; OOS −$361 at 0¢ (mean −$0.36/trade,
+  95% CI −0.45 to −0.27), −$537 at 1¢.
+- Not yet covered: older months, Challenger/ITF, real depth (needs the recorder), score-state splits,
+  fair-price settlements (this checkpoint predates `settle_a/b`).
+
 ## Live configuration
 - Scanner thresholds: placeholders in `config.yaml` (`min_arb_profit_per_contract` 0.5¢,
   `min_lock_profit` $0.05). None backed by a backtest yet.
