@@ -233,6 +233,10 @@ the newest 200. Format changes go through the Lead (Scanner proposes, Dashboard 
 - 2026-10-24: Swing entry filters `min_entry_ask` / `max_minutes_from_start` are gate-valid;
   `min_minutes_to_close` uses the match end (lookahead), so it's diagnostic only and walk-forward
   refuses to PASS with it on (phat-d0/Tennis_Model#29).
+- 2026-10-24 (Lead): Backfill scope = recent ATP+WTA (6 months) + recent Challenger (group 1); group 2
+  (~48.8k older/ITF matches, ~6–7 days at the archive's effective ~0.2 req/s) is **not run**: results are
+  uniform, and less bulk collection is lighter on the Kalshi Data ToU. Can run later on a separate
+  machine (never the scanner/recorder IP) if the owner asks. No API keys (no read-only scope exists).
 - 2026-10-24: Walk-forward: monthly folds by each match's first observation; expanding window;
   select on total P&L at 1¢ slippage with ≥ 10 training trades; training trades must settle before
   the test month; positive-folds check at the worst slippage, and total OOS P&L > 0 at every
@@ -296,3 +300,5 @@ the newest 200. Format changes go through the Lead (Scanner proposes, Dashboard 
   Remaining top hits are wide stale offers. Conclusion unchanged.
 - 2026-10-24: INTERIM Challenger read (3,000 matches, Aug 24 → Oct 24): no edge; after-fee arbs
   $0.71 total (1 contract); swing −$0.31 to −$0.38/trade OOS, WF FAIL 0/2. Group 1 ETA ~08:00 UTC 10-25.
+- 2026-10-24: Data container reclaimed twice (19:56, 20:34); a keep-alive background task fixed it.
+  Group 2 descoped (see Decisions).
