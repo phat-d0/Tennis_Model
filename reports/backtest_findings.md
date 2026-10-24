@@ -1,115 +1,122 @@
 # Backtest findings: do tennis arbs and swing locks exist after fees?
 
-**Status: skeleton. No real data has been run yet.** Every `TBD` below is filled from
-`python -m swinglock.backtest.run --data data/processed/kalshi --out reports/` once the Data
-role publishes the backfill on `data-store`. Only out-of-sample walk-forward numbers count as
-results. In-sample grid numbers are hypotheses.
+**Status: PRELIMINARY.** Kalshi 1-minute candles, no order-book depth, ATP + WTA only, 6 months.
+Run locally by the Data role with `python -m swinglock.backtest.run`; this report holds aggregates
+only (Kalshi data stays private). Numbers are copied from `docs/WORK_PLAN.md` "Findings so far"
+(read of 2026-10-24).
 
-## Answer in one paragraph
-TBD. Say plainly: do true arbs occur (how often, how big, how long), and does any swing-lock
-rule (X, Y) pass the gate? If nothing passes, say that first.
+## The answer
+**No.** On 6 months of Kalshi ATP/WTA match markets (4,686 matches), neither true arbs nor swing
+locks show an edge after fees and the ask spread.
+- **True arbs** (buy both players at once for under $1 after fees) show up 98 times in 40 matches,
+  almost all for one candle. They're tiny ($2.49 in total on 1-contract fills), and the biggest ones
+  look like stale or carried quotes, not offers you could actually fill. 98 is an upper bound.
+- **Swing locks** (buy one player cheap, lock later by buying the other) lose money under every
+  entry/lock rule tested: about −$0.30 per 10-contract trade in sample. Chosen on past months and
+  tested on the next, they lose in **all 6 of 6 months** (−$0.32/trade, 95% CI −$0.37 to −$0.28;
+  −$0.47 at 1¢ slippage).
+- Restricting entries to in-play only, or to the first hour of play, doesn't change that (still 0 of 6).
+- The gate fails on the **sign** of the result, not just on sample size. The loss per contract,
+  ~3–4¢, is roughly the ask spread plus the taker fee, which is what trading a fairly priced market
+  costs.
 
 ## Data used
 | Item | Value |
 |---|---|
-| Venue / series | TBD (e.g. Kalshi KXATPMATCH, KXWTAMATCH, ...) |
-| Date range (UTC) | TBD |
-| Matches (settled A/B) | TBD |
-| Quote source | TBD: candle (1-min, no depth) / orderbook (recorded) |
-| Aligned observations | TBD (as-of join, max staleness 60s) |
-| Fees | Kalshi taker, round up per order to $0.01; per-series fee_type/multiplier |
-| Run | commit TBD, `config.yaml` as of TBD |
+| Venue / series | Kalshi KXATPMATCH, KXWTAMATCH ("group 0") |
+| Matches | 4,686 (market close 2026-04-24 → 2026-10-24) |
+| Fair-price settlements (match never started) | 161, settled at Kalshi's fair price via `settle_a/settle_b` |
+| Quote source | 1-minute candles (YES bid/ask close per market), each leg carried forward ≤ 1,800 s; **no depth** |
+| Aligned observations | 5.09 M (as-of join, max staleness 60 s); 12% live (after scheduled start) |
+| Fees | Kalshi taker 0.07 × C × P × (1−P), rounded up per order to $0.01; multiplier 1 |
+| Fills | buy at the ask (+ slippage, 0¢ and 1¢), never mid or last |
 
 ## 1. True arb: ask(A) + ask(B) + fees < $1 at the same moment
-Source: `arb_episodes.csv`, `arb_by_match.csv`.
+| Metric | Value |
+|---|---|
+| Observations with combined ask < $1 **before** fees | 2.46% (99¢: 109,629; 98¢: 13,821; ≤ 95¢: 127) |
+| After-fee arb episodes, 0¢ slippage | **98 in 40 matches** (upper bound, see below) |
+| After-fee arb episodes, 1¢ slippage | 26 in 18 matches |
+| Typical duration | median one candle (≤ 1 minute observed) |
+| Sum of one-fill profits | $2.49 (1 contract each; depth unknown) |
+| Largest | NAKBAE 21¢ (stale pre-match quote); PELMAN 13¢ (used a carried leg); CHOVAN 13¢ (zero volume) |
 
-| Metric | All | Pre-match | Live |
-|---|---|---|---|
-| Matches with ≥1 arb episode | TBD | TBD | TBD |
-| % of observations in arb | TBD | TBD | TBD |
-| Episodes | TBD | TBD | TBD |
-| Median / p90 duration (s, lower bound) | TBD | TBD | TBD |
-| Median best edge per contract after fees | TBD | TBD | TBD |
-| Median matched depth (contracts) | TBD | TBD | TBD |
-| Sum of one-fill profits ($) | TBD | TBD | TBD |
-| … at 1¢ slippage | TBD | TBD | TBD |
-
-By tier (ATP / WTA / Challenger / ITF): TBD.
-
-Reading: with candle data, arbs shorter than a minute are invisible and depth is unknown, so
-dollar profit is for 1 contract (the most fee-heavy case).
+**Read:** a combined price of 99¢ is common, but after two taker fees (each ≥ 1¢, rounded up per
+order) almost none clear $1. The few that do are single candles, mostly pre-match in thin books,
+and the largest ones came from a stale or carried quote. **98 is an upper bound**: the 1,800 s
+carry can pair a stale leg with a fresh one. A stricter count that ignores legs whose price hasn't
+changed for N seconds (`backtest.arb_max_leg_age_s`) is available; the 60 s / 300 s runs are
+pending. Not reported yet: the split by pre-match vs live and by tier.
 
 ## 2. Swing-lock grid (in sample: a hypothesis, not a result)
-Source: `grid_metrics.csv`, `grid_trades.csv`. Mode `first` (one entry per match on whichever
-side triggers first) unless stated. X = entry ask ≤ X; Y = lock when all-in entry + lock ask + fee ≤ Y.
+Rule: buy 10 contracts of the first side whose ask ≤ X; lock when entry all-in + other ask + fee ≤ Y;
+otherwise hold to settlement. X ∈ {0.20 … 0.60}, Y ∈ {0.90 … 0.99}, mode "first".
 
-| Metric | Best (X, Y) in sample | Median over grid |
-|---|---|---|
-| Trades | TBD | TBD |
-| Lock rate | TBD | TBD |
-| Avg locked P&L ($) | TBD | TBD |
-| Avg loss on unlocked positions ($) | TBD | TBD |
-| Total P&L ($) / per trade | TBD | TBD |
-| Return on capital per trade | TBD | TBD |
-| Hit rate | TBD | TBD |
-| Max drawdown ($) | TBD | TBD |
-| Peak / average capital tied up ($) | TBD | TBD |
+| Metric | Best rule in sample (X = 0.20, Y = 0.90) |
+|---|---|
+| Trades | 4,509 |
+| Lock rate | 48.8% |
+| Total P&L at 0¢ / 1¢ | −$1,374 / −$2,023 |
+| P&L per trade at 0¢ | −$0.30 |
 
-Heatmap or table of total P&L over X × Y: TBD (is the best cell isolated, i.e. likely noise,
-or part of a smooth region?).
+**Every rule in the grid is negative.** From the earlier 2,000-match read (same method), locked
+trades averaged +$1.11 and unlocked −$1.86. That split is selection (the trades that happened to
+swing), not an edge. Entry diagnostics on that read: losses don't come from near-decided matches
+(only 1–3% of entries are below 10¢). Entries at or above 10¢ lose at every X, and lose more as X
+rises (−$0.33/trade at X = 0.20 → −$1.09 at X = 0.50).
 
 ## 3. Walk-forward gate (the headline)
-Source: `walkforward_gate.csv`, `walkforward_folds.csv`, `walkforward_trades.csv`.
-Rule (mode, X, Y) chosen on earlier months only (expanding window, training trades must have
-settled before the test month; objective: total P&L at 1¢ slippage; at least 10 training trades),
-then run unchanged on the next month.
+Rule chosen each month on earlier months only (expanding window; best total P&L at 1¢ slippage
+with ≥ 10 training trades; training trades must have settled before the test month), then run
+unchanged on the next month.
 
-**Verdict: TBD (PASS / FAIL + failed checks)**
+**Verdict: FAIL, 0 of 6 folds positive (May–Oct 2026).**
 
-| Fold | Test month | Chosen (X, Y) | OOS trades | OOS P&L 0¢ | OOS P&L 1¢ | Lock rate |
-|---|---|---|---|---|---|---|
-| 1 | TBD | TBD | TBD | TBD | TBD | TBD |
-| 2 | TBD | TBD | TBD | TBD | TBD | TBD |
-| 3 | TBD | TBD | TBD | TBD | TBD | TBD |
-| 4 | TBD | TBD | TBD | TBD | TBD | TBD |
+| Variant | Folds positive | OOS trades | Mean P&L/trade 0¢ (95% CI) | Mean P&L/trade 1¢ (95% CI) |
+|---|---|---|---|---|
+| Default (all entries) | 0 / 6 | 4,432 | −$0.32 (−0.37 to −0.28) | −$0.47 (−0.52 to −0.43) |
+| `entry_phase: live` (in-play only) | 0 / 6 | n/r | −$0.27 | −$0.43 |
+| First hour of play (`min/max_minutes_from_start` 0–60) | 0 / 6 | 3,108 | −$0.27 | −$0.42 |
 
-| Gate check | Required | Actual |
+(n/r = not reported in the run summary.) CIs come from a bootstrap that resamples whole matches.
+
+| Gate check | Required | Default variant |
 |---|---|---|
-| Folds | ≥ 4 | TBD |
-| Positive folds at 1¢ | ≥ 3 of 4 (4 of 5) | TBD |
-| Total OOS P&L at 0¢ / 1¢ | > 0 / > 0 | TBD / TBD |
-| OOS trades | ≥ 30 | TBD |
-| Mean P&L per trade, 95% CI (match bootstrap) | report | TBD [TBD, TBD] |
-| No-lookahead test | passes | `tests/test_backtest*.py` (TBD: CI run link) |
+| Folds | ≥ 4 | 6 ✔ |
+| Positive folds at 1¢ | ≥ 5 of 6 (⌈0.75 × 6⌉) | 0 ✘ |
+| Total OOS P&L > 0 at 0¢ and 1¢ | yes | no ✘ |
+| OOS trades | ≥ 30 | 4,432 ✔ |
+| No-lookahead test | passes | ✔ (`tests/test_backtest*.py`) |
 
-Does the chosen rule stay stable across folds? TBD.
-
-## 4. Breakdowns (out-of-sample trades of the walk-forward rule)
-Source: `breakdowns.csv` (in sample) and `walkforward_trades.csv` (out of sample).
-
-| Dimension | Value | Trades | Lock rate | P&L / trade | Hit rate |
-|---|---|---|---|---|---|
-| Phase at entry | pre | TBD | TBD | TBD | TBD |
-| Phase at entry | live | TBD | TBD | TBD | TBD |
-| Role at entry | favorite (ask > 0.5) | TBD | TBD | TBD | TBD |
-| Role at entry | underdog | TBD | TBD | TBD | TBD |
-| Tier | ATP / WTA / Challenger / ITF | TBD | TBD | TBD | TBD |
-| Score state | (once Data joins live score) | TBD | TBD | TBD | TBD |
+## 4. Breakdowns
+| Dimension | Finding |
+|---|---|
+| Phase | In-play-only entries: still 0/6 folds, −$0.27/trade OOS (0¢). The earlier 2,000-match read had live entries losing more in total than pre-match ones (−$455 vs −$150 at X = 0.20/Y = 0.92). |
+| Entry price | < 10¢ entries are 1–3% and slightly positive; ≥ 10¢ entries lose at every X (2,000-match read). |
+| Favorite vs underdog | not reported yet |
+| Tier | ATP vs WTA split not reported yet; Challenger/ITF not run yet |
+| Score state | needs the recorder's score history (no history before recording started) |
 
 ## 5. Caveats (read next to every number)
-- **Candle data:** 1-minute sampled asks with no depth. Fills are assumed at the sampled ask in
-  full size (optimistic); moves between samples are missed (pessimistic for short locks/arbs).
-  Re-run on recorded order books when the recorder has enough history.
+- **Candles, not order books.** 1-minute closes of YES bid/ask per market, with no depth. Fills
+  assume the sampled ask in full size (optimistic); moves inside a minute are missed (pessimistic
+  for short-lived arbs and locks). The carried quote can lag the live book by up to 60 s.
+- **Carry.** Each leg's last candle is carried forward up to 1,800 s. Candles are written on quote
+  changes, so carrying is usually right (140/144 live checks matched), but it can pair a stale leg
+  with a fresh one, which inflates the true-arb count.
 - **Fills:** buy at ask + slippage, Kalshi taker fee rounded up per order; no queue position,
-  latency, partial fills or market impact.
+  latency, partial fills or market impact. Maker (resting-order) strategies were not tested.
 - **Settlement time** is each match's last aligned quote (proxy for capital and drawdown timing).
-- **Retirements / walkovers:** a not-started match settles at a "fair price" and a retirement
-  settles the retiring player's market to No; check how many trades these affect.
-- **Selection:** the in-sample grid is never the headline; walk-forward picks rules on past months only.
-- **Fee constants** (0.07 / 0.0175) still await the owner's confirmation at kalshi.com/fee-schedule;
-  rounding assumes a direct (cent-rounded) account.
-- **Sample size:** few months means few folds; a FAIL for "not enough folds" says nothing either way.
+- **Retirements:** a retirement after the first ball settles the retiring player's market to No;
+  matches that never started are settled at Kalshi's fair price (161 here).
+- **Fee constants** (0.07 / 0.0175) still await the owner's confirmation at kalshi.com/fee-schedule.
+- **Scope:** ATP/WTA only, 6 months. Older months, Challenger/ITF and real order-book depth are not
+  covered yet.
 - Kalshi data is for the owner's private research only; this report must not be published.
 
 ## Next steps
-TBD (e.g. re-run on order-book data; add score-state breakdown; cross-venue check).
+1. Stricter true-arb count with `backtest.arb_max_leg_age_s` at 60 s and 300 s (Data runs it on group 0).
+2. Re-run on recorded order books (real depth, 10 s snapshots) once the VPS recorder has history.
+3. Challenger/ITF and older months as the backfill completes.
+4. Score-state and favorite/underdog splits; a maker-order variant only if the owner wants it
+   (it needs queue assumptions the data can't verify).

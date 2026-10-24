@@ -307,3 +307,39 @@ def test_in_play_window_and_phase_filters():
         {"entry_phase": "live", "min_minutes_from_start": 0.0}
     with pytest.raises(ValueError):
         entry_filters(cfg_with(entry_phase="inplay"))
+
+
+# ---- stale-leg arb filter (arb_max_leg_age_s) -------------------------------
+# Candle-like grid every 60s: A's ask sits at 0.40 from t=0 (carried), B drifts down to 0.50.
+
+def stale_path(a_fresh_at=None):
+    rows = [(s, 0.40 if a_fresh_at is None or s >= a_fresh_at else 0.45, 0.60 - s / 6000) for s in range(0, 660, 60)]
+    return path(rows, size=np.nan, source="candle")
+
+
+def test_leg_age_in_aligned_frame():
+    al = align(stale_path())
+    last = al.iloc[-1]
+    assert (last["ts"], last["age_a"], last["age_b"]) == (t(600), 600.0, 0.0)
+    # no lookahead: dropping later quotes doesn't change an earlier row's age
+    early = align(stale_path()[lambda d: d["ts"] <= t(300)])
+    assert early.iloc[-1]["age_a"] == al.set_index("ts").loc[t(300), "age_a"] == 300.0
+    # a change of source market resets the age even at the same price
+    q = quotes([(0, "A", 0.40, np.nan), (0, "B", 0.70, np.nan), (60, "A", 0.40, np.nan), (60, "B", 0.69, np.nan)])
+    q["ask_source"] = ["yes:X", "yes:Y", "no:Y", "yes:Y"]
+    assert list(align(q)["age_a"]) == [0.0, 0.0]
+
+
+def test_arb_max_leg_age_filter():
+    m = matches("M1")
+    base, _ = scan_arb(align(stale_path()), m, CFG)
+    # 1-contract arb from t=300 (0.40 + 0.55 + 2 x 2c fees = 0.99) to t=600; best fill at t=600
+    e = base.iloc[0]
+    assert len(base) == 1 and (e["start"], e["end"], e["leg_age_s"]) == (t(300), t(600), 600.0)
+    strict, summ = scan_arb(align(stale_path()), m, cfg_with(arb_max_leg_age_s=240))
+    assert strict.empty and summ.iloc[0]["n_arb"] == 0          # A had sat unchanged for >= 5 min
+    edge, _ = scan_arb(align(stale_path()), m, cfg_with(arb_max_leg_age_s=300))
+    assert (edge.iloc[0]["n_obs"], edge.iloc[0]["leg_age_s"]) == (1, 300.0)    # only t=300 qualifies
+    assert len(scan_arb(align(stale_path()), m, cfg_with(arb_max_leg_age_s=900))[0]) == 1
+    fresh, _ = scan_arb(align(stale_path(a_fresh_at=540)), m, cfg_with(arb_max_leg_age_s=240))
+    assert len(fresh) == 1 and fresh.iloc[0]["leg_age_s"] == 60.0  # A just moved to 0.40
