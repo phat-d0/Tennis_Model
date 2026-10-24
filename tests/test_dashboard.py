@@ -170,22 +170,62 @@ def _node_playwright() -> bool:
     return subprocess.run(["node", "-e", "require('playwright')"], capture_output=True).returncode == 0
 
 
-@pytest.mark.skipif(not _node_playwright(), reason="needs node + playwright")
-@pytest.mark.parametrize("fresh", [True, False])
-def test_page_in_browser(serve, tmp_path, fresh):
-    """Phone + laptop, light + dark: no page errors, no horizontal overflow, stale banner logic."""
-    s = json.loads(SAMPLE_STATE.read_text())
-    if fresh:
-        s["generated_at"] = datetime.now(UTC).strftime("%Y-%m-%dT%H:%M:%SZ")
-    state = tmp_path / "state.json"
-    state.write_text(json.dumps(s))
+def _run_check(base: str, search: str = "") -> list[dict]:
     script = Path(__file__).parents[1] / "swinglock" / "dashboard" / "check_page.js"
-    r = subprocess.run(["node", str(script), serve(state) + "/"], capture_output=True, text=True, timeout=120)
+    r = subprocess.run(["node", str(script), base + "/", "", search],
+                       capture_output=True, text=True, timeout=180)
     out = json.loads(r.stdout)
     assert r.returncode == 0 and out["problems"] == [], out["problems"] or r.stderr
     assert len(out["results"]) == 4
-    for res in out["results"]:
+    return out["results"]
+
+
+def _now() -> str:
+    return datetime.now(UTC).strftime("%Y-%m-%dT%H:%M:%SZ")
+
+
+@pytest.mark.skipif(not _node_playwright(), reason="needs node + playwright")
+@pytest.mark.parametrize("fresh", [True, False])
+def test_page_in_browser(serve, tmp_path, fresh):
+    """Phone + laptop, light + dark: no page errors, no horizontal overflow, stale banner, filters."""
+    s = json.loads(SAMPLE_STATE.read_text())
+    if fresh:
+        s["generated_at"] = _now()
+    state = tmp_path / "state.json"
+    state.write_text(json.dumps(s))
+    for res in _run_check(serve(state), "swiatek"):
         assert res["status"] == ("ok" if fresh else "stale")
-        assert res["markets"] == 5 and res["alerts"] == 3
+        assert res["markets"] == 4 and res["noMarket"] == 1 and res["alerts"] == 3
         assert res["arbRows"] == 1 and res["lockRows"] == 1
         assert res["firstMarket"] == "Jaime Faria vs Nicolas Brunold"   # sorted by combined + fees
+        f = res["filters"]
+        assert f["search"] == {"rows": 1, "noMarket": 0, "label": "1 of 5 matches"}
+        assert f["pre"] == {"rows": 1, "noMarket": 0, "label": "1 of 5 matches"}
+        assert f["all"] == {"rows": 4, "noMarket": 1, "label": "5 matches"}
+
+
+@pytest.mark.skipif(not _node_playwright(), reason="needs node + playwright")
+def test_page_with_many_matches(serve, tmp_path):
+    """~100 matches (the real scanner lists 95+): still no overflow or errors; filters scale."""
+    s = json.loads(SAMPLE_STATE.read_text())
+    s["generated_at"] = _now()
+    base = s["matches"]
+    s["matches"] = []
+    for i in range(100):
+        m = dict(base[i % len(base)])
+        m["match_id"] = f"{m['match_id']}-{i}"
+        m["player_a"] = f"{m['player_a']} {i}"
+        m["phase"] = ("live", "pre", "unknown")[i % 3]
+        s["matches"].append(m)
+    state = tmp_path / "state.json"
+    state.write_text(json.dumps(s))
+    no_ask = sum(1 for m in s["matches"] if m["ask_b"] is None)
+    pre = [m for m in s["matches"] if m["phase"] == "pre"]
+    for res in _run_check(serve(state), "krueger 4"):   # every search word must match
+        assert res["markets"] == 100 - no_ask and res["noMarket"] == no_ask
+        hay = [" ".join(m[k] for k in ("player_a", "player_b", "tier", "series", "match_id")).lower()
+               for m in s["matches"] if m["ask_b"] is not None]
+        hits = [h for h in hay if "krueger" in h and "4" in h]
+        assert 0 < res["filters"]["search"]["rows"] == len(hits) < 100 - no_ask
+        assert res["filters"]["pre"]["rows"] + res["filters"]["pre"]["noMarket"] == len(pre)
+        assert res["filters"]["all"]["label"] == "100 matches"

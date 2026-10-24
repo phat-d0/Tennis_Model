@@ -148,14 +148,48 @@ function matchCell(m) {
 // Cell content sits in one span so the phone card layout keeps label and value as two flex items.
 const td = (label, ...kids) => el("td", { class: "num", "data-label": label }, el("span", {}, ...kids));
 
+const hasBothAsks = (m) => isNum(m.ask_a) && isNum(m.ask_b);
+
+function matchesFilter(m, q, phase) {
+  if (phase !== "all" && (m.phase || "unknown") !== phase) return false;
+  if (!q) return true;
+  const hay = [m.player_a, m.player_b, m.tier, m.series, m.match_id].join(" ").toLowerCase();
+  return q.split(/\s+/).every((w) => hay.includes(w));
+}
+
+// Phase options carry live counts; any phase value outside the contract still gets an option.
+function syncPhaseOptions(all) {
+  const sel = $("phase");
+  const counts = { all: all.length };
+  for (const m of all) { const p = m.phase || "unknown"; counts[p] = (counts[p] || 0) + 1; }
+  for (const p of Object.keys(counts)) {
+    if (![...sel.options].some((o) => o.value === p)) sel.append(el("option", { value: p }, p));
+  }
+  for (const o of sel.options) {
+    o.textContent = `${o.dataset.label || (o.dataset.label = o.textContent)} (${counts[o.value] || 0})`;
+  }
+}
+
 function renderMarkets(s) {
   const body = $("markets");
   const locks = profitableLocks(s);
-  const rows = [...(s.matches || [])].sort(SORTS[$("sort").value] || SORTS.cwf);
+  const all = s.matches || [];
+  syncPhaseOptions(all);
+  const q = $("q").value.trim().toLowerCase();
+  const shown = all.filter((m) => matchesFilter(m, q, $("phase").value));
+  const rows = shown.filter(hasBothAsks).sort(SORTS[$("sort").value] || SORTS.cwf);
+  const noMarket = shown.filter((m) => !hasBothAsks(m))
+    .sort((a, b) => `${a.player_a} ${a.player_b}`.localeCompare(`${b.player_a} ${b.player_b}`));
+
+  $("m-count").textContent = shown.length === all.length
+    ? `${all.length} matches`
+    : `${shown.length} of ${all.length} matches`;
+
   body.replaceChildren();
   if (!rows.length) {
-    body.append(el("tr", {}, el("td", { colspan: 7, class: "empty" }, "No markets in state.json.")));
-    return;
+    const msg = !all.length ? "No markets in state.json."
+      : shown.length ? "No match has asks on both sides." : "No markets match the filter.";
+    body.append(el("tr", {}, el("td", { colspan: 7, class: "empty" }, msg)));
   }
   for (const m of rows) {
     const arb = isArb(m), lock = locks.has(m.match_id);
@@ -170,6 +204,17 @@ function renderMarkets(s) {
       td("Combined + fees", isNum(cwf) ? el("span", { class: cwf < 1 ? "pos" : "" }, cents(cwf)) : cents(cwf)),
       td("Arb", arb ? [qty(m.arb_contracts) + " ct · ", money(m.arb_profit)] : el("span", { class: "na" }, "—"))));
   }
+
+  // Matches missing an ask on a side (often ended, suspended or not yet listed): one collapsed group.
+  $("nomarket").hidden = !noMarket.length;
+  $("nomarket-sum").textContent = `No market: ${noMarket.length} match${noMarket.length === 1 ? "" : "es"} without an ask on both sides`;
+  $("nomarket-list").replaceChildren(...noMarket.map((m) => {
+    const missing = !isNum(m.ask_a) && !isNum(m.ask_b) ? "no asks"
+      : `no ask on ${(!isNum(m.ask_a) ? m.player_a : m.player_b) || "one side"}`;
+    return el("li", {},
+      el("span", { class: "players" }, `${m.player_a || "?"} vs ${m.player_b || "?"}`),
+      el("span", { class: "why" }, `${m.tier || m.series || ""} · ${m.phase || "unknown"} · ${missing}`));
+  }));
 }
 
 function held(c, avg) {
@@ -294,6 +339,15 @@ function applyTheme(v) {
 })();
 
 $("sort").addEventListener("change", render);
+$("phase").addEventListener("change", () => {
+  render();
+  try { localStorage.setItem("swinglock-phase", $("phase").value); } catch (_) { /* ignore */ }
+});
+$("q").addEventListener("input", render);
+try {
+  const p = localStorage.getItem("swinglock-phase");
+  if (p && [...$("phase").options].some((o) => o.value === p)) $("phase").value = p;
+} catch (_) { /* storage blocked */ }
 setInterval(renderStatus, 1000);   // keep the age and stale warning ticking between polls
 document.addEventListener("visibilitychange", () => { if (!document.hidden) poll(); });
 poll();
