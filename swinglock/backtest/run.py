@@ -109,7 +109,7 @@ def summary_md(data_dir, matches, quotes, aligned, episodes, by_match, grid, bd,
             "avg_return", "hit_rate", "max_drawdown", "peak_capital"]
     traded = grid[grid["n_trades"] > 0].sort_values("total_pnl", ascending=False)
     lines += [md_table(traded[cols].head(10)), ""]
-    filt = ", ".join(f"{k}={v:g}" for k, v in (filters or {}).items()) or "none"
+    filt = ", ".join(f"{k}={_fmt(v)}" for k, v in (filters or {}).items()) or "none"
     look = [k for k in (filters or {}) if k in LOOKAHEAD_FILTERS]
     lines += [f"Entry filters: {filt}" + (f" (**{', '.join(look)} uses lookahead: diagnostic only**)" if look else ""),
               ""]

@@ -9,7 +9,7 @@ from swinglock.backtest.arb import scan_arb
 from swinglock.backtest.grid import entry_diagnostics, grid_search, grid_trades
 from swinglock.backtest.metrics import breakdown, capital_usage, max_drawdown, summarize
 from swinglock.backtest.run import main
-from swinglock.backtest.swing import match_paths, simulate
+from swinglock.backtest.swing import entry_filters, match_paths, simulate
 from swinglock.schema import MATCH_COLUMNS, QUOTE_COLUMNS, conform
 
 T0 = pd.Timestamp("2026-01-01 12:00", tz="UTC")
@@ -287,3 +287,23 @@ def test_entry_diagnostics_per_rule():
     assert swing["ask_p50"] == pytest.approx(0.38) and swing["frac_ask_lt_10c"] == 0
     assert swing["mtc_p50"] == pytest.approx(20)
     assert swing["pnl_ask_ge_10c"] == pytest.approx(10 - 3.97 - 0.43)              # B 0.38 locked by A at 4c
+
+
+def test_in_play_window_and_phase_filters():
+    # Start at t=900s: rows at -15, -5 (pre) and +5, +15 min (live). B dips to 0.38 pre-match;
+    # A collapses to 4c in play.
+    q, m = path(LATE_PATH), matches("M1", winner="A", start=t(900))
+    side = lambda **f: list(trades_for(q, m, x=0.40, cfg=cfg_with(**f))["side"])   # noqa: E731
+    assert side() == ["B"]
+    assert side(entry_phase="any") == ["B"] and side(entry_phase=None) == ["B"]
+    assert side(entry_phase="live") == ["A"] and side(entry_phase="pre") == ["B"]
+    assert side(min_minutes_from_start=0, max_minutes_from_start=60) == ["A"]     # in play, first hour
+    assert side(min_minutes_from_start=0) == ["A"]
+    assert side(min_minutes_from_start=-10, max_minutes_from_start=0) == ["B"]
+    r = trades_for(q, m, x=0.40, cfg=cfg_with(min_minutes_from_start=6, max_minutes_from_start=60)).iloc[0]
+    assert (r["side"], r["entry_ask"], r["minutes_from_start"]) == ("A", 0.03, 15)   # skips the +5 min row
+    assert trades_for(q, matches("M1", winner="A"), x=0.40, cfg=cfg_with(min_minutes_from_start=0)).empty
+    assert entry_filters(cfg_with(entry_phase="live", min_minutes_from_start=0)) == \
+        {"entry_phase": "live", "min_minutes_from_start": 0.0}
+    with pytest.raises(ValueError):
+        entry_filters(cfg_with(entry_phase="inplay"))

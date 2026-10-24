@@ -9,7 +9,9 @@ and the other side's depth (when known) covers the position; the fill itself com
 
 Entry filters (config backtest.*, all off by default) also require, at the entry row:
 - `min_entry_ask`: ask >= this (skips near-decided matches quoted at a few cents);
-- `max_minutes_from_start`: at most this many minutes after scheduled_start (known live);
+- `min_minutes_from_start` / `max_minutes_from_start`: a window in minutes after scheduled_start
+  (known live; negative = before the start), e.g. 0 and 60 for the first hour of play only;
+- `entry_phase`: "live" or "pre" (row phase from align); "any" = off;
 - `min_minutes_to_close`: at least this many minutes before the match's last observation.
   LOOKAHEAD: the end time isn't known live, so this one is a diagnostic only and results
   using it don't count for the gate.
@@ -43,14 +45,21 @@ from ..locks import SIDES, Holding, buy_cost, lock_quote, other
 from .align import match_fees
 
 MODES = ("first", "both")
-ENTRY_FILTERS = ("min_entry_ask", "max_minutes_from_start", "min_minutes_to_close")
+ENTRY_FILTERS = ("min_entry_ask", "min_minutes_from_start", "max_minutes_from_start", "min_minutes_to_close")
+ENTRY_PHASES = ("any", "pre", "live")
 LOOKAHEAD_FILTERS = ("min_minutes_to_close",)
 
 
-def entry_filters(cfg: dict[str, Any]) -> dict[str, float]:
-    """Active entry filters from config backtest.* (unset or null = off)."""
+def entry_filters(cfg: dict[str, Any]) -> dict[str, Any]:
+    """Active entry filters from config backtest.* (unset or null = off; entry_phase "any" = off)."""
     bt = cfg.get("backtest") or {}
-    return {k: float(bt[k]) for k in ENTRY_FILTERS if bt.get(k) is not None}
+    out: dict[str, Any] = {k: float(bt[k]) for k in ENTRY_FILTERS if bt.get(k) is not None}
+    phase = bt.get("entry_phase") or "any"
+    if phase not in ENTRY_PHASES:
+        raise ValueError(f"backtest.entry_phase must be one of {ENTRY_PHASES}, got {phase!r}")
+    if phase != "any":
+        out["entry_phase"] = phase
+    return out
 
 
 @dataclass
@@ -149,21 +158,26 @@ def _minutes(p: MatchPath) -> tuple[np.ndarray, np.ndarray]:
     return to_close, from_start
 
 
-def _allowed(p: MatchPath, filters: dict[str, float]) -> np.ndarray | None:
+def _allowed(p: MatchPath, filters: dict[str, Any]) -> np.ndarray | None:
     """Rows where entry filters pass (None = no filters). Unknown start time fails a
-    max_minutes_from_start filter."""
+    minutes-from-start window."""
     if not filters:
         return None
     to_close, from_start = _minutes(p)
     ok = np.ones(len(p.ts), bool)
-    if "max_minutes_from_start" in filters:
-        ok &= ~np.isnan(from_start) & (from_start <= filters["max_minutes_from_start"])
+    if "min_minutes_from_start" in filters or "max_minutes_from_start" in filters:
+        lo = filters.get("min_minutes_from_start", -np.inf)
+        hi = filters.get("max_minutes_from_start", np.inf)
+        with np.errstate(invalid="ignore"):
+            ok &= ~np.isnan(from_start) & (from_start >= lo) & (from_start <= hi)
+    if "entry_phase" in filters:
+        ok &= p.phase == filters["entry_phase"]
     if "min_minutes_to_close" in filters:
         ok &= to_close >= filters["min_minutes_to_close"]
     return ok
 
 
-def _first_trigger(p: MatchPath, side: str, x: float, filters: dict[str, float] | None = None,
+def _first_trigger(p: MatchPath, side: str, x: float, filters: dict[str, Any] | None = None,
                    allowed: np.ndarray | None = None) -> int | None:
     ask, size = p.ask[side], p.size[side]
     ok = (ask <= x) & (ask > 0) & (np.isnan(size) | (size > 0))
@@ -175,7 +189,7 @@ def _first_trigger(p: MatchPath, side: str, x: float, filters: dict[str, float] 
     return int(hit[0]) if hit.size else None
 
 
-def _entries(p: MatchPath, x: float, mode: str, filters: dict[str, float] | None = None) -> list[tuple[str, int]]:
+def _entries(p: MatchPath, x: float, mode: str, filters: dict[str, Any] | None = None) -> list[tuple[str, int]]:
     allowed = _allowed(p, filters or {})
     hits = [(s, i) for s in SIDES if (i := _first_trigger(p, s, x, filters, allowed)) is not None]
     if mode == "both" or not hits:
