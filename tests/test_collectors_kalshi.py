@@ -283,3 +283,66 @@ def test_carry_forward_is_capped():
     q2 = candles_to_quotes("M", "M-A", "M-B", ca, cb, max_carry_s=None)
     assert q_at(q2, 400, "B")["ask"] == pytest.approx(0.58)
     assert q_at(q2, 400, "A")["ask"] == pytest.approx(0.42)
+
+
+# -- backfill planning ----------------------------------------------------------------
+def _item(i, open_s, close_s, tier_="atp", hist=False):
+    return {"open": pd.Timestamp(open_s, unit="s", tz="UTC"), "close": pd.Timestamp(close_s, unit="s", tz="UTC"),
+            "tickers": [f"E{i}-A", f"E{i}-B"], "tier": tier_, "historical": hist}
+
+
+def test_plan_batches_respects_requested_candle_cap():
+    # 40 matches, each live ~13 h, opening 20 min apart → several share a request
+    items = [_item(i, i * 1200, i * 1200 + 800 * 60) for i in range(40)]
+    batches = backfill.plan_batches(items)
+    assert sum(map(len, batches)) == 40
+    for bt in batches:
+        lo = min(backfill._span(r)[0] for r in bt)
+        hi = max(backfill._span(r)[1] for r in bt)
+        assert backfill.requested_candles(2 * len(bt), lo, hi) <= backfill.BATCH_CANDLE_CAP
+        assert 2 * len(bt) <= backfill.MAX_TICKERS
+    assert max(map(len, batches)) >= 4
+    # the live 400 seen on 2026-10-24: 2 tickers × 5,001 minutes = 10,002 requested
+    assert backfill.requested_candles(2, 0, 5000 * 60) == 10_002
+    lo, hi = backfill.windows(pd.Timestamp(0, unit="s", tz="UTC"), pd.Timestamp(10**6, unit="s", tz="UTC"))[0]
+    assert backfill.requested_candles(2, lo, hi) <= backfill.BATCH_CANDLE_CAP
+
+
+def test_prefetch_batch_seeds_per_match_cache(tmp_path):
+    def cand(t):
+        return {"end_period_ts": t, "yes_bid": {"close_dollars": "0.4"}, "yes_ask": {"close_dollars": "0.42"}}
+    r1, r2 = _item(1, 600, 3600), _item(2, 3000, 7200)
+    resp = {"markets": [{"market_ticker": "E1-A", "candlesticks": [cand(660), cand(3600)]},
+                        {"market_ticker": "E1-B", "candlesticks": [cand(660)]},
+                        {"market_ticker": "E2-A", "candlesticks": [cand(3060), cand(7200)]},
+                        {"market_ticker": "E2-B", "candlesticks": []}]}
+    c, _ = client(tmp_path, [FakeResp(200, resp)])
+    stats = {"group_errors": 0, "grouped_matches": 0}
+    backfill.prefetch_batch(c, [r1, r2], stats)
+    assert c.requests_made == 1 and stats["grouped_matches"] == 2
+    assert c.session.calls[0][1]["market_tickers"] == "E1-A,E1-B,E2-A,E2-B"
+    # fetch_candles for each match is now a pure cache hit with only that match's window
+    got1 = backfill.fetch_candles(c, r1["tickers"], r1["open"], r1["close"], historical=False)
+    got2 = backfill.fetch_candles(c, r2["tickers"], r2["open"], r2["close"], historical=False)
+    assert c.requests_made == 1
+    assert [x["end_period_ts"] for x in got1["E1-A"]] == [660, 3600]
+    assert [x["end_period_ts"] for x in got2["E2-A"]] == [3060, 7200] and got2["E2-B"] == []
+
+
+def test_prefetch_batch_falls_back_on_error(tmp_path):
+    c, _ = client(tmp_path, [FakeResp(400, {"error": "bad request"})])
+    stats = {"group_errors": 0, "grouped_matches": 0}
+    backfill.prefetch_batch(c, [_item(1, 600, 3600), _item(2, 600, 3600)], stats)
+    assert stats["group_errors"] == 1 and stats["grouped_matches"] == 0
+
+
+def test_work_order_priority():
+    now = pd.Timestamp("2026-10-24", tz="UTC")
+    recent, old = now - pd.Timedelta(days=10), now - pd.Timedelta(days=400)
+    def it(t, close):
+        return {"tier": t, "close": close}
+    assert backfill.priority(it("atp", recent), now, 183) == 0
+    assert backfill.priority(it("wta", recent), now, 183) == 0
+    assert backfill.priority(it("challenger", recent), now, 183) == 1
+    assert backfill.priority(it("itf", recent), now, 183) == 2
+    assert backfill.priority(it("atp", old), now, 183) == 2
