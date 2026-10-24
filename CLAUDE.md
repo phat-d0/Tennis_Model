@@ -57,6 +57,18 @@ tests/                      pytest; fixtures/ holds trimmed real API responses
   KXLAVERCUPMATCH, KXSIXKINGSMATCH (quadratic).
 - Fee formula (taker): round_up(M × 0.07 × C × P × (1−P)); maker 0.0175 where charged.
   Full details & sources: docs/research/kalshi_api.md.
+- Polymarket (intl): public read APIs (Gamma discovery, CLOB `/book`, prices-history, trades),
+  tennis tag id 864; each match = one market with two player tokens (not negRisk).
+  `/book` levels are sorted worst-first (best = last element); `/price?side=SELL` returns the ask.
+  Sports taker fee 0.05 × p × (1−p) per share. prices-history is a single (mid-like) series,
+  so there's no historical bid/ask; ask-based backtests need our own recorded books.
+  **US users can't trade intl.** Polymarket US is a separate CFTC venue with its own public
+  read API (WS needs a signed key), taker coefficient 0.0695. Walkover settlement differs
+  (US: last fair price; intl: 50-50), so check rule mismatches before calling a cross-venue gap an arb.
+  Details: docs/research/other_venues.md (some facts from search summaries; re-verify before coding).
+- DraftKings Predictions: **no public/partner API**. ToU (2026-08-04) bans bots/scrapers and
+  limits use to personal non-commercial. It's a broker (FCM) routing to CME / Crypto.com / DKeX /
+  Bitnomial. Fee ≈ flat $0.02/contract between $0.30 and $0.94. → manual logging only.
 
 ## Decisions
 - 2026-10-24: Python 3.13, pandas + parquet storage, requests for REST, websockets for WS.
@@ -70,16 +82,19 @@ tests/                      pytest; fixtures/ holds trimmed real API responses
 - [x] Core math: fees, true arb, swing-lock quote, worked-example tests
 - [x] Config, positions loader, data schema
 - [ ] Kalshi API research → docs/research/kalshi_api.md (in progress)
-- [ ] DraftKings/Polymarket research → docs/research/other_venues.md (in progress)
+- [x] DraftKings/Polymarket research → docs/research/other_venues.md
 - [ ] Kalshi collector (markets, orderbook, trades, candles) → normalized parquet
 - [ ] Backtest engine + grid search + breakdowns
 - [ ] Live scanner + alerts + dashboard
 - [ ] Backtest report, README
 
 ## Open questions for the user
-- DraftKings Predictions: pending research on API/ToS.
+- DraftKings Predictions: no sanctioned API and ToU bans automated collection. Options: manual
+  price logging (positions/quotes CSV with source=manual) or skip DK. **User to decide.**
+- Polymarket: intl isn't tradeable from the US; Polymarket US is. Which venue to compare against?
 - Live score/set state: Kalshi doesn't appear to publish it; needs an external source if wanted.
 
 ## Changelog
 - 2026-10-24: Project scaffold, core math + tests (12 passing), config, schema, CLAUDE.md.
   Environment network policy updated by user so Kalshi/Polymarket APIs are reachable.
+- 2026-10-24: Venue research done (DK: no sanctioned access; Polymarket intl + US read APIs public).

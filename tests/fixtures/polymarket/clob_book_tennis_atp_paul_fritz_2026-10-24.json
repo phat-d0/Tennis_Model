@@ -1,0 +1,93 @@
+{
+ "_fixture_note": "Trimmed from GET https://clob.polymarket.com/book?token_id=<Tommy Paul token> fetched 2026-10-24T08:51Z. Kept the 6 best levels per side IN ORIGINAL ORDER: bids ascending (best bid LAST), asks descending (best ask LAST). Full book had 21 bids / 36 asks.",
+ "_outcome": "Tommy Paul",
+ "market": "0xf0a126086ac801389842a65186829d833ccadc9bdff74d8fc013e83c109529ff",
+ "asset_id": "45783500680688754498275056095979702063104510095533675907194173635962787738310",
+ "timestamp": "1792831860739",
+ "hash": "64ef546146b9a4af4376797a6c5b16c8b33d3a43",
+ "bids": [
+  {
+   "price": "0.32",
+   "size": "12188"
+  },
+  {
+   "price": "0.33",
+   "size": "16651"
+  },
+  {
+   "price": "0.34",
+   "size": "13870.82"
+  },
+  {
+   "price": "0.35",
+   "size": "26841.29"
+  },
+  {
+   "price": "0.36",
+   "size": "31521.77"
+  },
+  {
+   "price": "0.37",
+   "size": "18903.78"
+  }
+ ],
+ "asks": [
+  {
+   "price": "0.43",
+   "size": "30"
+  },
+  {
+   "price": "0.42",
+   "size": "25"
+  },
+  {
+   "price": "0.41",
+   "size": "1306.71"
+  },
+  {
+   "price": "0.4",
+   "size": "2768.03"
+  },
+  {
+   "price": "0.39",
+   "size": "7338.98"
+  },
+  {
+   "price": "0.38",
+   "size": "311.9"
+  }
+ ],
+ "min_order_size": "5",
+ "tick_size": "0.01",
+ "neg_risk": false,
+ "last_trade_price": "0.370",
+ "_prices_history_sample": {
+  "_note": "GET https://clob.polymarket.com/prices-history?market=<same token>&interval=1d&fidelity=5 returns only {t,p} points (single price, no bid/ask/size). First 4 and last 2 of 167 points.",
+  "history": [
+   {
+    "t": 1792776326,
+    "p": 0.58
+   },
+   {
+    "t": 1792776629,
+    "p": 0.58
+   },
+   {
+    "t": 1792776932,
+    "p": 0.545
+   },
+   {
+    "t": 1792777227,
+    "p": 0.52
+   },
+   {
+    "t": 1792831824,
+    "p": 0.375
+   },
+   {
+    "t": 1792831824,
+    "p": 0.375
+   }
+  ]
+ }
+}

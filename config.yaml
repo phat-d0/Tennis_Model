@@ -7,9 +7,12 @@ fees:
     maker_rate: 0.0175          # only on series with fee_type quadratic_with_maker_fees
     default_multiplier: 1.0     # overridden per series by the API's fee_multiplier
     rounding_increment: 0.01    # retail accounts round fees up to the cent per order
-  polymarket:
-    taker_rate: 0.0             # TODO: confirm from docs/research/other_venues.md
+  polymarket:                   # international venue, sports markets (taker only)
+    taker_rate: 0.05            # fee/share = rate * p * (1 - p); see docs/research/other_venues.md
     rounding_increment: 0.0
+  polymarket_us:
+    taker_rate: 0.0695
+    rounding_increment: 0.01    # unverified
 
 execution:
   slippage: 0.0                 # dollars added to every ask fill (0.01 = 1c worse)
