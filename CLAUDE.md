@@ -68,7 +68,8 @@ swinglock/
   config.py                 load_config(), kalshi_fees(cfg, fee_type, mult)
   positions.py              load_positions(json|csv)
   collectors/               venue API clients → raw JSON → normalized parquet   (Data)
-  backtest/                 align, arb scan, swing sim, metrics, grid, run CLI  (Backtest)
+  backtest/                 align (as-of A/B join, phase) · arb (episodes) · swing (sim) ·
+                            metrics · grid · run CLI → reports/                 (Backtest)
   scanner/                  live loop, alerts, state.json                       (Scanner)
   dashboard/                live HTML view of state.json                        (Dashboard)
 docs/WORK_PLAN.md           status, open items, next steps
@@ -113,13 +114,14 @@ the newest 200. Format changes go through the Lead (Scanner proposes, Dashboard 
 - Raw/processed data under `data/` is gitignored on code branches; commit only small fixtures.
 
 ## Key facts (verified)
-- Kalshi REST base: `https://api.elections.kalshi.com/trade-api/v2` (public market data
-  needs no auth). `GET /series` returns `fee_type` ∈ {quadratic,
-  quadratic_with_maker_fees} and `fee_multiplier` ∈ {1, 0.5} (checked 2026-10-24).
-- Kalshi tennis match series (from `/series`, 2026-10-24): KXATPMATCH, KXWTAMATCH
-  (both quadratic_with_maker_fees), KXATPCHALLENGERMATCH, KXCHALLENGERMATCH,
-  KXWTACHALLENGERMATCH, KXITFMATCH, KXITFWMATCH, KXDAVISCUPMATCH, KXUNITEDCUPMATCH,
-  KXLAVERCUPMATCH, KXSIXKINGSMATCH (quadratic).
+- Kalshi REST base: `https://external-api.kalshi.com/trade-api/v2` (recommended;
+  `api.elections.kalshi.com` also works). Public market data needs no auth. `GET /series` gives
+  per-series `fee_type` (quadratic, quadratic_with_maker_fees, quadratic_with_combo_maker_fees,
+  flat) and `fee_multiplier`. Every tennis series has multiplier 1 (checked 2026-10-24).
+- Active Kalshi tennis match series: KXATPMATCH, KXWTAMATCH (quadratic_with_maker_fees since
+  2025-11-15), KXATPCHALLENGERMATCH, KXWTACHALLENGERMATCH, KXITFMATCH, KXITFWMATCH (quadratic).
+  Team-event series also exist (KXDAVISCUPMATCH, KXUNITEDCUPMATCH, KXLAVERCUPMATCH, KXSIXKINGSMATCH).
+  KXCHALLENGERMATCH is empty, since Challenger matches are under KXATPCHALLENGERMATCH.
 - Fee formula (taker): round_up(M × 0.07 × C × P × (1−P)); maker 0.0175 where charged
   (maker = ¼ taker confirmed in docs; the 0.07/0.0175 constants are from the fee-schedule PDF
   via search snippets, so the owner should confirm at kalshi.com/fee-schedule). Fees are rounded up
@@ -135,7 +137,8 @@ the newest 200. Format changes go through the Lead (Scanner proposes, Dashboard 
   snapshot only, no history).
 - Markets settled before `GET /historical/cutoff` (2026-08-25 as of 2026-10-24) are only in
   `/historical/*`; historical candles drop the `_dollars`/`_fp` field suffixes. Not-started
-  matches settle at a "fair price", not 0/1.
+  matches settle at a "fair price", not 0/1; a retirement after the first ball settles the
+  retiring player's market to No.
 - Auth: REST market data is public; **every WebSocket connection needs a signed API key**.
   Unauthenticated REST hit a 429 after ~8 rapid calls, so throttle hard.
 - **Kalshi Data Terms of Use** (kalshi-public-docs PDF) restrict "Kalshi Data" to personal
@@ -168,11 +171,14 @@ the newest 200. Format changes go through the Lead (Scanner proposes, Dashboard 
 - 2026-10-24: Worked example (Krueger/Li) treated as all-in prices; test tolerance 1.5¢
   because the brief's $ figures are rounded (+$0.84 vs exact 27.62 × 3¢ = $0.83).
 - 2026-10-24: Team structure per the owner's playbook: Lead + Data, Backtest, Scanner, Dashboard.
-- 2026-10-24: Processed datasets live on an orphan `data-store` branch (never merged into main).
+- 2026-10-24: Backtest: as-of join with 60s max staleness (`backtest.max_staleness_s`);
+  settlement time = last aligned quote; default swing mode = first side to trigger; arb profit =
+  one fill at the best observation's depth (1 contract if depth unknown, so fees are cent-heavy).
 
 ## Changelog
 - 2026-10-24: Project scaffold, core math + tests (12 passing), config, schema, CLAUDE.md.
   Environment network policy updated by owner so Kalshi/Polymarket APIs are reachable.
 - 2026-10-24: Venue research done (DK: no sanctioned access; Polymarket intl + US read APIs public).
 - 2026-10-24: Kalshi API research done (docs/research/kalshi_api.md, 13 fixtures).
+- 2026-10-24: Backtest module v1 (align, arb, swing, metrics, grid, CLI); 28 tests passing.
 - 2026-10-24: Team set up (CLAUDE.md Team section, WORK_PLAN.md, role briefs, team/* branches).
