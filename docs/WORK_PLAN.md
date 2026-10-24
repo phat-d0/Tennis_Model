@@ -18,11 +18,16 @@ updates in their PR descriptions. Durable rules and facts are in `CLAUDE.md`.
 - Slippage: 0¢ default; backtests also report 1¢.
 
 ## Open items (being watched)
-- **Where the live scanner and order-book recorder run.** Cloud sessions are reclaimed when
-  idle, so a 24/7 process needs the owner's machine or a small server. Owner to decide.
-- **DraftKings:** manual price logging, or drop it? Owner to decide.
-- **Polymarket venue for the cross-venue check:** Polymarket US (tradeable for a US user) vs intl
-  (data only). Recommendation: Polymarket US.
+- **Repo visibility:** the owner is making `phat-d0/Tennis_Model` private. No data goes on
+  `data-store` until the Lead confirms it's private.
+- **The Odds API budget:** the owner's key is shared with their soccer and baseball apps. We need the
+  monthly credit budget, a floor, and the key added as `ODDS_API_KEY` in the cloud environment's
+  secrets. Until then, Data does docs research only (free endpoints like `/sports` don't cost credits).
+- **VPS:** the owner chose a small cloud server for the scanner + recorder. Scanner prepares the
+  Docker/systemd setup; the owner provisions the server.
+- **Fee constants:** the owner should confirm the KXATPMATCH / KXWTAMATCH rows at
+  kalshi.com/fee-schedule (the site blocks scripts), and say whether the account is direct or via
+  an FCM (this sets fee-rounding precision).
 - Historical depth: Kalshi candles have no depth and sample at 1 minute. Order-book history only
   starts when the recorder runs, so record early.
 
@@ -31,8 +36,10 @@ updates in their PR descriptions. Durable rules and facts are in `CLAUDE.md`.
 2. Backtest: arb scan + swing grid on the backfill; then walk-forward gate; then findings report.
 3. Scanner: discovery + scan loop + alerts + positions + `state.json`.
 4. Dashboard: page from a sample `state.json`, then wired to the scanner.
-5. Data: order-book recorder; live score/state join; Polymarket collectors.
-6. Lead: README covering how to run each part.
+5. Data: order-book recorder; live score/state join; The Odds API (DraftKings Sportsbook tennis
+   h2h) + Polymarket US collectors for the cross-venue check.
+6. Scanner: VPS deploy (Docker + systemd), cross-venue alerts.
+7. Lead: README covering how to run each part.
 
 ## How to continue in a new session
 Read `CLAUDE.md`, this file, and your brief in `docs/team/`. Check open PRs into `main` and the

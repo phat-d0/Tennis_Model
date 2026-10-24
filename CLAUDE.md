@@ -16,11 +16,16 @@ match winners first) and alert when one appears live.
    behind a flag.
 2. Fills are realistic: buy at the ask, sell at the bid, fees per order, plus slippage.
    **Never fill at mid or last.**
-3. DraftKings: no scraping or automated collection (its ToU bans it). Manual logging only,
-   if the owner wants it.
-4. Confirm API endpoints, rate limits and fees from official docs. Don't assume them.
-5. Document every update here (Changelog) and in `docs/WORK_PLAN.md` so nothing gets lost.
-6. Report results plainly, bad ones included.
+3. DraftKings: no scraping of DraftKings itself (its ToU bans it). DraftKings **Sportsbook**
+   prices come only through **The Odds API** (the owner's paid key, shared with their soccer and
+   baseball apps). Only the Data role spends credits, within the owner's budget, and logs every spend.
+4. **Kalshi data is for the owner's personal, private research** (owner decision 2026-10-24, made
+   knowing the Kalshi Data ToU): low request rates, never redistributed or published, only tiny
+   test fixtures in git. Datasets go on the `data-store` branch **only while the repo is
+   private**; the Lead confirms visibility before the first data push.
+5. Confirm API endpoints, rate limits and fees from official docs. Don't assume them.
+6. Document every update here (Changelog) and in `docs/WORK_PLAN.md` so nothing gets lost.
+7. Report results plainly, bad ones included.
 
 ## Team
 Each role runs in its own Claude Code cloud session on its own branch, tagged `tennis-team`.
@@ -29,9 +34,9 @@ Session IDs are in `docs/team/lead.md`.
 | Role | Job | Owns | Branch |
 |---|---|---|---|
 | **Lead / Reviewer** | Coordinates, reviews and merges every PR, keeps the memory docs current, watches the API budget, reports to the owner | `CLAUDE.md`, `docs/WORK_PLAN.md`, `docs/team/*`, shared core (`fees.py`, `locks.py`, `schema.py`, `config.py`, `positions.py`, `config.yaml`, `pyproject.toml`) | `team/lead` |
-| **Data** | Kalshi (then Polymarket) collectors, normalizers, order-book recorder, historical backfill. **Only role that bulk-pulls history** | `swinglock/collectors/`, `tests/fixtures/`, `docs/research/kalshi_api.md`, `docs/data_*.md`, branch `data-store` | `team/data` |
+| **Data** | Kalshi, then The Odds API and Polymarket US collectors, normalizers, order-book recorder, historical backfill. **Only role that bulk-pulls history or spends Odds API credits** | `swinglock/collectors/`, `tests/fixtures/`, `docs/research/kalshi_api.md`, `docs/data_*.md`, branch `data-store` | `team/data` |
 | **Backtest** | True-arb scan, swing-lock grid, walk-forward gate, findings report | `swinglock/backtest/`, `reports/`, `docs/edge_*.md` | `team/backtest` |
-| **Scanner** | Live scan loop, alerts, positions → lock quotes, `state.json` | `swinglock/scanner/`, `docs/scanner_*.md` | `team/scanner` |
+| **Scanner** | Live scan loop, alerts, positions → lock quotes, `state.json`, VPS deploy (Docker/systemd) | `swinglock/scanner/`, `deploy/`, `docs/scanner_*.md` | `team/scanner` |
 | **Dashboard** | Live HTML view of `state.json` | `swinglock/dashboard/`, `docs/ui_*.md` | `team/ui` |
 
 Each role also owns its own `tests/test_<area>*.py`.
@@ -43,8 +48,11 @@ Each role also owns its own `tests/test_<area>*.py`.
    Lead sequences merges.
 3. **Before a PR:** `python -m pytest -q` passes; backtest claims pass the gate (below);
    dashboard PRs attach 390×844 and 1280×800 screenshots in light and dark mode, with no page errors.
-4. **Kalshi API budget:** Data stays under ½ of the read limit, Scanner under ¼; everyone
-   else reuses data from the `data-store` branch. Back off on 429.
+4. **API budgets:** Kalshi: Data stays under ½ of the read limit, Scanner under ¼; everyone
+   else reuses data from the `data-store` branch. Back off on 429. The Odds API: credits are paid
+   and shared with the owner's other apps; only Data spends them, within the budget in
+   `docs/WORK_PLAN.md`, never below the floor, and logs each spend (date, endpoint, credits,
+   balance after) in `docs/data_inventory.md`. The key comes from the env var `ODDS_API_KEY`; never commit it.
 5. **Results go in `docs/` or `reports/`** with numbers, bad ones included.
 6. **Update your branch by merging `main` in, never by rebasing.**
 7. **Memory rule:** only the Lead edits `CLAUDE.md` and `docs/WORK_PLAN.md`. Others put
@@ -153,6 +161,11 @@ the newest 200. Format changes go through the Lead (Scanner proposes, Dashboard 
   read API (WS needs a signed key), taker coefficient 0.0695. Walkover settlement differs
   (US: last fair price; intl: 50-50), so check rule mismatches before calling a cross-venue gap an arb.
   Details: docs/research/other_venues.md (some facts from search summaries; re-verify before coding).
+- The Odds API (the-odds-api.com): `draftkings` is the DraftKings **Sportsbook** (region `us`), not
+  DK Predictions; region `us_ex` lists Kalshi, Polymarket, Novig, ProphetX, BetOpenly. Tennis sport
+  keys and credit costs: see docs/research/odds_api.md (Data role, to do). A sportsbook leg is a
+  bet, not a contract: equal-payout sizing is stake = N / decimal_odds, and retirement/void rules
+  differ from Kalshi's, so a "lock" across them isn't risk-free when a player retires.
 - DraftKings Predictions: **no public/partner API**. ToU (2026-08-04) bans bots/scrapers and
   limits use to personal non-commercial. It's a broker (FCM) routing to CME / Crypto.com / DKeX /
   Bitnomial. Fee ≈ flat $0.02/contract between $0.30 and $0.94. → manual logging only.
@@ -170,6 +183,9 @@ the newest 200. Format changes go through the Lead (Scanner proposes, Dashboard 
 - 2026-10-24: Lock = buy short side to equalize counts (owner's sizing rule), not dollar-equal.
 - 2026-10-24: Worked example (Krueger/Li) treated as all-in prices; test tolerance 1.5¢
   because the brief's $ figures are rounded (+$0.84 vs exact 27.62 × 3¢ = $0.83).
+- 2026-10-24 (owner): Kalshi data OK for personal, private use; repo to be made private; live
+  scanner + recorder will run on a small cloud server (VPS); cross-venue via The Odds API
+  (DraftKings Sportsbook) + Polymarket US.
 - 2026-10-24: Team structure per the owner's playbook: Lead + Data, Backtest, Scanner, Dashboard.
 - 2026-10-24: Backtest: as-of join with 60s max staleness (`backtest.max_staleness_s`);
   settlement time = last aligned quote; default swing mode = first side to trigger; arb profit =

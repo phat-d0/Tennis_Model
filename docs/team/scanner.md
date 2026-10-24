@@ -29,6 +29,9 @@ Read first: `CLAUDE.md`, `docs/WORK_PLAN.md`, `docs/research/kalshi_api.md`,
 ## Limits
 - No bulk history pulls (Data owns those).
 - No order placement, ever. Not behind a flag, not "for later".
+- You own `deploy/` too: Dockerfile + docker-compose or systemd units to run the scanner,
+  Data's recorder and the dashboard on a small Linux VPS, with restart-on-failure, log rotation and
+  secrets from env. Document it in `docs/scanner_deploy.md`.
 
 ## First tasks, in order of value
 1. Market discovery: list open tennis match events, build A/B pairs, and get the effective ask
@@ -37,4 +40,6 @@ Read first: `CLAUDE.md`, `docs/WORK_PLAN.md`, `docs/research/kalshi_api.md`,
 3. Positions: map `positions.json` rows (market/side tickers) onto A/B holdings and alert on
    profitable locks above `scanner.min_lock_profit`.
 4. Websocket upgrade if public, with snapshot + delta handling.
-5. Cross-venue gaps (Polymarket) once Data has a client, and only for venues the owner can use.
+5. VPS deploy (`deploy/`), once the scan loop works.
+6. Cross-venue gaps once Data has the collectors: Kalshi vs DraftKings Sportsbook (via The Odds
+   API; sizing stake = N / decimal_odds; warn about retirement/void-rule mismatch) and Polymarket US.

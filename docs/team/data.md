@@ -28,9 +28,15 @@ and the fixtures in `tests/fixtures/kalshi/`.
 - **You're the only role that bulk-pulls history.** Stay under half the Kalshi read
   rate limit (see `docs/research/kalshi_api.md`), with backoff on 429. Log each bulk pull
   (date, range, request count) in `docs/data_inventory.md`.
-- Read-only endpoints only. No API key is needed for market data; if one is ever used,
+- Read-only endpoints only. No API key is needed for Kalshi market data; if one is ever used,
   it's read-scope and never committed.
-- DraftKings: no collection at all (its ToU forbids it). Polymarket: only after Kalshi is done.
+- Kalshi data is for the owner's personal, private research: never publish it. Push to
+  `data-store` only after the Lead confirms the repo is private.
+- **The Odds API:** you're the only role that spends credits. Stay within the budget in
+  WORK_PLAN, never go below the floor, and log every spend. The key is `ODDS_API_KEY` from env.
+  Use historical-odds endpoints only after the Lead OKs the credit cost.
+- DraftKings itself: no collection (its ToU forbids it); DraftKings Sportsbook prices come via
+  The Odds API only. Polymarket: Polymarket US, after Kalshi is done.
 
 ## First tasks, in order of value
 1. Kalshi REST client (`collectors/kalshi.py`): paging, throttle, retries, raw JSON cache
@@ -45,6 +51,9 @@ and the fixtures in `tests/fixtures/kalshi/`.
    long-running process; see Open items in WORK_PLAN for where it will run.
 5. Live score/state: check Kalshi's `live_data` / milestones endpoints (see fixtures) for set
    and game state, and join it onto quotes if usable.
-6. Polymarket (intl + US) collectors for the cross-venue check.
+6. `docs/research/odds_api.md`: tennis sport keys, h2h markets, regions/bookmakers (does
+   `us_ex` include Kalshi tennis?), credit cost per call, historical odds availability and cost,
+   and DraftKings' tennis retirement rules. Then a collector for live h2h odds within the budget.
+7. Polymarket US collector for the cross-venue check.
 
 Write up failures and dead ends too, so nobody repeats them.
