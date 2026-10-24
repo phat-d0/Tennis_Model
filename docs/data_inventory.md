@@ -68,7 +68,6 @@ Milestones (scheduled start) cover start dates from ~Feb 2025 onward.
 | 2026-10-24 10:06–10:20 | Kalshi trials: WTA 30, WTA 125 20, ITF 40 | Oct 2026 | ~210 | first grouped-candle version got HTTP 400s (requested-candle cap) |
 | 2026-10-24 10:20–10:38 | Kalshi full backfill, new order | group 0 | ~200 | crashed on a proxy outage 10:38 |
 | 2026-10-24 10:34 | Kalshi recorder trial | 3 min | 30 | 2 × 429 (shared IP with backfill) |
-| 2026-10-24 10:39 → | Kalshi full backfill (relaunch loop) | all, by group | running | 1.0 s gap |
 | 2026-10-24 10:43 | Kalshi `/live_data/batch` | 10 milestones | 1 | live fixture for score formats |
 | 2026-10-24 10:39–15:46 | Kalshi backfill group 0 (relaunch loop, no relaunches needed) | ATP+WTA, Apr 24 → Oct 24 | ≈ 7,400 | ≈ 150 × 429 |
 | 2026-10-24 15:47–16:20 | Kalshi group-0 re-normalize (`--groups 0`) | same | 477 | listings only; 80 × 429 |
