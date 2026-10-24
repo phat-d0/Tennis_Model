@@ -189,6 +189,12 @@ the newest 200. Format changes go through the Lead (Scanner proposes, Dashboard 
   Bitnomial. Fee ≈ flat $0.02/contract between $0.30 and $0.94. → manual logging only.
 
 ## Environment gotchas
+- VPS deploy (`deploy/`, docs/scanner_deploy.md): one Docker image; `scanner` + `dashboard` by
+  default (dashboard published on 127.0.0.1:8000 only, so it's reached over an SSH tunnel), `recorder`
+  behind `--profile recorder`, optional Caddy HTTPS + basic auth behind `--profile public`. Secrets in
+  `deploy/.env` (gitignored); holdings in `data/positions.json` (gitignored). **Scanner and recorder
+  share the VPS IP and therefore Kalshi's unauthenticated rate limit**: the scanner uses ~0.22 req/s,
+  so size the recorder within Data's ½ share.
 - Cloud sessions are ephemeral: commit and push work before stopping. A long-running
   recorder or scanner can't live in a cloud session; it needs the owner's machine or a server.
 - The environment's network policy must allow api.elections.kalshi.com, docs.kalshi.com and
@@ -232,3 +238,6 @@ the newest 200. Format changes go through the Lead (Scanner proposes, Dashboard 
   session at 1 req/s (settled events: ATP 5,029, WTA 5,034, Challenger 10,232 + 2,214, ITF next).
 - 2026-10-24: Candle carry-forward verified + capped (phat-d0/Tennis_Model#11); cap set to 1800 s
   (300 s would discard valid unchanged quotes); 82 tests passing.
+- 2026-10-24: VPS deploy merged (phat-d0/Tennis_Model#13): Docker compose + systemd + logrotate;
+  tested in the dev container (scanner ~25 MB, dashboard ~16 MB); Caddy, recorder and a real
+  reboot are untested.
