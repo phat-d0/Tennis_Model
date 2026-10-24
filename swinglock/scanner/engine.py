@@ -27,6 +27,7 @@ from ..positions import PositionRow
 from .market import MatchPair, MatchQuote
 
 log = logging.getLogger(__name__)
+_warned: set[tuple[str, str]] = set()   # unmapped position rows already logged (once per row)
 
 
 def iso(ts: datetime) -> str:
@@ -81,6 +82,9 @@ def holdings_from_positions(rows: list[PositionRow], pairs: dict[str, MatchPair]
     for r in rows:
         side = side_of(r, pairs.get(r.market))
         if side is None:
+            if (r.market, r.side) in _warned:
+                continue
+            _warned.add((r.market, r.side))
             log.warning("position %s/%s: can't map side to A/B (match not open or unknown side)",
                         r.market, r.side)
             continue

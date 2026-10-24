@@ -14,6 +14,10 @@ updates in their PR descriptions. Durable rules and facts are in `CLAUDE.md`.
 | 7 | Walk-forward gate + findings skeleton | `walkforward.py` (monthly folds, purged expanding window, match-clustered bootstrap CI); 37 tests, synthetic only, not run on real data | `swinglock/backtest/walkforward.py`, `reports/backtest_findings.md`, phat-d0/Tennis_Model#2 |
 | 8 | Scanner v1 | REST polling, discovery (95–96 open matches across 6 series), effective ask/bid with depth, arb + lock alerts with dedup/re-alert, `state.json`, read-only test. Live pass 2026-10-24 09:14 UTC: best combined ask $1.00, no arb. ~0.22 req/s steady state | `swinglock/scanner/`, `docs/scanner_live.md`, phat-d0/Tennis_Model#3 |
 | 9 | Dashboard v1 | Stdlib server + static page (no CDN), alerts / markets / positions, stale + offline banners; Lead-verified at 390×844 and 1280×800 light/dark on real scanner output, no errors or overflow | `swinglock/dashboard/`, phat-d0/Tennis_Model#5 |
+| 10 | Dashboard filters | Search, phase filter, "No market" group; 61 tests | phat-d0/Tennis_Model#8 |
+| 11 | Kalshi collector + backfill | Read-only client (throttle, 429 backoff, gz raw cache → resumable), normalizer (effective ask/bid, no trade/mid), historical split handled; trial 3 ATP matches → 4,888 quote rows, winners correct. Odds API research (0 credits) | `swinglock/collectors/`, `docs/data_*.md`, `docs/research/odds_api.md`, phat-d0/Tennis_Model#9 |
+| 12 | Candle carry-forward check | Valid: candles are written on quote changes (live check 140/144 matches); `data.max_carry_s` cap = 1800 s | phat-d0/Tennis_Model#11 |
+| 13 | VPS deploy | Docker compose (scanner + dashboard; recorder and Caddy as profiles), systemd, logrotate; owner setup ~20 min | `deploy/`, `docs/scanner_deploy.md`, phat-d0/Tennis_Model#13 |
 | 6 | Team set up | 4 role sessions started 2026-10-24 on `team/*` branches (IDs in `docs/team/lead.md`) | phat-d0/Tennis_Model#1 |
 
 ## Live configuration
@@ -27,21 +31,27 @@ updates in their PR descriptions. Durable rules and facts are in `CLAUDE.md`.
 - **The Odds API budget:** the owner's key is shared with their soccer and baseball apps. We need the
   monthly credit budget, a floor, and the key added as `ODDS_API_KEY` in the cloud environment's
   secrets. Until then, Data does docs research only (free endpoints like `/sports` don't cost credits).
-- **VPS:** the owner chose a small cloud server for the scanner + recorder. Scanner prepares the
-  Docker/systemd setup; the owner provisions the server.
+- **VPS:** ready to deploy. The owner provisions a 1 vCPU / 1 GB Ubuntu server and follows
+  `docs/scanner_deploy.md` (~20 min). The recorder service turns on once Data writes it.
 - **Fee constants:** the owner should confirm the KXATPMATCH / KXWTAMATCH rows at
   kalshi.com/fee-schedule (the site blocks scripts), and say whether the account is direct or via
   an FCM (this sets fee-rounding precision).
+- **Odds API coverage is tour-level only** (no Challenger/ITF), so the DraftKings cross-venue check
+  only applies to big ATP/WTA events.
+- **Backfill durability:** it runs in the Data session's ephemeral container and can't be pushed
+  until the repo is private. The raw cache makes reruns resumable.
 - Historical depth: Kalshi candles have no depth and sample at 1 minute. Order-book history only
   starts when the recorder runs, so record early.
 
 ## Next steps (in order)
-1. Data: Kalshi client + normalizer + backfill → `data-store`.
+1. Data: backfill the most recent ~6 months of ATP + WTA first (batch candles for post-cutoff
+   markets), then Challenger/ITF/older; re-normalize with the carry cap; publish to `data-store`
+   once the repo is private. Progress 10:02 UTC: KXATPMATCH 800/5,029, ~1 match/s.
 2. Backtest: arb scan + swing grid on the backfill; then walk-forward gate; then findings report.
 3. Data: order-book recorder; live score/state join; The Odds API (DraftKings Sportsbook tennis
    h2h) + Polymarket US collectors for the cross-venue check.
-4. Scanner: VPS deploy (`deploy/`: scanner, recorder, dashboard as services), then cross-venue
-   alerts. A WebSocket upgrade needs a read-scope Kalshi API key from the owner.
+4. Scanner: cross-venue alerts once Data's Odds API / Polymarket US collectors exist. A
+   WebSocket upgrade needs a read-scope Kalshi API key from the owner.
 5. Lead: consolidate the scanner's GET-only client (`swinglock/scanner/client.py`) with Data's
    collector client once it lands.
 6. Lead: README covering how to run each part.

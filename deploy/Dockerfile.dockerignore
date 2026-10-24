@@ -1,0 +1,7 @@
+# Build context is the repo root; send only what the image needs.
+*
+!pyproject.toml
+!config.yaml
+!positions.example.json
+!swinglock/
+swinglock/**/__pycache__

@@ -152,8 +152,17 @@ the newest 200. Format changes go through the Lead (Scanner proposes, Dashboard 
   `/historical/*`; historical candles drop the `_dollars`/`_fp` field suffixes. Not-started
   matches settle at a "fair price", not 0/1; a retirement after the first ball settles the
   retiring player's market to No.
+- Kalshi 1-min candles are **sparse** (minutes with no change are omitted; VanAssche–Musetti had
+  786 candles over 1,745 min). **Verified 2026-10-24 (phat-d0/Tennis_Model#11): candles are written
+  on quote changes, not only on trades** (26,786 zero-volume candles with a changed bid/ask; live
+  check: carried state matched the live best bid/ask in 140/144 leg-snapshots, misses = intra-minute
+  moves). So carrying each leg's last close forward is valid. It's capped at `data.max_carry_s`
+  (1800 s) only to guard against data gaps. Within a minute, the carried quote can lag up to 60 s.
+- Before 2025-11-15, KXATPMATCH/KXWTAMATCH matches are tagged fee_type `quadratic` (an assumption,
+  since the fee history only records the new value). Taker fees are the same either way.
 - Auth: REST market data is public; **every WebSocket connection needs a signed API key**.
-  Unauthenticated REST hit a 429 after ~8 rapid calls, so throttle hard (seen again on a single
+  Unauthenticated REST hit a 429 after ~8 rapid calls (backfill at a 0.5 s gap: 11×429 in 178
+  requests; at a 1.0 s gap: a burst of 16×429 at the start, then clean), so throttle hard (seen again on a single
   scanner pass on 2026-10-24; the scanner backs off and spaces requests ≥ 1 s).
 - **Kalshi Data Terms of Use** (kalshi-public-docs PDF) restrict "Kalshi Data" to personal
   non-commercial use and prohibit compiling databases, bulk script retrieval, redistribution,
@@ -169,7 +178,10 @@ the newest 200. Format changes go through the Lead (Scanner proposes, Dashboard 
   Details: docs/research/other_venues.md (some facts from search summaries; re-verify before coding).
 - The Odds API (the-odds-api.com): `draftkings` is the DraftKings **Sportsbook** (region `us`), not
   DK Predictions; region `us_ex` lists Kalshi, Polymarket, Novig, ProphetX, BetOpenly. Tennis sport
-  keys and credit costs: see docs/research/odds_api.md (Data role, to do). A sportsbook leg is a
+  keys and credit costs: docs/research/odds_api.md. **Tennis coverage is tour-level only** (one key
+  per tournament, e.g. `tennis_atp_us_open`; 47 keys; no Challenger/ITF and few 250s). `/odds` costs
+  markets × regions credits; `/sports` and `/events` are free. DraftKings voids walkovers and
+  retirements before set 1 is complete. A sportsbook leg is a
   bet, not a contract: equal-payout sizing is stake = N / decimal_odds, and retirement/void rules
   differ from Kalshi's, so a "lock" across them isn't risk-free when a player retires.
 - DraftKings Predictions: **no public/partner API**. ToU (2026-08-04) bans bots/scrapers and
@@ -177,6 +189,12 @@ the newest 200. Format changes go through the Lead (Scanner proposes, Dashboard 
   Bitnomial. Fee ≈ flat $0.02/contract between $0.30 and $0.94. → manual logging only.
 
 ## Environment gotchas
+- VPS deploy (`deploy/`, docs/scanner_deploy.md): one Docker image; `scanner` + `dashboard` by
+  default (dashboard published on 127.0.0.1:8000 only, so it's reached over an SSH tunnel), `recorder`
+  behind `--profile recorder`, optional Caddy HTTPS + basic auth behind `--profile public`. Secrets in
+  `deploy/.env` (gitignored); holdings in `data/positions.json` (gitignored). **Scanner and recorder
+  share the VPS IP and therefore Kalshi's unauthenticated rate limit**: the scanner uses ~0.22 req/s,
+  so size the recorder within Data's ½ share.
 - Cloud sessions are ephemeral: commit and push work before stopping. A long-running
   recorder or scanner can't live in a cloud session; it needs the owner's machine or a server.
 - The environment's network policy must allow api.elections.kalshi.com, docs.kalshi.com and
@@ -214,3 +232,12 @@ the newest 200. Format changes go through the Lead (Scanner proposes, Dashboard 
 - 2026-10-24: Scanner v1 (phat-d0/Tennis_Model#3) and Dashboard v1 (phat-d0/Tennis_Model#5) merged;
   58 tests passing. Run: `python -m swinglock.scanner [--once]`,
   `python -m swinglock.dashboard --state data/live/state.json` (or `--sample`).
+- 2026-10-24: Dashboard filters merged (phat-d0/Tennis_Model#8); 61 tests passing.
+- 2026-10-24: Kalshi client, normalizer and resumable backfill merged (phat-d0/Tennis_Model#9);
+  81 tests passing. Run: `python -m swinglock.collectors.backfill`. Full backfill running in the Data
+  session at 1 req/s (settled events: ATP 5,029, WTA 5,034, Challenger 10,232 + 2,214, ITF next).
+- 2026-10-24: Candle carry-forward verified + capped (phat-d0/Tennis_Model#11); cap set to 1800 s
+  (300 s would discard valid unchanged quotes); 82 tests passing.
+- 2026-10-24: VPS deploy merged (phat-d0/Tennis_Model#13): Docker compose + systemd + logrotate;
+  tested in the dev container (scanner ~25 MB, dashboard ~16 MB); Caddy, recorder and a real
+  reboot are untested.
