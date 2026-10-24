@@ -100,6 +100,32 @@ def collect_series(client: KalshiClient, series: str, cutoff: pd.Timestamp, sinc
     return out[:max_matches] if max_matches else out
 
 
+def normalize_one(client: KalshiClient, r: dict, starts: dict, stats: dict) -> tuple[dict, pd.DataFrame]:
+    e, mk = r["event"], r["markets"]
+    row = match_row(e, mk, r["series"], r["fee_changes"], starts.get(e["event_ticker"]))
+    try:
+        c = fetch_candles(client, [row["instrument_a"], row["instrument_b"]],
+                          row["open_time"], row["close_time"], r["historical"])
+    except KalshiError as err:
+        log.warning("%s: candles failed (%s); match kept without quotes", e["event_ticker"], err)
+        stats["skipped"]["candle error"] += 1
+        c = {}
+    q = candles_to_quotes(row["match_id"], row["instrument_a"], row["instrument_b"],
+                          c.get(row["instrument_a"], []), c.get(row["instrument_b"], []),
+                          until=row["close_time"])
+    return row, q
+
+
+def write_outputs(out_dir: Path, rows: list[dict], quotes: list[pd.DataFrame]):
+    matches = matches_frame(rows)
+    q = pd.concat(quotes, ignore_index=True) if quotes else empty(QUOTE_COLUMNS)
+    validate_quotes(q)
+    out_dir.mkdir(parents=True, exist_ok=True)
+    matches.to_parquet(out_dir / "matches.parquet", index=False)
+    q.to_parquet(out_dir / "quotes.parquet", index=False)
+    return matches, q
+
+
 def run(series_list: list[str], out_dir: Path, raw_dir: Path, since: str | None = None,
         max_matches: int | None = None, min_interval_s: float = 0.5) -> dict:
     client = KalshiClient(raw_dir=raw_dir, min_interval_s=min_interval_s)
@@ -107,39 +133,21 @@ def run(series_list: list[str], out_dir: Path, raw_dir: Path, since: str | None 
     cutoff = ts(client.historical_cutoff()["market_settled_ts"])
     since_ts = ts(since) if since else None
     stats: dict = {"events_listed": {}, "skipped": defaultdict(int)}
-    todo = []
-    for s in series_list:
-        found = collect_series(client, s, cutoff, since_ts, max_matches, stats)
-        log.info("%s: %d settled matches to normalize", s, len(found))
-        todo += found
-
     starts = scheduled_starts(client, since)
     rows, quotes = [], []
-    for i, r in enumerate(todo, 1):
-        e, mk = r["event"], r["markets"]
-        row = match_row(e, mk, r["series"], r["fee_changes"], starts.get(e["event_ticker"]))
-        try:
-            c = fetch_candles(client, [row["instrument_a"], row["instrument_b"]],
-                              row["open_time"], row["close_time"], r["historical"])
-        except KalshiError as err:
-            log.warning("%s: candles failed (%s); match kept without quotes", e["event_ticker"], err)
-            stats["skipped"]["candle error"] += 1
-            c = {}
-        q = candles_to_quotes(row["match_id"], row["instrument_a"], row["instrument_b"],
-                              c.get(row["instrument_a"], []), c.get(row["instrument_b"], []),
-                              until=row["close_time"])
-        rows.append(row)
-        quotes.append(q)
-        if i % 50 == 0:
-            log.info("%d/%d matches, %d requests (%d cached, %d 429s)", i, len(todo),
-                     client.requests_made, client.cache_hits, client.rate_limited)
-
-    matches = matches_frame(rows)
-    q = pd.concat(quotes, ignore_index=True) if quotes else empty(QUOTE_COLUMNS)
-    validate_quotes(q)
-    out_dir.mkdir(parents=True, exist_ok=True)
-    matches.to_parquet(out_dir / "matches.parquet", index=False)
-    q.to_parquet(out_dir / "quotes.parquet", index=False)
+    for s in series_list:
+        todo = collect_series(client, s, cutoff, since_ts, max_matches, stats)
+        log.info("%s: %d settled matches to normalize", s, len(todo))
+        for i, r in enumerate(todo, 1):
+            row, q = normalize_one(client, r, starts, stats)
+            rows.append(row)
+            quotes.append(q)
+            if i % 50 == 0:
+                log.info("%s %d/%d matches, %d requests (%d cached, %d 429s)", s, i, len(todo),
+                         client.requests_made, client.cache_hits, client.rate_limited)
+        # Checkpoint after each series so finished series are usable while later ones run.
+        matches, q = write_outputs(out_dir, rows, quotes)
+        log.info("%s done: wrote %d matches, %d quote rows", s, len(matches), len(q))
 
     summary = summarize(matches, q, cutoff)
     summary.update({
