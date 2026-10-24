@@ -292,3 +292,5 @@ the newest 200. Format changes go through the Lead (Scanner proposes, Dashboard 
   are stale/carried quotes. Inventory merged (phat-d0/Tennis_Model#35).
 - 2026-10-24: Findings report v1 (`reports/backtest_findings.md`) + `arb_max_leg_age_s` merged
   (phat-d0/Tennis_Model#37); 111 tests passing.
+- 2026-10-24: Leg-age arb counts on group 0: 35 episodes / $1.32 at 60 s (0¢); 19 / $0.77 at 1¢.
+  Remaining top hits are wide stale offers. Conclusion unchanged.
