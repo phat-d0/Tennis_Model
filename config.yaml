@@ -52,6 +52,8 @@ scanner:
   episode_gap_seconds: 30       # an opportunity gone this long starts a new episode
 
 data:
-  max_carry_s: 300             # max age a candle leg is carried forward before it becomes NaN
+  max_carry_s: 1800            # max age a candle leg is carried forward before it becomes NaN.
+                                # Candles are written on quote changes, so an unchanged quote stays valid;
+                                # the cap only guards against data gaps (halts, missing candles).
   raw_dir: data/raw
   processed_dir: data/processed

@@ -153,9 +153,11 @@ the newest 200. Format changes go through the Lead (Scanner proposes, Dashboard 
   matches settle at a "fair price", not 0/1; a retirement after the first ball settles the
   retiring player's market to No.
 - Kalshi 1-min candles are **sparse** (minutes with no change are omitted; VanAssche–Musetti had
-  786 candles over 1,745 min). The collector carries each leg's last close forward, capped by
-  `data.max_carry_s`. Whether a quote-only change (no trade) always emits a candle is being
-  verified (Data); until then, treat candle-based arb counts as provisional.
+  786 candles over 1,745 min). **Verified 2026-10-24 (phat-d0/Tennis_Model#11): candles are written
+  on quote changes, not only on trades** (26,786 zero-volume candles with a changed bid/ask; live
+  check: carried state matched the live best bid/ask in 140/144 leg-snapshots, misses = intra-minute
+  moves). So carrying each leg's last close forward is valid. It's capped at `data.max_carry_s`
+  (1800 s) only to guard against data gaps. Within a minute, the carried quote can lag up to 60 s.
 - Before 2025-11-15, KXATPMATCH/KXWTAMATCH matches are tagged fee_type `quadratic` (an assumption,
   since the fee history only records the new value). Taker fees are the same either way.
 - Auth: REST market data is public; **every WebSocket connection needs a signed API key**.
@@ -228,3 +230,5 @@ the newest 200. Format changes go through the Lead (Scanner proposes, Dashboard 
 - 2026-10-24: Kalshi client, normalizer and resumable backfill merged (phat-d0/Tennis_Model#9);
   81 tests passing. Run: `python -m swinglock.collectors.backfill`. Full backfill running in the Data
   session at 1 req/s (settled events: ATP 5,029, WTA 5,034, Challenger 10,232 + 2,214, ITF next).
+- 2026-10-24: Candle carry-forward verified + capped (phat-d0/Tennis_Model#11); cap set to 1800 s
+  (300 s would discard valid unchanged quotes); 82 tests passing.
