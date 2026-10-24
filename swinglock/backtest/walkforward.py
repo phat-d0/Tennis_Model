@@ -32,7 +32,7 @@ import numpy as np
 import pandas as pd
 
 from .grid import KEYS, combos as grid_combos, grid_trades
-from .swing import TRADE_COLUMNS, MatchPath
+from .swing import LOOKAHEAD_FILTERS, TRADE_COLUMNS, MatchPath, entry_filters
 
 WF_DEFAULTS: dict[str, Any] = dict(
     min_train_months=1,       # earlier months required before a month can be a test fold
@@ -208,4 +208,9 @@ def walk_forward(paths: Sequence[MatchPath], cfg: dict[str, Any], modes: Sequenc
     st = wf_settings(cfg)
     slips = sorted({float(s) for s in st["slippages"]} | {float(st["select_slippage"])})
     trades = {s: grid_trades(list(paths), with_slippage(cfg, s), modes) for s in slips}
-    return evaluate(trades, match_months(paths), grid_combos(cfg, modes), st)
+    wf = evaluate(trades, match_months(paths), grid_combos(cfg, modes), st)
+    look = [k for k in entry_filters(cfg) if k in LOOKAHEAD_FILTERS]
+    if look:
+        wf.passed = False
+        wf.reasons.append(f"lookahead entry filter {', '.join(look)} is on; diagnostic only, not valid for the gate")
+    return wf

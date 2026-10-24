@@ -8,6 +8,7 @@ from __future__ import annotations
 
 from typing import Any, Sequence
 
+import numpy as np
 import pandas as pd
 
 from .metrics import METRICS, summarize
@@ -40,3 +41,31 @@ def grid_search(aligned: pd.DataFrame, matches: pd.DataFrame, cfg: dict[str, Any
                 modes: Sequence[str] = ("first",)) -> pd.DataFrame:
     """Metrics per (mode, X, Y) straight from an aligned quote frame."""
     return grid_metrics(grid_trades(match_paths(aligned, matches, cfg), cfg, modes), cfg, modes)
+
+
+ENTRY_COLUMNS = ["n_trades", "ask_min", "ask_p10", "ask_p50", "ask_p90", "frac_ask_lt_5c", "frac_ask_lt_10c",
+                 "mtc_p10", "mtc_p50", "mtc_p90", "frac_live", "pnl_ask_lt_10c", "pnl_ask_ge_10c"]
+
+
+def _entry_stats(t: pd.DataFrame) -> dict[str, float]:
+    ask, mtc, pnl = t["entry_ask"].astype(float), t["minutes_to_close"].astype(float), t["pnl"].astype(float)
+    q = lambda s, p: float(s.quantile(p)) if len(s) else np.nan   # noqa: E731
+    low = ask < 0.10
+    return dict(n_trades=len(t), ask_min=float(ask.min()) if len(t) else np.nan,
+                ask_p10=q(ask, 0.1), ask_p50=q(ask, 0.5), ask_p90=q(ask, 0.9),
+                frac_ask_lt_5c=float((ask < 0.05).mean()) if len(t) else np.nan,
+                frac_ask_lt_10c=float(low.mean()) if len(t) else np.nan,
+                mtc_p10=q(mtc, 0.1), mtc_p50=q(mtc, 0.5), mtc_p90=q(mtc, 0.9),
+                frac_live=float((t["entry_phase"] == "live").mean()) if len(t) else np.nan,
+                pnl_ask_lt_10c=float(pnl[low].mean()) if low.any() else np.nan,
+                pnl_ask_ge_10c=float(pnl[~low].mean()) if (~low).any() else np.nan)
+
+
+def entry_diagnostics(trades: pd.DataFrame, cfg: dict[str, Any], modes: Sequence[str] = ("first",)) -> pd.DataFrame:
+    """Per (mode, X, Y): where entries happen. Entry-ask quantiles and the share under 5c/10c
+    (near-decided matches), minutes from entry to the last observation (mtc_*), the share of
+    live entries, and mean P&L per trade for entries under vs at/over 10c."""
+    groups = {k: g for k, g in trades.groupby(KEYS)} if len(trades) else {}
+    rows = [{"mode": m, "x": x, "y": y, **_entry_stats(groups.get((m, x, y), trades.iloc[:0]))}
+            for m, x, y in combos(cfg, modes)]
+    return pd.DataFrame(rows, columns=[*KEYS, *ENTRY_COLUMNS])
