@@ -274,3 +274,5 @@ the newest 200. Format changes go through the Lead (Scanner proposes, Dashboard 
   closes 2026-09-06 → 10-24), 1.80 M quote rows, 0.37% NaN asks. Schema: `settle_a/settle_b` added;
   `Holding.pnl_settled`. 99 tests passing.
 - 2026-10-24: `settle_a/settle_b` populated by the normalizer (phat-d0/Tennis_Model#25); 100 tests.
+- 2026-10-24: Swing backtest settles fair-price matches via `pnl_settled` (phat-d0/Tennis_Model#26);
+  103 tests passing.
