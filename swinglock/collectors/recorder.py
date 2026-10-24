@@ -38,7 +38,8 @@ import pandas as pd
 from ..config import load_config
 from ..schema import MATCH_COLUMNS, QUOTE_COLUMNS, conform
 from .kalshi import KalshiClient, KalshiError
-from .kalshi_normalize import match_row, num, orderbooks_to_quotes, ts
+from .kalshi_normalize import (SCORE_COLUMNS, SCORE_KEY, competitor_sides, match_row, num,
+                               orderbooks_to_quotes, score_row, ts)
 
 log = logging.getLogger("swinglock.recorder")
 
@@ -52,7 +53,11 @@ DEPTH_COLUMNS = {
     "price": "float64",    # dollars
     "size": "float64",     # contracts
 }
+LIVE_IDS_PER_CALL = 100     # GET /live_data/batch: milestone_ids maxItems 100
+SCORE_HEARTBEAT_S = 600     # write an unchanged score row at least this often
+SCORE_LEAD_S = 1800         # start polling a match's score this long before its scheduled start
 DEFAULTS = {"poll_s": 10.0, "discovery_s": 600.0, "flush_s": 60.0, "max_rps": 1.0, "depth": 5,
+            "score_poll_s": 60.0,
             "out_dir": "data/recorded/kalshi"}
 
 
@@ -72,12 +77,14 @@ def open_matches(client: KalshiClient, series: list[str], series_meta: dict[str,
     for s in series:
         params = {"series_ticker": s, "status": "open", "with_nested_markets": "true",
                   "with_milestones": "true", "limit": 200}
-        starts = {}
+        starts, milestone_ids = {}, {}
         for page in _pages(client, "/events", params):
             for m in page.get("milestones") or []:
                 main = (m.get("details") or {}).get("main_game_event_ticker")
                 if main and m.get("start_date"):
                     starts[main] = m["start_date"]
+                if main and m.get("id") and m.get("type") == "tennis_tournament_singles":
+                    milestone_ids[main] = m["id"]
             for e in page.get("events") or []:
                 mk = e.get("markets") or []
                 if len(mk) != 2:
@@ -88,6 +95,11 @@ def open_matches(client: KalshiClient, series: list[str], series_meta: dict[str,
                 except (KeyError, ValueError) as err:
                     log.warning("%s: skipped (%s)", e.get("event_ticker"), err)
                     continue
+                # Extra keys for live-score polling (dropped when the matches table is written).
+                ma = next(x for x in mk if x["ticker"] == row["instrument_a"])
+                mb = next(x for x in mk if x["ticker"] == row["instrument_b"])
+                row["_milestone_id"] = milestone_ids.get(row["match_id"])
+                row["_sides"] = competitor_sides(ma, mb)
                 out[row["match_id"]] = row
     return out
 
@@ -106,18 +118,25 @@ def _pages(client: KalshiClient, path: str, params: dict):
 class Recorder:
     def __init__(self, client: KalshiClient, series: list[str], out_dir: Path, poll_s: float = 10.0,
                  discovery_s: float = 600.0, flush_s: float = 60.0, depth: int = 5,
+                 score_poll_s: float = 60.0,
                  clock: Callable[[], float] = time.time, sleep: Callable[[float], None] = time.sleep):
         self.client, self.series, self.out_dir = client, series, Path(out_dir)
         self.poll_s, self.discovery_s, self.flush_s, self.depth = poll_s, discovery_s, flush_s, depth
+        self.score_poll_s = score_poll_s   # 0 = live-score polling off
         self.clock, self.sleep = clock, sleep
         self.matches: dict[str, dict] = {}
         self.series_meta: dict[str, dict] = {}
         self._quotes: list[pd.DataFrame] = []
         self._depth: list[dict] = []
         self._open_ids: set[str] = set()
+        self._scores: list[dict] = []
+        self._last_score: dict[str, tuple[tuple, float]] = {}   # match → (SCORE_KEY values, written at)
+        self._score_done: set[str] = set()                       # matches seen closed/ended
         self._last_discovery = -1e18
+        self._last_score_poll = -1e18
         self._last_flush = clock()
         self.snapshots = 0
+        self.score_polls = 0
         self.stop = False
 
     # -- steps ---------------------------------------------------------------------------
@@ -156,6 +175,46 @@ class Recorder:
             self._depth += depth_rows(at, mid, b, books[b], self.depth)
         self.snapshots += 1
 
+    def poll_scores(self) -> None:
+        """One GET /live_data/batch per 100 matches that are due (from SCORE_LEAD_S before the
+        scheduled start, or always if the start is unknown) and not yet seen ended. Writes a row
+        when the score/state changed, or every SCORE_HEARTBEAT_S otherwise."""
+        now = self.clock()
+        self._last_score_poll = now
+        due = {}
+        for mid in sorted(self._open_ids):
+            m = self.matches[mid]
+            start = m.get("scheduled_start")
+            if not m.get("_milestone_id") or mid in self._score_done:
+                continue
+            if start is not None and pd.notna(start) and pd.Timestamp(start).timestamp() - SCORE_LEAD_S > now:
+                continue
+            due[m["_milestone_id"]] = mid
+        ids = list(due)
+        at = pd.Timestamp(now, unit="s", tz="UTC")
+        for i in range(0, len(ids), LIVE_IDS_PER_CALL):
+            chunk = ids[i:i + LIVE_IDS_PER_CALL]
+            try:
+                d = self.client.get("/live_data/batch", {"milestone_ids": chunk}, cache=False)
+            except KalshiError as err:
+                log.warning("live_data call failed (%s)", err)
+                continue
+            for live in d.get("live_datas") or []:
+                mid = due.get(live.get("milestone_id"))
+                if mid is None or live.get("type") != "tennis_tournament_singles":
+                    continue
+                row = score_row(mid, live, self.matches[mid].get("_sides") or {}, at)
+                if row is None:
+                    continue
+                key = tuple(row[k] for k in SCORE_KEY)
+                prev = self._last_score.get(mid)
+                if prev is None or prev[0] != key or now - prev[1] >= SCORE_HEARTBEAT_S:
+                    self._scores.append(row)
+                    self._last_score[mid] = (key, now)
+                if row["status"] == "closed" or row["match_status"] == "ended":
+                    self._score_done.add(mid)
+        self.score_polls += 1
+
     def flush(self) -> None:
         now = datetime.fromtimestamp(self.clock(), tz=timezone.utc)
         stamp = now.strftime("%H%M%S")
@@ -175,7 +234,11 @@ class Recorder:
                 old = conform(pd.read_parquet(p), MATCH_COLUMNS)
                 m = pd.concat([old[~old["match_id"].isin(m["match_id"])], m], ignore_index=True)
             _atomic_parquet(m, p)
-        self._quotes, self._depth = [], []
+        if self._scores:
+            sc = conform(pd.DataFrame(self._scores), SCORE_COLUMNS)
+            for day, part in sc.groupby(sc["ts"].dt.strftime("%Y-%m-%d")):
+                _write_part(self.out_dir / "score" / day, stamp, part)
+        self._quotes, self._depth, self._scores = [], [], []
         self._last_flush = self.clock()
         compact_days(self.out_dir, before=now.strftime("%Y-%m-%d"))
 
@@ -190,6 +253,8 @@ class Recorder:
                     log.warning("discovery failed (%s); keeping the previous match list", err)
                     self._last_discovery = start
             self.poll()
+            if self.score_poll_s and self.clock() - self._last_score_poll >= self.score_poll_s:
+                self.poll_scores()
             if self.clock() - self._last_flush >= self.flush_s:
                 self.flush()
                 log.info("%d snapshots, %d requests, %d 429s, %d open matches", self.snapshots,
@@ -218,7 +283,7 @@ def _write_part(day_dir: Path, stamp: str, df: pd.DataFrame) -> None:
 
 def compact_days(out_dir: Path, before: str) -> None:
     """Merge each day directory older than `before` (YYYY-MM-DD) into <table>/<day>.parquet."""
-    for table in ("quotes", "depth"):
+    for table in ("quotes", "depth", "score"):
         root = Path(out_dir) / table
         if not root.exists():
             continue
@@ -247,11 +312,13 @@ def main(argv: list[str] | None = None) -> None:
     ap.add_argument("--flush", type=float, default=rc["flush_s"])
     ap.add_argument("--max-rps", type=float, default=rc["max_rps"], help="request cap, all calls")
     ap.add_argument("--depth", type=int, default=rc["depth"], help="bid levels kept per book side")
+    ap.add_argument("--score-poll", type=float, default=rc["score_poll_s"],
+                    help="seconds between live-score polls (0 = off)")
     ap.add_argument("--duration", type=float, help="stop after this many seconds (test runs)")
     a = ap.parse_args(argv)
     logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
     client = KalshiClient(raw_dir=Path(cfg["data"]["raw_dir"]) / "kalshi", min_interval_s=1.0 / a.max_rps)
-    rec = Recorder(client, a.series, a.out, a.poll, a.discovery, a.flush, a.depth)
+    rec = Recorder(client, a.series, a.out, a.poll, a.discovery, a.flush, a.depth, a.score_poll)
 
     def _stop(*_):
         rec.stop = True

@@ -1,8 +1,10 @@
 # Proposal: record live score/state next to the order books
 
-Data role, 2026-10-24. **Status: proposal, not built and not turned on.** No API calls were made
-for this write-up. Sources: Kalshi docs (fetched as `.md`) and our fixtures
-`tests/fixtures/kalshi/{milestones_*,live_data_*}.json`.
+Data role, 2026-10-24. **Status: built into the recorder (`recorder.score_poll_s`, default 60 s),
+approved by the Lead.** Sources: Kalshi docs (fetched as `.md`), our fixtures
+`tests/fixtures/kalshi/{milestones_*,live_data_*}.json`, and **one** live
+`GET /live_data/batch` call on 2026-10-24 10:43 UTC (10 milestones, HTTP 200), trimmed into
+`live_data_batch_tennis_live_2026-10-24.json` to pin down the live formats.
 
 ## Why
 Kalshi keeps no score history: `GET /live_data/milestone/{id}` is a current snapshot only
@@ -38,19 +40,21 @@ fixture: VAN = `f0e4…` = competitor1, MUS = `8fa1…` = competitor2).
 
 | Field | Example (ended match) | Meaning |
 |---|---|---|
-| `status` / `match_status` / `widget_status` | `closed` / `ended` / `finished` | game state; values while live are not in our fixtures |
+| `status` | `not_started` → `started` → `live` → `closed` | game state (seen live) |
+| `match_status` | `null`/`""` before and early on, `1st_set`, `2nd_set`, …, `ended` | set in progress |
+| `widget_status` | `none`, `live`, `finished` | UI state |
 | `competitor{1,2}_id` | UUID | maps to side A/B via `tennis_competitor` |
 | `competitor{1,2}_overall_score` | 1 / 2 | sets won |
 | `competitor{1,2}_round_scores[]` | `{score: 6, tiebreak_score: 5, outcome: "loser"}` | games per set (+ tiebreak points) |
-| `competitor{1,2}_current_round_score` | 0 | **unverified**: points in the current game, or games in the current set? |
+| `competitor{1,2}_current_round_score` | 15 / 30, 40 / 40 | **points in the current game, literal 0/15/30/40** (live). Tiebreak values not yet seen |
 | `completed_rounds`, `round_winners[]` | 3, [ids] | finished sets |
-| `server` | `''` (empty after the end) | who is serving: **unverified** format while live |
-| `advantage` | `''` | deuce/advantage state: **unverified** format |
+| `server` | competitor UUID (live); `''` before the start and after the end | who is serving |
+| `advantage` | competitor UUID at deuce (seen at 40-40); `''` otherwise | player with AD |
 | `winner` | UUID | match winner |
 | `competitor{1,2}_statistics` | aces, breakpoints_won, points_won, … | cumulative match stats |
 | `live_data_delayed` | (absent here) | staleness flag, not always set |
 
-## Proposed table: `data/recorded/kalshi/score/<day>.parquet`
+## Table: `data/recorded/kalshi/score/<day>.parquet`
 One row per match per poll **only when something changed** since the last row (status, sets,
 games, points, server), plus one row per match every 10 min as a heartbeat. That keeps it small,
 and a timeline can be rebuilt with an as-of join on `ts`.
@@ -65,8 +69,9 @@ and a timeline can be rebuilt with an as-of join on `ts`.
 | sets_a, sets_b | int | `competitorN_overall_score`, mapped to A/B |
 | games_a, games_b | int | last entry of `competitorN_round_scores[].score` (current set) |
 | tb_a, tb_b | int/NA | that entry's `tiebreak_score` |
-| points_a, points_b | string | `competitorN_current_round_score` (format to verify) |
-| server | "A"/"B"/NA | `details.server` mapped via competitor IDs (format to verify) |
+| points_a, points_b | int | `competitorN_current_round_score` (0/15/30/40 as given) |
+| server | "A"/"B"/NA | `details.server` mapped via competitor IDs |
+| advantage | "A"/"B"/NA | `details.advantage` mapped via competitor IDs |
 | set_scores | string | compact "6-7(5) 7-6(9) 4-6" in A-B order, for humans |
 | winner | "A"/"B"/NA | `details.winner` mapped |
 | raw | string | the `details` JSON minus `statistics`, so nothing is lost while formats are unverified |
@@ -75,18 +80,24 @@ The `raw` column is the safety net: if a field's live format turns out different
 the columns later from `raw` without having lost history. Statistics are dropped by default; they
 are large and cumulative. A config flag could keep them.
 
-## Implementation sketch (when approved)
-- `recorder.py`: keep `milestone_id` and the competitor→side map per match from discovery. Every
-  `score_poll_s` (default 60), call `/live_data/batch` for matches whose `scheduled_start − 30 min ≤ now`
-  and whose last status isn't ended. Write changed rows to `score/` with the same part/compact
-  scheme as quotes and depth.
-- `kalshi_normalize.py`: `live_row(details, side_of_competitor)`, pure, tested on the fixture.
-- Config: `recorder.score_poll_s: 60` (0 = off, **default off** until the owner/Lead says go).
-- Before turning it on: one short supervised run on the VPS to capture a live fixture (mid-match
-  `server`, `advantage`, `current_round_score` values), then fix the mapping and add that fixture.
+## As built
+- `kalshi_normalize.score_row(match_id, live, sides, at)` (pure) and `competitor_sides(market_a, market_b)`.
+  If either competitor can't be mapped to A/B, it returns no row; we never guess the orientation.
+- `recorder.py`: discovery keeps each match's singles milestone id and the competitor→side map.
+  Every `score_poll_s` (default **60**; 0 = off) it calls `/live_data/batch` (100 ids per call) for
+  matches from 30 min before their scheduled start (or always, if no start is known) until a
+  `closed`/`ended` state has been recorded.
+- A row is written when any of status, match_status, sets, games, tiebreak, points, server,
+  advantage or winner changed, and otherwise every 10 min as a heartbeat. Rows go to
+  `score/<day>/part-*.parquet`, compacted daily like quotes and depth.
+- Tests: `score_row` on the ended VanMus fixture (real event + live data: A = Van Assche, the
+  set scores and winner match the settled markets) and on the live batch fixture (deuce with
+  advantage, flipped orientation, not started, unmapped → no row). Recorder: change-only rows,
+  heartbeat logic, polling off (`0`) and not before the lead time.
 
 ## Open questions
-1. While a match is live, is `current_round_score` points (0/15/30/40 as 0–3? or literal?) or games?
-2. `server` / `advantage` format: competitor ID, "home"/"away", or 1/2?
+1. ~~`current_round_score` format~~: points, literal 0/15/30/40 (live call 2026-10-24).
+   In a tiebreak it is presumably tiebreak points; not seen yet. `raw` keeps it either way.
+2. ~~`server` / `advantage` format~~: competitor UUIDs.
 3. How far behind real time is the feed during play? Compare `ts` of score changes with quote jumps.
 4. Doubles / team events use other milestone types; this design covers `tennis_tournament_singles` only.
