@@ -18,11 +18,30 @@ def load(name):
     return json.loads((FX / name).read_text())
 
 
+FAR_ID, BRU_ID = "667e04df-9b7e-46af-9e6f-03822430836a", "5127a62a-542d-4dc3-b408-bdfa4bcc9729"
+FARBRU_MILESTONE = "ed49f25c-2db2-4d80-a576-664955e73499"
+
+
+def live_far_bru(points=(15, 30)):
+    """The live BASTSI entry from the batch fixture, re-keyed onto the Faria/Brunold
+    milestone and competitors (competitor1 = Faria, as in the milestones fixture)."""
+    x = json.loads(json.dumps(load("live_data_batch_tennis_live_2026-10-24.json")["live_datas"][2]))
+    d = x["details"]
+    old1, old2 = d["competitor1_id"], d["competitor2_id"]
+    swap = {old1: FAR_ID, old2: BRU_ID}
+    d["competitor1_id"], d["competitor2_id"] = FAR_ID, BRU_ID
+    d["server"] = swap.get(d["server"], d["server"])
+    d["competitor1_current_round_score"], d["competitor2_current_round_score"] = points
+    x["milestone_id"] = FARBRU_MILESTONE
+    return x
+
+
 class FakeClient:
     """Stands in for KalshiClient: answers /events and /markets/orderbooks from fixtures."""
 
-    def __init__(self, fail_books=False):
+    def __init__(self, fail_books=False, live=None):
         self.calls, self.requests_made, self.rate_limited, self.fail_books = [], 0, 0, fail_books
+        self.live = live or [live_far_bru()]
 
     def series(self, ticker, max_age_s=None):
         return load("series_KXATPMATCH_2026-10-24.json")["series"]
@@ -30,6 +49,9 @@ class FakeClient:
     def get(self, path, params=None, cache=True, max_age_s=None):
         self.calls.append((path, dict(params or {})))
         self.requests_made += 1
+        if path == "/live_data/batch":
+            ids = set(params["milestone_ids"])
+            return {"live_datas": [x for x in self.live if x["milestone_id"] in ids]}
         assert path == "/events" and params["status"] == "open"
         page = load("events_atp_match_faria_brunold_open_2026-10-24.json")
         page["milestones"] = load("milestones_atp_faria_brunold_2026-10-24.json")["milestones"]
@@ -94,6 +116,7 @@ def test_request_pattern(tmp_path):
     r.run(duration_s=35)
     paths = [p for p, _ in c.calls]
     assert paths.count("/events") == 1                  # discovery once per 600 s
+    assert paths.count("/live_data/batch") == 1         # score once per 60 s
     books = [p for p in c.calls if p[0] == "/markets/orderbooks"]
     assert len(books) == 4 and books[0][1] == {"tickers": [F, B], "depth": 5}   # both legs, one call
 
@@ -123,3 +146,33 @@ def test_depth_rows_handle_empty_side():
     rows = rec.depth_rows(pd.Timestamp("2026-10-24", tz="UTC"), "M", "M-A",
                           {"yes_dollars": [["0.40", "5"], ["0.41", "7"]]}, depth=5)
     assert [(r["book"], r["level"], r["price"]) for r in rows] == [("yes", 0, 0.41), ("yes", 1, 0.40)]
+
+
+def test_live_score_rows_change_only(tmp_path):
+    c = FakeClient()
+    r, clk = make(tmp_path, c)
+    r.run(duration_s=185)                               # score polls at 0, 60, 120, 180 s
+    sc = pd.read_parquet(tmp_path / "score" / "2026-10-24")
+    assert r.score_polls == 4 and len(sc) == 1          # unchanged score → one row only
+    row = sc.iloc[0]
+    assert row["match_id"] == "KXATPMATCH-26OCT24FARBRU" and row["status"] == "live"
+    # competitor1 = Faria = side A (market FAR's tennis_competitor)
+    assert (row["games_a"], row["games_b"], row["points_a"], row["points_b"]) == (5, 4, 15, 30)
+    assert row["server"] in ("A", "B") and row["set_scores"] == "5-4"
+    c.live = [live_far_bru(points=(30, 30))]           # a point is played
+    r.run(duration_s=65)
+    sc = pd.read_parquet(tmp_path / "score" / "2026-10-24")
+    assert len(sc) == 2 and sc["points_a"].tolist() == [15, 30]
+
+
+def test_score_polling_off_and_before_start(tmp_path):
+    c = FakeClient()
+    clk = Clock(1792836000.0)
+    r = rec.Recorder(c, ["KXATPMATCH"], tmp_path, score_poll_s=0, clock=clk, sleep=clk.sleep)
+    r.run(duration_s=125)
+    assert "/live_data/batch" not in [p for p, _ in c.calls]
+    c2 = FakeClient()
+    early = Clock(1792836000.0 - 4 * 3600)               # 4 h before the 10:10 scheduled start
+    r2 = rec.Recorder(c2, ["KXATPMATCH"], tmp_path / "x", clock=early, sleep=early.sleep)
+    r2.run(duration_s=125)
+    assert "/live_data/batch" not in [p for p, _ in c2.calls]
