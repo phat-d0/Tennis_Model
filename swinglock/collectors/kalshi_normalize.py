@@ -11,8 +11,9 @@ mid or last. A side with no quote stays NaN.
 
 Candles (1-minute) carry only YES bid/ask OHLC and no size; we use the `close` of each
 period (the quote at period end). Kalshi omits candles for minutes with no update, so each
-market's last close is carried forward until its next candle, and the two legs are combined
-at the union of their candle times.
+market's last close is carried forward until its next candle (for at most `max_carry_s`,
+config `data.max_carry_s`, default 300 s), and the two legs are combined at the union of
+their candle times.
 """
 
 from __future__ import annotations
@@ -211,17 +212,23 @@ def candle_frame(candles: list[dict]) -> pd.DataFrame:
     return df.drop_duplicates("ts", keep="last").sort_values("ts").reset_index(drop=True)
 
 
+DEFAULT_MAX_CARRY_S = 300.0
+
+
 def candles_to_quotes(match_id: str, ticker_a: str, ticker_b: str, candles_a: list[dict],
-                      candles_b: list[dict], until: Any = None) -> pd.DataFrame:
+                      candles_b: list[dict], until: Any = None,
+                      max_carry_s: float | None = DEFAULT_MAX_CARRY_S) -> pd.DataFrame:
     """Candles of both legs → quotes (source 'candle'). Each leg's last close is carried
-    forward to the other leg's candle times; nothing before a leg's first candle is filled.
+    forward to the other leg's candle times for at most `max_carry_s` (None = no cap); an
+    older leg counts as missing (NaN). Nothing before a leg's first candle is filled.
     Candles ending more than one period after `until` (match close) are dropped."""
     a, b = candle_frame(candles_a), candle_frame(candles_b)
     if a.empty and b.empty:
         return empty(QUOTE_COLUMNS)
     grid = pd.DataFrame({"ts": pd.concat([a["ts"], b["ts"]]).drop_duplicates().sort_values()})
-    m = pd.merge_asof(grid, a.rename(columns={"yes_bid": "yb_a", "yes_ask": "ya_a"}), on="ts")
-    m = pd.merge_asof(m, b.rename(columns={"yes_bid": "yb_b", "yes_ask": "ya_b"}), on="ts")
+    tol = None if max_carry_s is None else pd.Timedelta(seconds=max_carry_s)
+    m = pd.merge_asof(grid, a.rename(columns={"yes_bid": "yb_a", "yes_ask": "ya_a"}), on="ts", tolerance=tol)
+    m = pd.merge_asof(m, b.rename(columns={"yes_bid": "yb_b", "yes_ask": "ya_b"}), on="ts", tolerance=tol)
     if until is not None and pd.notna(ts(until)):
         m = m[m["ts"] <= ts(until) + pd.Timedelta(minutes=1)]
     return effective_quotes(match_id, ticker_a, ticker_b, m["ts"].to_numpy(),
