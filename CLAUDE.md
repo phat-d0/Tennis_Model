@@ -86,8 +86,8 @@ swinglock/
                             metrics · grid · run CLI → reports/                 (Backtest)
   scanner/                  live loop, alerts, state.json                       (Scanner)
   dashboard/                live HTML view of state.json                        (Dashboard)
-upsets/                     early-round upset study: load (tennis-data.co.uk) · elo · features ·
-                            model · backtest (season walk-forward) · odds_api (DK) · run   (Lead)
+upsets/                     early-round upset study: sackmann (results loader) · seeds (base rates) ·
+                            elo · features · model · backtest · kalshi_preview · odds_api (DK) (Upsets)
 docs/WORK_PLAN.md           status, open items, next steps
 docs/team/                  role briefs + lead.md (session IDs)
 docs/research/              verified API/fee/ToS notes per venue (with source URLs)
@@ -217,6 +217,7 @@ the newest 200. Format changes go through the Lead (Scanner proposes, Dashboard 
 - Recorded order books (~100 MB/day before compaction) stay on the VPS disk under
   `data/recorded/kalshi/`. They don't go to `data-store`, which is too big for git; Backtest gets
   extracts on request.
+- A fresh cloud container may lack pyarrow/pytest: run `pip install -e . pytest` first.
 - Cloud sessions are ephemeral: commit and push work before stopping. A long-running
   recorder or scanner can't live in a cloud session; it needs the owner's machine or a server.
 - The environment's network policy (Limited, Allowed domains) must list: api.elections.kalshi.com,
@@ -336,3 +337,7 @@ the newest 200. Format changes go through the Lead (Scanner proposes, Dashboard 
 - 2026-10-25: Results source: Sackmann's repos now 404; the owner forked the mirror `phat-d0/tennis-sackmann-archive`
   (ATP/WTA 1968 → May 2026, seeds/ranks/rounds, no odds; CC BY-NC-SA). Public, so it's an anonymous git
   clone. tennis-data.co.uk is dropped (Cloudflare blocks cloud IPs).
+- 2026-10-25: Upsets phase A merged (phat-d0/Tennis_Model#58; `reports/upsets_findings.md`,
+  `reports/upsets_seed_base_rates.md`); 140 tests. 2010–2025, rounds 1–2, seed vs unseeded: seeds lose 29.7%
+  (ATP) / 30.1% (WTA), ~2 pp more than Elo expects, mostly vs qualifiers. 42% / 46% of seeds are out by round 2.
+  No odds in this data, so no edge claim. Lead re-check matched ATP within 0.2 pp.

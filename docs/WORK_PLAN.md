@@ -92,6 +92,10 @@ Plan, method, gate and data blockers: `docs/upsets_plan.md`. Code: `upsets/` (Le
   underdog against a ≥ 75¢ favourite at the closing ask with the fee. ATP+WTA: 688 bets, −15.7% ROI
   (CI −29% to −1%); WTA −32.5%; ATP +4.0% (CI −18% to +29%, noise). Challenger+WTA 125: 1,151 bets, −16.7%
   (CI −27% to −6%). Underdogs win less often than their price implies (favourite–longshot bias).
+- **Phase A done (phat-d0/Tennis_Model#58):** in rounds 1–2, seeds lose to unseeded players 29.7% (ATP) /
+  30.1% (WTA) of the time (2010–2025). Elo expects 27.5% / 28.4%; the gap is mostly qualifiers, and at
+  Slams seeds lose less than Elo says. These are base rates, not an edge (no odds). **Next: Phase B**
+  (`upsets/kalshi_elo.py`: Elo vs Kalshi closing prices; Upsets writes it, Data runs it).
 - **Results data (2026-10-25):** Jeff Sackmann's repos now return 404. The owner forked the archival
   mirror `phat-d0/tennis-sackmann-archive` (CC BY-NC-SA 4.0, non-commercial, attribute Sackmann; never
   commit the CSVs). It covers ATP/WTA 1968 → tournaments starting by 2026-05-25, with seeds, ranks, rounds
