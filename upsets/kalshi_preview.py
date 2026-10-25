@@ -45,22 +45,34 @@ def round_number(label) -> float:
     return np.nan
 
 
-def round_group(df: pd.DataFrame) -> pd.Series:
+LATER_WORDS = ("quarter", "semi", "final", "robin")
+SERIES_TOUR = {"KXATPMATCH": "atp", "KXWTAMATCH": "wta",
+               "KXATPCHALLENGERMATCH": "atp-ch", "KXWTACHALLENGERMATCH": "wta125"}
+
+
+def round_group(df: pd.DataFrame, warmup_days: float = 7.0) -> pd.Series:
     """qualifying | early (first two main-draw rounds) | later | unknown, per match.
 
     'Round of N' labels are early when N is the tournament's largest or second-largest draw
-    size seen (tournament = name + year); 'Round k' labels are early when k <= 2."""
+    size seen (tournament = name + year); 'Round k' labels are early when k <= 2. Labels with
+    no round number (e.g. a bare 'Round') are unknown. Main-draw rounds of tournaments whose
+    first match is within `warmup_days` of the data's first match are unknown too: their
+    early rounds may predate the data, which would make a later round look like the largest draw."""
     label = df["round"].fillna("")
+    low = label.str.lower()
     num = label.map(round_number)
-    out = pd.Series("later", index=df.index)
-    out[label == ""] = "unknown"
-    out[label.str.lower().str.contains("qualif")] = "qualifying"
+    out = pd.Series("unknown", index=df.index)
+    out[low.map(lambda s: any(w in s for w in LATER_WORDS))] = "later"
+    out[num.notna()] = "later"
     key = df["tournament_name"].fillna("") + "|" + df["scheduled_start"].dt.year.astype(str)
     draw = num.where(num > 0)
     top_two = draw.groupby(key).transform(lambda s: s.dropna().drop_duplicates().nlargest(2).min()
                                           if s.notna().any() else np.nan)
     out[(draw.notna()) & (draw >= top_two)] = "early"
     out[(num < 0) & (num >= -2)] = "early"
+    first = df["scheduled_start"].groupby(key).transform("min")
+    out[(out != "unknown") & (first < df["scheduled_start"].min() + pd.Timedelta(days=warmup_days))] = "unknown"
+    out[low.str.contains("qualif")] = "qualifying"
     return out
 
 
@@ -103,6 +115,8 @@ def build_bets(matches: pd.DataFrame, quotes: pd.DataFrame, details: pd.DataFram
     m["dog_pay"] = m["settle_a"].where(dog_a, m["settle_b"])
     m["upset"] = (m["dog_pay"] == 1.0).astype(int)
     m["group"] = round_group(m)
+    series = m["series"] if "series" in m else pd.Series(pd.NA, index=m.index)
+    m["tour"] = series.map(SERIES_TOUR).fillna(m["tier"])
     fees = {}
     for slip in (0.0, 0.01):
         cost = []
@@ -159,8 +173,8 @@ def report(b: pd.DataFrame, strong_fav: float, n_matches: int) -> str:
              "Kalshi's taker fee; 1-min candles, no depth. Aggregates only.", "",
              "## Headline: early rounds, strong favourite", "", *HEAD,
              _row(f"Early rounds, fav ask ≥ {strong_fav:.2f} (all)", strong)]
-    for tour in sorted(b["tier"].dropna().unique()):
-        lines.append(_row(f"… {tour.upper()}", strong[strong["tier"] == tour]))
+    for tour in sorted(b["tour"].dropna().unique()):
+        lines.append(_row(f"… {tour.upper()}", strong[strong["tour"] == tour]))
     lines.append(_row("Early rounds, any favourite", early))
     lines += ["", "By month (early rounds, strong favourite):", "", "| Month | Bets | ROI 0¢ |", "|---|---|---|"]
     for mo, g in strong.groupby("month"):
@@ -168,7 +182,7 @@ def report(b: pd.DataFrame, strong_fav: float, n_matches: int) -> str:
 
     lines += ["", "## Calibration by tour, round group and underdog price", "", *HEAD]
     b = b.assign(bucket=pd.cut(b["dog_ask"], DOG_BINS))
-    for (tour, grp), g in b.groupby(["tier", "group"]):
+    for (tour, grp), g in b.groupby(["tour", "group"]):
         lines.append(_row(f"**{tour.upper()} {grp} (all)**", g))
         for bucket, gb in g.groupby("bucket", observed=True):
             lines.append(_row(f"{tour.upper()} {grp} dog {bucket}", gb))
