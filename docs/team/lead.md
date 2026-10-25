@@ -16,6 +16,7 @@ All tagged `tennis-team`. Message a role with `send_message` to its session ID.
 | Backtest | session_011TMahQYKejjndRUutywyxf | `team/backtest` |
 | Scanner | session_01BktfhyVLRfRy1pPtSyFLWZ | `team/scanner` |
 | Dashboard | session_01W1DSUJuc7wQcHRTpWk2cX2 | `team/ui` |
+| Upsets | session_01DMNowYiDRCQz3Dn5JFnx9J | `team/upsets` |
 
 ## Review checklist (every PR)
 1. The diff stays in the role's files; shared-file changes are minimal and flagged.
