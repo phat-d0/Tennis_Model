@@ -88,6 +88,13 @@ Plan, method, gate and data blockers: `docs/upsets_plan.md`. Code: `upsets/` (Le
 - **Blocked (2026-10-25 17:37):** tennis-data.co.uk's Cloudflare blocks the cloud container's IP (403
   "you have been blocked"; not worked around). The owner downloads the ATP + WTA xlsx files for 2015–2026
   by hand. The Limited network policy also denies api.the-odds-api.com, so it needs adding.
+- **Kalshi preview (2026-10-25, `reports/upsets_kalshi_preview.md`): no edge.** The test bets every early-round
+  underdog against a ≥ 75¢ favourite at the closing ask with the fee. ATP+WTA: 688 bets, −15.7% ROI
+  (CI −29% to −1%); WTA −32.5%; ATP +4.0% (CI −18% to +29%, noise). Challenger+WTA 125: 1,151 bets, −16.7%
+  (CI −27% to −6%). Underdogs win less often than their price implies (favourite–longshot bias).
+- **Replacement data (owner to decide):** tennis-data.co.uk blocks cloud IPs, and the owner may be blocked
+  too. Proposal: results from Jeff Sackmann's ATP/WTA repos (the owner forks them), plus DraftKings history
+  from one month of The Odds API paid plan (~$30, ~5–8k credits).
 - Next: download 2013–2026, calibration table + walk-forward, `reports/upsets_findings.md`.
 
 ## How to continue in a new session
