@@ -459,3 +459,18 @@ def test_run_only_groups_skips_other_groups(tmp_path, monkeypatch):
     monkeypatch.setattr(backfill, "write_outputs", lambda out, rows, q: (backfill.matches_frame([]), backfill.empty(backfill.QUOTE_COLUMNS)))
     backfill.run(["S"], tmp_path, tmp_path / "raw", only_groups=[1])
     assert done == ["challenger"]
+
+
+def test_crossed_candle_ask_is_dropped():
+    """Real historical candles (SAKMUL, 2026-05-13): the ask close froze at 0.62 while the
+    bid traded up to 0.79-0.80. A YES ask below the same market's YES bid is not a real quote."""
+    sak = load("historical_candlesticks_1m_challenger_sakmul_SAK_crossed_2026-05-13.json")["candlesticks"]
+    q = candles_to_quotes("M", "M-SAK", "M-MUL", sak, [])
+    ok = q_at(q, 1778672400, "A")                     # 11:40: bid .39 < ask .62, kept
+    assert ok["ask"] == pytest.approx(0.62) and ok["bid"] == pytest.approx(0.39)
+    for t in (1778672460, 1778672520, 1778672580):    # 11:41-11:43: crossed
+        a, b = q_at(q, t, "A"), q_at(q, t, "B")
+        assert math.isnan(a["ask"])                   # dropped, nothing filled in
+        assert a["bid"] >= 0.75                       # the traded bid is kept
+        assert b["ask"] == pytest.approx(1 - a["bid"])  # NO on SAK still prices side B
+        assert math.isnan(b["bid"])                   # 1 - YES ask(SAK) is gone with the ask

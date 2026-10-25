@@ -53,6 +53,14 @@ Scheduled start: one bulk listing of `GET /milestones?type=tennis_tournament_sin
 - **No quote → NaN.** A YES ask of 1.00 (no NO bids) or a YES bid of 0.00 (no YES bids)
   means that level doesn't exist; it becomes NaN, not a price.
 - Candles ending more than one minute after the match's close_time are dropped.
+- **Crossed candles:** a candle whose `yes_ask` close is below the same market's `yes_bid` close
+  gets its ask set to NaN (the bid is kept). Found 2026-10-25 while reading the Challenger
+  backfill: 84 of 13.8 M two-sided candles, all historical, in 5 markets
+  (KXATPCHALLENGERMATCH-26MAY12POLSTR-STR 31, -26MAY12MONAND-AND 21, -26MAY13SAKMUL-SAK 19,
+  -26MAY13VIRMPE-VIR 9, KXWTACHALLENGERMATCH-26MAY13ZAKBOU-ZAK 4), all on 2026-05-13 11:00–15:00 UTC.
+  In each, the ask close sat frozen (e.g. 0.62) while the bid traded far above it on heavy volume.
+  Those candles produced the largest "true arbs" in the read (up to 34¢ for 14 min), which were not real.
+  Live (post-cutoff) candles had none.
 - **Winner:** A/B when one market settled `yes` at $1 and the other `no`. A not-started match
   settled at a "fair price" (fractional `settlement_value_dollars`) gets winner NA.
 - **Fee type:** event override if set; else the series' fee history at the match's open time
