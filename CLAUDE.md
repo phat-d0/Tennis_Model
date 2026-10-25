@@ -21,8 +21,9 @@ match winners first) and alert when one appears live.
 2. Fills are realistic: buy at the ask, sell at the bid, fees per order, plus slippage.
    **Never fill at mid or last.**
 3. DraftKings: no scraping of DraftKings itself (its ToU bans it). DraftKings **Sportsbook**
-   prices come only through **The Odds API** (the owner's paid key, shared with their soccer and
-   baseball apps). Only the Data role spends credits, within the owner's budget, and logs every spend.
+   prices come only through **The Odds API** (a free-plan key used only by this project, ~500
+   credits/month, no historical odds; owner 2026-10-25). Only the Data and Upsets roles spend credits,
+   within the budget in WORK_PLAN, and log every spend.
 4. **Kalshi data is for the owner's personal, private research** (owner decision 2026-10-24, made
    knowing the Kalshi Data ToU): low request rates, never redistributed or published, only tiny
    test fixtures in git. Datasets go on the `data-store` branch **only while the repo is
@@ -54,8 +55,8 @@ Each role also owns its own `tests/test_<area>*.py`.
 3. **Before a PR:** `python -m pytest -q` passes; backtest claims pass the gate (below);
    dashboard PRs attach 390×844 and 1280×800 screenshots in light and dark mode, with no page errors.
 4. **API budgets:** Kalshi: Data stays under ½ of the read limit, Scanner under ¼; everyone
-   else reuses data from the `data-store` branch. Back off on 429. The Odds API: credits are paid
-   and shared with the owner's other apps; only Data spends them, within the budget in
+   else reuses data from the `data-store` branch. Back off on 429. The Odds API: credits are limited
+   (free plan, this project only); only Data and Upsets spend them, within the budget in
    `docs/WORK_PLAN.md`, never below the floor, and logs each spend (date, endpoint, credits,
    balance after) in `docs/data_inventory.md`. The key comes from the env var `ODDS_API_KEY`; never commit it.
 5. **Results go in `docs/` or `reports/`** with numbers, bad ones included.
@@ -322,3 +323,5 @@ the newest 200. Format changes go through the Lead (Scanner proposes, Dashboard 
 - 2026-10-25: Owner added `ODDS_API_KEY` (free plan: ~500 credits/month, no historical odds) and allowed
   tennis-data.co.uk. Upsets role session started to run the study on real data. DraftKings history isn't
   available on the free plan, so Bet365/Pinnacle closing odds stand in for DraftKings.
+- 2026-10-25 (owner): the Odds API key is used only by this project. Lead budget: ≤ 400 credits/month,
+  floor 50. tennis-data.co.uk is Cloudflare-blocked from cloud IPs, so the owner downloads those files by hand.
