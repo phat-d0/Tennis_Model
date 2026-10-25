@@ -73,3 +73,22 @@ data:
                                 # the cap only guards against data gaps (halts, missing candles).
   raw_dir: data/raw
   processed_dir: data/processed
+
+upsets:                         # early-round upset study (python -m upsets.run); see docs/upsets_plan.md
+  data_dir: data/raw/tennis_data  # tennis-data.co.uk files (python -m upsets.download)
+  tours: [atp, wta]
+  bet_book: b365                # DraftKings proxy until we have DK history from The Odds API
+  early_rounds: 2               # rounds 1-2 count as "early"
+  min_train_seasons: 4          # first test season = first season + this
+  haircuts: [0.0, 0.03]         # cut off winnings: DK prices are usually a bit worse than Bet365
+  rule:
+    early_only: true
+    fav_rank_max: 32            # favourite ranked top 32 (seed proxy; files have no seed column)
+    min_odds: 1.0
+    max_odds: 10.0
+    min_history: 20
+    edge_grid: [0.0, 0.02, 0.05, 0.08, 0.10, 0.15]
+    default_edge: 0.05          # used until earlier test seasons can choose a threshold
+    min_select_bets: 50
+    l2: 1.0
+    burn_in_seasons: 2          # Elo warm-up seasons left out of training

@@ -104,7 +104,7 @@ observations, 12% live; 161 fair-price settlements included via settle_a/b):**
   starts when the recorder runs, so record early.
 
 ## Next steps (in order)
-0. Data: finish group 1 (recent Challenger, ~4,600/8,339 at 23:26 UTC; ~12 h at the archive's ~0.2 req/s),
+0. Data: finish group 1 (recent Challenger, 5,500/8,339 at 02:30 UTC 10-25; 429s up, ETA ~15:30 UTC),
    then full Challenger read. Group 2 (older/ITF) descoped; see CLAUDE.md Decisions.
 1. Data: backfill the most recent ~6 months of ATP + WTA first (batch candles for post-cutoff
    markets), then Challenger/ITF/older; re-normalize with the carry cap; publish to `data-store`
@@ -118,6 +118,14 @@ observations, 12% live; 161 fair-price settlements included via settle_a/b):**
 5. Lead: consolidate the scanner's GET-only client (`swinglock/scanner/client.py`) with Data's
    collector client once it lands.
 6. Lead: README covering how to run each part.
+
+## Second project: early-round upsets (ATP + WTA)
+Plan, method, gate and data blockers: `docs/upsets_plan.md`. Code: `upsets/` (Lead).
+- Status 2026-10-25: pipeline built and tested on synthetic data (122 tests); **no real-data result yet**.
+- Blocked on the owner: (1) allow `www.tennis-data.co.uk` in the environment's network settings;
+  (2) `ODDS_API_KEY` + a tennis credit budget and floor (live DK odds 1 credit per call per key; DK
+  history ≈ 5–8k credits for 2020–2026 rounds 1–2, needs an explicit OK).
+- Next: download 2013–2026, calibration table + walk-forward, `reports/upsets_findings.md`.
 
 ## How to continue in a new session
 Read `CLAUDE.md`, this file, and your brief in `docs/team/`. Check open PRs into `main` and the

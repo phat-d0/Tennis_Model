@@ -10,6 +10,10 @@ match winners first) and alert when one appears live.
 - **True arb:** ask(A) + ask(B) + fees < $1 at the same moment → buy equal counts.
 - **Swing lock:** hold A @ p1; later if p1 + ask(B) + fees < $1, buy the SAME NUMBER
   of B contracts. Locked P&L = contracts × (1 − p1 − p2) − fees.
+- **Second project (2026-10-25): early-round upsets, ATP + WTA.** Can a model of upset
+  probability beat DraftKings' odds on the underdog? Code in `upsets/`, plan and status in
+  `docs/upsets_plan.md`. The Lead builds it for now. Same rules apply: research only, no bet
+  placement, DraftKings odds only via The Odds API.
 
 ## Owner's standing rules
 1. **Read-only. No automated order placement**: no order code, no write-scope keys, not
@@ -80,6 +84,8 @@ swinglock/
                             metrics · grid · run CLI → reports/                 (Backtest)
   scanner/                  live loop, alerts, state.json                       (Scanner)
   dashboard/                live HTML view of state.json                        (Dashboard)
+upsets/                     early-round upset study: load (tennis-data.co.uk) · elo · features ·
+                            model · backtest (season walk-forward) · odds_api (DK) · run   (Lead)
 docs/WORK_PLAN.md           status, open items, next steps
 docs/team/                  role briefs + lead.md (session IDs)
 docs/research/              verified API/fee/ToS notes per venue (with source URLs)
@@ -302,3 +308,6 @@ the newest 200. Format changes go through the Lead (Scanner proposes, Dashboard 
   $0.71 total (1 contract); swing −$0.31 to −$0.38/trade OOS, WF FAIL 0/2. Group 1 ETA ~08:00 UTC 10-25.
 - 2026-10-24: Data container reclaimed twice (19:56, 20:34); a keep-alive background task fixed it.
   Group 2 descoped (see Decisions).
+- 2026-10-25: Second project started: early-round upsets (`upsets/`, docs/upsets_plan.md). The
+  pipeline and an Odds API client with a credit floor are built; 122 tests pass, but nothing has run
+  on real data yet. Blocked: the network policy denies www.tennis-data.co.uk, and `ODDS_API_KEY` is unset.
