@@ -13,7 +13,7 @@ match winners first) and alert when one appears live.
 - **Second project (2026-10-25): early-round upsets, ATP + WTA.** Can a model of upset
   probability beat DraftKings' odds on the underdog? Code in `upsets/`, plan and status in
   `docs/upsets_plan.md`. The Lead builds it for now. Same rules apply: research only, no bet
-  placement, DraftKings odds only via The Odds API.
+  placement, DraftKings odds only via The Odds API. Run by the Upsets role since 2026-10-25.
 
 ## Owner's standing rules
 1. **Read-only. No automated order placement**: no order code, no write-scope keys, not
@@ -42,6 +42,7 @@ Session IDs are in `docs/team/lead.md`.
 | **Backtest** | True-arb scan, swing-lock grid, walk-forward gate, findings report | `swinglock/backtest/`, `reports/`, `docs/edge_*.md` | `team/backtest` |
 | **Scanner** | Live scan loop, alerts, positions → lock quotes, `state.json`, VPS deploy (Docker/systemd) | `swinglock/scanner/`, `deploy/`, `docs/scanner_*.md` | `team/scanner` |
 | **Dashboard** | Live HTML view of `state.json` | `swinglock/dashboard/`, `docs/ui_*.md` | `team/ui` |
+| **Upsets** | Early-round upset study: tennis-data.co.uk download, model, walk-forward, findings. **May spend Odds API credits only within the budget in WORK_PLAN** (currently 0) | `upsets/`, `tests/test_upsets.py`, `docs/upsets_*.md`, `reports/upsets_*.md` | `team/upsets` |
 
 Each role also owns its own `tests/test_<area>*.py`.
 
@@ -318,3 +319,6 @@ the newest 200. Format changes go through the Lead (Scanner proposes, Dashboard 
 - 2026-10-25: Crossed-candle guard merged (phat-d0/Tennis_Model#46); 123 tests passing. Cleaned
   Challenger arbs: $2.89 at 0¢ (1 contract) / $1.25 at 1¢; ATP/WTA unchanged ($2.49 / $1.21). All of it
   is stale or glitched quotes. Kalshi history work is paused until the VPS recorder runs.
+- 2026-10-25: Owner added `ODDS_API_KEY` (free plan: ~500 credits/month, no historical odds) and allowed
+  tennis-data.co.uk. Upsets role session started to run the study on real data. DraftKings history isn't
+  available on the free plan, so Bet365/Pinnacle closing odds stand in for DraftKings.

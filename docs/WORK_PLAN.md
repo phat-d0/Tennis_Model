@@ -81,9 +81,10 @@ observations, 12% live; 161 fair-price settlements included via settle_a/b):**
 ## Second project: early-round upsets (ATP + WTA)
 Plan, method, gate and data blockers: `docs/upsets_plan.md`. Code: `upsets/` (Lead).
 - Status 2026-10-25: pipeline built and tested on synthetic data (122 tests); **no real-data result yet**.
-- Blocked on the owner: (1) allow `www.tennis-data.co.uk` in the environment's network settings;
-  (2) `ODDS_API_KEY` + a tennis credit budget and floor (live DK odds 1 credit per call per key; DK
-  history ≈ 5–8k credits for 2020–2026 rounds 1–2, needs an explicit OK).
+- 2026-10-25: the owner allowed tennis-data.co.uk and added `ODDS_API_KEY`. It's the **free plan** (~500
+  credits/month, no historical odds), so there's no DraftKings history; Bet365/Pinnacle closing odds stand
+  in for DraftKings. **Odds API budget: 0 credits until the owner confirms** (proposal: ≤ 150/month for tennis
+  live DK odds, floor 100). Run by the Upsets role (session in docs/team/lead.md).
 - Next: download 2013–2026, calibration table + walk-forward, `reports/upsets_findings.md`.
 
 ## How to continue in a new session
