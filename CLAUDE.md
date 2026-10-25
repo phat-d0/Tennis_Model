@@ -315,3 +315,6 @@ the newest 200. Format changes go through the Lead (Scanner proposes, Dashboard 
   Challenger read: no edge. After-fee arbs $4.30 (1 contract) and top hits are crossed historical candles
   (84 candles, 5 markets, 2026-05-13); swing WF FAIL 0/6, OOS −$0.39/trade at 0¢. Research set = 13,019
   matches. A normalizer guard for crossed candles has been approved.
+- 2026-10-25: Crossed-candle guard merged (phat-d0/Tennis_Model#46); 123 tests passing. Cleaned
+  Challenger arbs: $2.89 at 0¢ (1 contract) / $1.25 at 1¢; ATP/WTA unchanged ($2.49 / $1.21). All of it
+  is stale or glitched quotes. Kalshi history work is paused until the VPS recorder runs.
