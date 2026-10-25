@@ -42,7 +42,28 @@ days (8,340), group 2 = everything else (48,785), newest first within each group
 The group-0 fetch ran 10:39 → 15:46 UTC. Its pace swung between ~50 matches per 5 min and per 10 min:
 `/historical/` candles need one call per market, and 429 bursts widened the request gap.
 
-Groups 1–2 (8,339 recent Challenger + 48,825 others) started 16:21 UTC → `data/processed/kalshi_g12/`.
+**Group 1 done (recent ATP Challenger + WTA 125), 2026-10-25 08:52 UTC** → `data/processed/kalshi_g12/`
+(current code, `settle_a`/`settle_b` filled):
+
+| | |
+|---|---|
+| Matches | 8,333 (KXATPCHALLENGERMATCH 6,667, KXWTACHALLENGERMATCH 1,666); 8,331 with quotes; 8,332 with a scheduled start |
+| Match close range | 2026-04-24 23:50 → 2026-10-24 21:30 UTC; 5,342 settled before the 2026-08-25 cutoff |
+| Winners | A 4,268, B 3,915, NA 150 |
+| Fair-price settlements | 150 (1.8 %), `settle_a + settle_b` = $1.00 in 150 of 150 |
+| Quote rows | 7,218,880 (1-min candles), 0.75 % NaN asks, carry cap 1800 s, 22.5 MB |
+| Quote span | 2026-04-24 09:42 → 2026-10-24 21:31 UTC |
+| Requests | ≈ 13,000 over all runs; final run (23:35 → 08:52) 8,280 requests, 902 × 429 (10.9 %), 6,851 cache hits |
+
+**Group 2 (48,825 older ATP/WTA/Challenger and all ITF matches) was not collected**, by Lead
+decision 2026-10-24 23:34. Results were uniform (no edge anywhere), group 2 would take about a week
+at the rate Kalshi allows unauthenticated (≈ 0.2 req/s on `/historical/` candles with 429 backoff),
+and collecting less keeps us lighter on the Kalshi Data ToU. It can be resumed later on a separate
+machine (not the scanner/recorder IP) with `python -m swinglock.collectors.backfill --groups 2`;
+the raw cache makes it resumable.
+
+**The research set is groups 0 + 1:** 13,019 matches (ATP 2,279, WTA 2,407, ATP Challenger 6,667,
+WTA 125 1,666), Apr 24 → Oct 24 2026, 17.47 M quote rows.
 
 Historical cutoff (`GET /historical/cutoff`, market_settled_ts): 2026-08-25T00:00Z. Matches settled
 before it come from `/historical/markets` + `/historical/markets/{t}/candlesticks`.
@@ -71,7 +92,9 @@ Milestones (scheduled start) cover start dates from ~Feb 2025 onward.
 | 2026-10-24 10:43 | Kalshi `/live_data/batch` | 10 milestones | 1 | live fixture for score formats |
 | 2026-10-24 10:39–15:46 | Kalshi backfill group 0 (relaunch loop, no relaunches needed) | ATP+WTA, Apr 24 → Oct 24 | ≈ 7,400 | ≈ 150 × 429 |
 | 2026-10-24 15:47–16:20 | Kalshi group-0 re-normalize (`--groups 0`) | same | 477 | listings only; 80 × 429 |
-| 2026-10-24 16:21 → | Kalshi backfill groups 1–2 (`--groups 1 2`) | Challenger, then rest | running | 1.0 s gap |
+| 2026-10-24 16:21–19:56 | Kalshi backfill groups 1–2 | Challenger | ≈ 4,000 | container reclaimed 19:56 |
+| 2026-10-24 20:30–23:35 | Kalshi backfill groups 1–2 (relaunches) | Challenger | ≈ 650 | reclaimed again 20:34; keep-alive from 22:02; 2 listing-phase relaunches (network, 429) |
+| 2026-10-24 23:35 → 2026-10-25 08:52 | Kalshi backfill `--groups 1` (Lead: stop after group 1) | Challenger | 8,280 | 902 × 429; group 2 not started |
 
 ## The Odds API spends
 None. No key, no budget yet.
