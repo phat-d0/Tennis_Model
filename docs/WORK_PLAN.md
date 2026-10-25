@@ -49,10 +49,12 @@ observations, 12% live; 161 fair-price settlements included via settle_a/b):**
 - **Full Challenger, group 1 (8,333 matches: ATP Challenger 6,667 + WTA 125 1,666; closes 2026-04-24 → 10-24;
   3.56 M aligned obs, pre 2.44 M / live 1.12 M; 150 fair-price settlements):** combined < $1 before fees in
   2.11% of obs (0.99: 63,507; ≤ 0.95: 166). After fees: 112 episodes in 59 matches at 0¢ ($4.30 total
-  1-contract profit); 47 at 1¢ ($2.53); leg-age 60 s: 50 episodes ($2.09). **The top hits (SAKMUL 34¢,
-  ZAKBOU 26¢, MONAND 25¢) are crossed historical candles** (ask < bid): 84 of 13.8 M two-sided candles,
-  5 markets, all 2026-05-13 11:00–15:00 UTC; none post-cutoff. A normalizer guard is being added and the
-  arb counts re-run (Lead OK 2026-10-25). Swing: best first/0.20/0.90 −$3,031 at 0¢ (8,156 trades, 46.8%
+  1-contract profit); 47 at 1¢ ($2.53); leg-age 60 s: 50 episodes ($2.09). The top hits (SAKMUL 34¢, ZAKBOU, MONAND) were crossed historical candles
+  (ask < bid; 84 candles, 5 markets, 2026-05-13 11:00–15:00 UTC). **After the guard (phat-d0/Tennis_Model#46),
+  re-normalized (8,349 matches):** 106 episodes / 57 matches, $2.89, best 28¢ at 0¢; 40 / $1.25 at 1¢;
+  leg-age 60 s 47 / $1.18, best 11¢. Leftovers are artefacts: TONBRO 28¢ (stale pre-match quote) and
+  POLSTR ≤ 11¢ (inside the 05-13 glitch window, not crossed; no date exclusion added). ATP/WTA unchanged
+  (no crossed candles). Swing: best first/0.20/0.90 −$3,031 at 0¢ (8,156 trades, 46.8%
   locked), −$4,242 at 1¢. **Walk-forward FAIL 0/6**: OOS 7,748 trades, −$0.39/trade (CI −0.42…−0.35) at 0¢,
   −$0.53 at 1¢. Live-only: 0/6, −$0.32 / −$0.47. First hour: 0/6, −$0.30 / −$0.45. Interim read (3,000) superseded.
 - **Answer:** on the research set (13,019 matches, groups 0+1, Apr → Oct 2026, 1-min candles), neither
@@ -60,9 +62,9 @@ observations, 12% live; 161 fair-price settlements included via settle_a/b):**
   fold and variant, not just sample size. Order-book history (recorder on the VPS) is the remaining test.
 
 ## Next steps (in order)
-0. Data: crossed-candle guard in the normalizer + re-normalize groups 0/1 from cache + re-run arb counts
-   (group 1 done 2026-10-25 08:52; group 2 descoped, see CLAUDE.md Decisions). Then Kalshi work pauses
-   until the VPS recorder runs. Backtest: findings report updated with the full Challenger read.
+0. Kalshi history work is done (groups 0+1, cleaned; group 2 descoped). Data is paused until the VPS
+   recorder runs; data stays in the Data container (kalshi_g0, kalshi_g12, raw cache). Backtest: swap
+   the cleaned arb counts into the findings report.
 1. Data: backfill the most recent ~6 months of ATP + WTA first (batch candles for post-cutoff
    markets), then Challenger/ITF/older; re-normalize with the carry cap; publish to `data-store`
    once the repo is private. Restarted 10:20 UTC in the new order; recent ATP+WTA slice (~4–5k
