@@ -329,3 +329,7 @@ the newest 200. Format changes go through the Lead (Scanner proposes, Dashboard 
   available on the free plan, so Bet365/Pinnacle closing odds stand in for DraftKings.
 - 2026-10-25 (owner): the Odds API key is used only by this project. Lead budget: ≤ 400 credits/month,
   floor 50. tennis-data.co.uk is Cloudflare-blocked from cloud IPs, so the owner downloads those files by hand.
+- 2026-10-25: Upset preview on Kalshi prices (`upsets/kalshi_preview.py`, phat-d0/Tennis_Model#54, #55;
+  `reports/upsets_kalshi_preview.md`): betting early-round underdogs against a ≥ 75¢ favourite lost
+  −15.7% (ATP+WTA, 688 bets) and −16.7% (Challenger+WTA 125, 1,151 bets). Underdogs are overpriced, not
+  underpriced. 128 tests passing.
