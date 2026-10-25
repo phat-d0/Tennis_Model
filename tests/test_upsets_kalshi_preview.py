@@ -49,14 +49,25 @@ def test_closing_quote_dog_and_settlement():
 
 
 def test_round_groups():
+    late = T0 + pd.Timedelta(days=30)
     df = pd.DataFrame({
         "round": ["Round of 128", "Round of 64", "Round of 32", "Final", "Round 1", "Round 3",
-                  "Qualification Round 2", None, "Round of 32", "Round of 16"],
-        "tournament_name": ["Slam"] * 4 + ["X", "X", "X", "X", "Small", "Small"],
-        "scheduled_start": [T0] * 10,
+                  "Qualification Round 2", None, "Round of 32", "Round of 16", "Round",
+                  "Round of 16", "Qualification Final"],
+        "tournament_name": ["Slam"] * 4 + ["X"] * 4 + ["Small", "Small", "Small", "Early", "Early"],
+        "scheduled_start": [late] * 11 + [T0, T0],
     })
+    # "Early" started on the data's first day: its main-draw round is unknown, its qualifier stays
     assert kp.round_group(df).tolist() == ["early", "early", "later", "later", "early", "later",
-                                           "qualifying", "unknown", "early", "early"]
+                                           "qualifying", "unknown", "early", "early", "unknown",
+                                           "unknown", "qualifying"]
+
+
+def test_tour_from_series():
+    m, q, d = frames()
+    m["series"] = ["KXATPCHALLENGERMATCH", "KXWTACHALLENGERMATCH", "KXATPMATCH", "KXATPMATCH"]
+    b = kp.build_bets(m, q, d, load_config()).set_index("match_id")
+    assert b.loc["M1", "tour"] == "atp-ch" and b.loc["M2", "tour"] == "wta125" and b.loc["M3", "tour"] == "atp"
 
 
 def test_report_renders():
