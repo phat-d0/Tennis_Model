@@ -46,66 +46,23 @@ observations, 12% live; 161 fair-price settlements included via settle_a/b):**
   (95% CI −0.37 to −0.28) at 0¢, −$0.47 (CI −0.52 to −0.43) at 1¢.
 - `entry_phase: live`: WF FAIL 0/6, OOS mean −$0.27 (0¢) / −$0.43 (1¢).
   First hour of play only (window 0–60 min): WF FAIL 0/6, OOS mean −$0.27 / −$0.42; 3,108 OOS trades.
-- **INTERIM Challenger (3,000 matches: ATP Challenger 2,298 + WTA 125 702; closes 2026-08-24 → 10-24;
-  1.25 M aligned obs, 29% live; 51 fair-price settlements):** combined < $1 before fees in 1.97% of obs.
-  After fees: 31 episodes in 15 matches at 0¢ ($0.71 total 1-contract profit, best 6¢ live); 17 at 1¢
-  ($0.23); leg-age 60 s: 18 episodes, all live, $0.34. No 20¢ stale outliers like ATP/WTA. Swing grid:
-  every rule negative (best first/0.20/0.96: 2,934 trades, 58% locked, −$1,067 at 0¢). Walk-forward FAIL
-  0/2 folds (default −$0.38/trade, live-only −$0.32, first hour −$0.31 at 0¢). Same picture as ATP/WTA.
-- **Answer so far:** on 6 months of ATP/WTA candles (and an interim 2 months of Challenger), neither true arbs nor swing locks have an edge
-  after fees and the ask spread. The gate fails on sign, not just sample size.
-
-**Earlier read (superseded by the group-0 read above):**
-**2026-10-24, 2,000 recent ATP/WTA matches (closes 2026-08-03 → 10-24; 2.10 M aligned observations, 12% live):**
-- **True arb:** combined ask < $1 before fees in 2.0% of observations (almost all at 99¢; 0.98: 4,072;
-  ≤ 0.95: 30). **After fees: 25 one-candle episodes in 14 matches** (11 at 1¢ slippage), depth unknown.
-  The biggest (21¢, NAKBAE, 3 days pre-match, zero volume) was a stale offer in a thin book. Read:
-  no tradeable true arb in recent ATP/WTA candles; the after-fee hits look like stale-quote artefacts.
-- **Swing-lock grid (in sample): every rule loses.** Best: X=0.20, Y=0.92 → 1,910 trades, 51.6% locked,
-  −$605 total (−$0.41/trade) at 0¢; −$900 at 1¢. Locked trades average +$1.11, unlocked −$1.86.
-  Live entries lose more than pre-match ones (−$455 vs −$150).
-- **Walk-forward gate: FAIL**: 3 folds (need 4), 0/3 positive; OOS −$361 at 0¢ (mean −$0.36/trade,
-  95% CI −0.45 to −0.27), −$537 at 1¢.
-- **Entry diagnostics (#29 re-runs, same 2,000 matches, Y=0.92):** losses are *not* from near-decided
-  entries: only 1–3% of entries are < 10¢ (and those are slightly positive). Entries ≥ 10¢ lose at
-  every X, more as X rises (P&L/trade −$0.33 at X=0.20 → −$1.09 at X=0.50; higher X enters earlier,
-  mostly pre-match). `min_entry_ask 0.10`: slightly worse (−$623, WF FAIL). `max_minutes_from_start 60`:
-  same −$0.36/trade (fewer trades; WF FAIL). Note: that filter caps entries *after* the start and
-  still allows pre-match ones.
-- **Interpretation (Lead):** the ~3–4¢/contract loss ≈ ask spread + taker fee, which is what fairly
-  priced markets cost you. The +$1.11 locked vs −$1.86 unlocked split is selection (trades that
-  happened to swing), not an edge. A swing lock = two taker round-trips; it only pays if prices
-  are predictable, and nothing so far says they are.
-- Not yet covered: older months, Challenger/ITF, real depth (needs the recorder), score-state splits,
-  fair-price settlements (this checkpoint predates `settle_a/b`).
-
-## Live configuration
-- Scanner thresholds: placeholders in `config.yaml` (`min_arb_profit_per_contract` 0.5¢,
-  `min_lock_profit` $0.05). None backed by a backtest yet.
-- Slippage: 0¢ default; backtests also report 1¢.
-
-## Open items (being watched)
-- **Repo visibility:** the owner is making `phat-d0/Tennis_Model` private. No data goes on
-  `data-store` until the Lead confirms it's private.
-- **The Odds API budget:** the owner's key is shared with their soccer and baseball apps. We need the
-  monthly credit budget, a floor, and the key added as `ODDS_API_KEY` in the cloud environment's
-  secrets. Until then, Data does docs research only (free endpoints like `/sports` don't cost credits).
-- **VPS:** ready to deploy, recorder included (`--profile recorder`). The owner provisions a
-  1 vCPU / 1 GB Ubuntu server (≥ 20 GB disk for ~100 MB/day of recorded books) and follows
-  `docs/scanner_deploy.md` (~20 min). **Every day without the recorder is order-book history lost.**
-- **Fee constants:** the owner should confirm the KXATPMATCH / KXWTAMATCH rows at
-  kalshi.com/fee-schedule (the site blocks scripts), and say whether the account is direct or via
-  an FCM (this sets fee-rounding precision).
-- **Odds API coverage is tour-level only** (no Challenger/ITF), so the DraftKings cross-venue check
-  only applies to big ATP/WTA events.
-- **Backfill durability:** it runs in the Data session's ephemeral container and can't be pushed
-  until the repo is private. The raw cache makes reruns resumable.
-- Historical depth: Kalshi candles have no depth and sample at 1 minute. Order-book history only
-  starts when the recorder runs, so record early.
+- **Full Challenger, group 1 (8,333 matches: ATP Challenger 6,667 + WTA 125 1,666; closes 2026-04-24 → 10-24;
+  3.56 M aligned obs, pre 2.44 M / live 1.12 M; 150 fair-price settlements):** combined < $1 before fees in
+  2.11% of obs (0.99: 63,507; ≤ 0.95: 166). After fees: 112 episodes in 59 matches at 0¢ ($4.30 total
+  1-contract profit); 47 at 1¢ ($2.53); leg-age 60 s: 50 episodes ($2.09). **The top hits (SAKMUL 34¢,
+  ZAKBOU 26¢, MONAND 25¢) are crossed historical candles** (ask < bid): 84 of 13.8 M two-sided candles,
+  5 markets, all 2026-05-13 11:00–15:00 UTC; none post-cutoff. A normalizer guard is being added and the
+  arb counts re-run (Lead OK 2026-10-25). Swing: best first/0.20/0.90 −$3,031 at 0¢ (8,156 trades, 46.8%
+  locked), −$4,242 at 1¢. **Walk-forward FAIL 0/6**: OOS 7,748 trades, −$0.39/trade (CI −0.42…−0.35) at 0¢,
+  −$0.53 at 1¢. Live-only: 0/6, −$0.32 / −$0.47. First hour: 0/6, −$0.30 / −$0.45. Interim read (3,000) superseded.
+- **Answer:** on the research set (13,019 matches, groups 0+1, Apr → Oct 2026, 1-min candles), neither
+  true arbs nor swing locks have an edge after fees and the ask spread. The gate fails on sign in every
+  fold and variant, not just sample size. Order-book history (recorder on the VPS) is the remaining test.
 
 ## Next steps (in order)
-0. Data: finish group 1 (recent Challenger, 5,500/8,339 at 02:30 UTC 10-25; 429s up, ETA ~15:30 UTC),
-   then full Challenger read. Group 2 (older/ITF) descoped; see CLAUDE.md Decisions.
+0. Data: crossed-candle guard in the normalizer + re-normalize groups 0/1 from cache + re-run arb counts
+   (group 1 done 2026-10-25 08:52; group 2 descoped, see CLAUDE.md Decisions). Then Kalshi work pauses
+   until the VPS recorder runs. Backtest: findings report updated with the full Challenger read.
 1. Data: backfill the most recent ~6 months of ATP + WTA first (batch candles for post-cutoff
    markets), then Challenger/ITF/older; re-normalize with the carry cap; publish to `data-store`
    once the repo is private. Restarted 10:20 UTC in the new order; recent ATP+WTA slice (~4–5k

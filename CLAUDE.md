@@ -311,3 +311,7 @@ the newest 200. Format changes go through the Lead (Scanner proposes, Dashboard 
 - 2026-10-25: Second project started: early-round upsets (`upsets/`, docs/upsets_plan.md). The
   pipeline and an Odds API client with a credit floor are built; 122 tests pass, but nothing has run
   on real data yet. Blocked: the network policy denies www.tennis-data.co.uk, and `ODDS_API_KEY` is unset.
+- 2026-10-25: Backfill group 1 done (8,333 Challenger matches; inventory phat-d0/Tennis_Model#44). Full
+  Challenger read: no edge. After-fee arbs $4.30 (1 contract) and top hits are crossed historical candles
+  (84 candles, 5 markets, 2026-05-13); swing WF FAIL 0/6, OOS −$0.39/trade at 0¢. Research set = 13,019
+  matches. A normalizer guard for crossed candles has been approved.
