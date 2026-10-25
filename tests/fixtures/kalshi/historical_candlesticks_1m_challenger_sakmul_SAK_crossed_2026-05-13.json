@@ -1,0 +1,105 @@
+{
+ "candlesticks": [
+  {
+   "end_period_ts": 1778672400,
+   "open_interest": "29311.52",
+   "price": {
+    "close": "0.6200",
+    "high": "0.6200",
+    "low": "0.4300",
+    "mean": "0.5526",
+    "open": "0.4300",
+    "previous": "0.4300"
+   },
+   "volume": "46.00",
+   "yes_ask": {
+    "close": "0.6200",
+    "high": "0.6200",
+    "low": "0.4300",
+    "open": "0.4300"
+   },
+   "yes_bid": {
+    "close": "0.3900",
+    "high": "0.3900",
+    "low": "0.3600",
+    "open": "0.3600"
+   }
+  },
+  {
+   "end_period_ts": 1778672460,
+   "open_interest": "29390.52",
+   "price": {
+    "close": "0.9100",
+    "high": "0.9100",
+    "low": "0.6300",
+    "mean": "0.8674",
+    "open": "0.6300",
+    "previous": "0.6200"
+   },
+   "volume": "184.04",
+   "yes_ask": {
+    "close": "0.6200",
+    "high": "0.6200",
+    "low": "0.6200",
+    "open": "0.6200"
+   },
+   "yes_bid": {
+    "close": "0.7900",
+    "high": "0.8300",
+    "low": "0.3900",
+    "open": "0.3900"
+   }
+  },
+  {
+   "end_period_ts": 1778672520,
+   "open_interest": "29451.05",
+   "price": {
+    "close": "0.8500",
+    "high": "0.9100",
+    "low": "0.7900",
+    "mean": "0.9010",
+    "open": "0.7900",
+    "previous": "0.9100"
+   },
+   "volume": "627.31",
+   "yes_ask": {
+    "close": "0.6200",
+    "high": "0.6200",
+    "low": "0.6200",
+    "open": "0.6200"
+   },
+   "yes_bid": {
+    "close": "0.7500",
+    "high": "0.8100",
+    "low": "0.7500",
+    "open": "0.7900"
+   }
+  },
+  {
+   "end_period_ts": 1778672580,
+   "open_interest": "29531.92",
+   "price": {
+    "close": "0.9200",
+    "high": "0.9200",
+    "low": "0.8000",
+    "mean": "0.9046",
+    "open": "0.8500",
+    "previous": "0.8500"
+   },
+   "volume": "101.13",
+   "yes_ask": {
+    "close": "0.6200",
+    "high": "0.6200",
+    "low": "0.6200",
+    "open": "0.6200"
+   },
+   "yes_bid": {
+    "close": "0.8000",
+    "high": "0.8500",
+    "low": "0.7300",
+    "open": "0.7500"
+   }
+  }
+ ],
+ "ticker": "KXATPCHALLENGERMATCH-26MAY13SAKMUL-SAK"
+}

@@ -215,7 +215,11 @@ def effective_quotes(match_id: str, ticker_a: str, ticker_b: str, t, yb_a, ya_a,
 
 
 def candle_frame(candles: list[dict]) -> pd.DataFrame:
-    """One market's candles → ts, yes_bid, yes_ask (period-end closes), deduped and sorted."""
+    """One market's candles → ts, yes_bid, yes_ask (period-end closes), deduped and sorted.
+
+    A crossed candle (yes_ask close < yes_bid close on the same market) can't come from a real
+    book; its ask is set to NaN. Seen only in historical candles: 84 of 13.8 M, all in 5 markets on
+    2026-05-13 11-15 UTC, where the ask close sat frozen while the bid traded (docs/data_kalshi_collector.md)."""
     if not candles:
         return pd.DataFrame({"ts": pd.Series(dtype="datetime64[ns, UTC]"),
                              "yes_bid": pd.Series(dtype=float), "yes_ask": pd.Series(dtype=float)})
@@ -225,6 +229,7 @@ def candle_frame(candles: list[dict]) -> pd.DataFrame:
         "yes_bid": [_close(c, "yes_bid") for c in candles],
         "yes_ask": [_close(c, "yes_ask") for c in candles],
     })
+    df.loc[df["yes_ask"] < df["yes_bid"], "yes_ask"] = np.nan
     return df.drop_duplicates("ts", keep="last").sort_values("ts").reset_index(drop=True)
 
 
