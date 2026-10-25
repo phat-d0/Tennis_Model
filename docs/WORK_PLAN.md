@@ -85,6 +85,9 @@ Plan, method, gate and data blockers: `docs/upsets_plan.md`. Code: `upsets/` (Le
   credits/month, no historical odds), so there's no DraftKings history; Bet365/Pinnacle closing odds stand
   in for DraftKings. **Odds API budget: 0 credits until the owner confirms** (proposal: ≤ 150/month for tennis
   live DK odds, floor 100). Run by the Upsets role (session in docs/team/lead.md).
+- **Blocked (2026-10-25 17:37):** tennis-data.co.uk's Cloudflare blocks the cloud container's IP (403
+  "you have been blocked"; not worked around). The owner downloads the ATP + WTA xlsx files for 2015–2026
+  by hand. The Limited network policy also denies api.the-odds-api.com, so it needs adding.
 - Next: download 2013–2026, calibration table + walk-forward, `reports/upsets_findings.md`.
 
 ## How to continue in a new session
