@@ -219,8 +219,12 @@ the newest 200. Format changes go through the Lead (Scanner proposes, Dashboard 
   extracts on request.
 - Cloud sessions are ephemeral: commit and push work before stopping. A long-running
   recorder or scanner can't live in a cloud session; it needs the owner's machine or a server.
-- The environment's network policy must allow api.elections.kalshi.com, docs.kalshi.com and
-  the Polymarket hosts (set by the owner on 2026-10-24). WebFetch can't reach docs.kalshi.com,
+- The environment's network policy (Limited, Allowed domains) must list: api.elections.kalshi.com,
+  external-api.kalshi.com, docs.kalshi.com, gamma-api.polymarket.com, clob.polymarket.com,
+  data-api.polymarket.com, gateway.polymarket.us, api.the-odds-api.com, www.tennis-data.co.uk. On
+  2026-10-25 an edit replaced the list and silently cut Kalshi/Polymarket/Odds API; re-check hosts after
+  any policy change (proxy `CONNECT 403` = policy denial). tennis-data.co.uk itself returns a Cloudflare
+  403 to cloud IPs, so its files are downloaded by the owner. WebFetch can't reach docs.kalshi.com,
   so use curl (docs pages are available as `.md`).
 
 ## Decisions
