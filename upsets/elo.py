@@ -22,10 +22,11 @@ def expected(r_a: float, r_b: float) -> float:
     return 1.0 / (1.0 + 10 ** ((r_b - r_a) / 400.0))
 
 
-def add_elo(df: pd.DataFrame) -> pd.DataFrame:
+def add_elo(df: pd.DataFrame, keys: tuple[str, str] = ("winner", "loser")) -> pd.DataFrame:
     """Add pre-match columns w_elo, l_elo, w_selo, l_selo, w_n, l_n (matches played before).
 
-    Players are keyed by (tour, name) so ATP and WTA pools never mix.
+    Players are keyed by (tour, <keys> column) so ATP and WTA pools never mix; pass
+    keys=("winner_id", "loser_id") when the source has player ids (Sackmann).
     """
     rating: dict = defaultdict(lambda: START)
     s_rating: dict = defaultdict(lambda: START)
@@ -35,7 +36,7 @@ def add_elo(df: pd.DataFrame) -> pd.DataFrame:
     cols = {c: np.empty(n) for c in ("w_elo", "l_elo", "w_selo", "l_selo", "w_n", "l_n")}
     walkover = df["comment"].fillna("").str.lower().str.startswith("walk").to_numpy()
     tours, surfaces = df["tour"].to_numpy(), df["surface"].fillna("?").to_numpy()
-    winners, losers = df["winner"].to_numpy(), df["loser"].to_numpy()
+    winners, losers = df[keys[0]].to_numpy(), df[keys[1]].to_numpy()
     for i in range(n):
         w, l = (tours[i], winners[i]), (tours[i], losers[i])
         ws, ls = (w, surfaces[i]), (l, surfaces[i])
