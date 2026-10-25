@@ -22,8 +22,8 @@ fails on sign in every fold of both groups.
 - Restricting entries to in-play only, or to the first hour of play, doesn't change that (still 0 of 6).
 - **Challenger + WTA 125 (6 months, 8,333 matches)** looks the same or slightly worse: every swing rule
   negative, walk-forward **0 of 6** folds positive (−$0.39/trade OOS, CI −$0.42 to −$0.35; −$0.53 at
-  1¢). Its biggest after-fee "arbs" are a data glitch (crossed historical candles on one day); cleaned
-  arb counts are pending.
+  1¢). After cleaning out a data glitch (crossed historical candles), its after-fee "arbs" total
+  $2.89 on 1-contract fills over 6 months ($1.25 at 1¢), all single-candle stale or glitched quotes.
 - The gate fails on the **sign** of the result, not just on sample size. The loss per contract,
   ~3–4¢, is roughly the ask spread plus the taker fee, which is what trading a fairly priced market
   costs.
@@ -44,10 +44,11 @@ fails on sign in every fold of both groups.
 |---|---|
 | Observations with combined ask < $1 **before** fees | 2.46% (99¢: 109,629; 98¢: 13,821; ≤ 95¢: 127) |
 | After-fee arb episodes, 0¢ slippage | **98 in 40 matches** (upper bound, see below) |
-| After-fee arb episodes, 1¢ slippage | 26 in 18 matches |
+| After-fee arb episodes, 1¢ slippage | 26 in 18 matches, $1.21 |
 | Typical duration | median one candle (≤ 1 minute observed) |
 | Sum of one-fill profits | $2.49 (1 contract each; depth unknown) |
 | Largest | NAKBAE 21¢ (stale pre-match quote); PELMAN 13¢ (used a carried leg); CHOVAN 13¢ (zero volume) |
+| Re-check with the crossed-candle guard (4,695 matches) | unchanged; group 0 had no crossed candles |
 
 **Read:** a combined price of 99¢ is common, but after two taker fees (each ≥ 1¢, rounded up per
 order) almost none clear $1. The few that do are single candles, mostly pre-match in thin books,
@@ -122,20 +123,25 @@ WTA 125: 1,666), market close 2026-04-24 → 2026-10-24; 150 fair-price settleme
 observations (pre-match 2.44 M, live 1.12 M). PRELIMINARY: 1-minute candles, no depth, carry 1,800 s.
 This replaces the interim 2-month read.
 
-**True arb** (arb rows below are **pending cleanup**, see the note):
+**True arb** (cleaned: crossed-candle guard, phat-d0/Tennis_Model#46; re-normalized, so arb counts
+cover **8,349 matches**, 16 more settled than in the swing run):
 
 | Metric | Value |
 |---|---|
-| Combined ask < $1 before fees | 2.11% of observations (99¢: 63,507; 98¢: 9,329; 97¢: 1,702; 96¢: 185; ≤ 95¢: 166) |
-| After-fee arb episodes, 0¢ | 112 in 59 matches, $4.30 total 1-contract profit, best 34¢ |
-| After-fee arb episodes, 1¢ | 47 in 30 matches, $2.53 |
-| Leg-age 60 s, 0¢ | 50 in 40 matches, $2.09 |
+| Combined ask < $1 before fees | 2.11% of observations (99¢: 63,507; 98¢: 9,329; 97¢: 1,702; 96¢: 185; ≤ 95¢: 166; before cleaning) |
+| After-fee arb episodes, 0¢ | 106 in 57 matches (44 live), $2.89 total 1-contract profit, best 28¢ |
+| After-fee arb episodes, 1¢ | 40 in 26 matches (18 live), $1.25, best 26¢ |
+| Leg-age 60 s, 0¢ | 47 in 39 matches, $1.18, best 11¢ |
 
-**Data glitch:** the top hits (SAKMUL 34¢, ZAKBOU 26¢, MONAND 25¢) come from **crossed historical
-candles** (ask < bid). There are 84 such candles out of 13.8 M two-sided candles, in 5 markets, all on
-2026-05-13 between 11:00 and 15:00 UTC; post-cutoff candles have none. They are not real offers. Data
-is adding a normalizer guard, and these arb numbers will be replaced by the cleaned counts. Even
-uncleaned, $4.30 over 6 months on 1-contract fills is not a tradeable edge.
+Before cleaning, the figures were 112 episodes, $4.30 and a best of 34¢. The guard drops candles with
+ask < bid (84 of 13.8 M two-sided historical candles, in 5 markets, all on 2026-05-13 between 11:00
+and 15:00 UTC), which removes SAKMUL 34¢, ZAKBOU 26¢ and MONAND 25¢. **What's left are artefacts too:**
+- **TONBRO 28¢:** pre-match, 3 days out, a stale BRO quote with 0–5 contracts traded (the NAKBAE pattern).
+- **POLSTR:** 4 live episodes up to 11¢, all inside the same 2026-05-13 11:00–15:00 window. These
+  candles aren't crossed, so the guard doesn't catch them; no date exclusion was added, so they stay
+  in the counts.
+
+About $2.9 of 1-contract arb in 6 months ($1.25 at 1¢), all of it single candles, is not a tradeable edge.
 
 **Swing lock** (default grid, mode "first"):
 
@@ -161,17 +167,17 @@ gets a single positive fold.
 - **Settlement time** is each match's last aligned quote (proxy for capital and drawdown timing).
 - **Retirements:** a retirement after the first ball settles the retiring player's market to No;
   matches that never started are settled at Kalshi's fair price (161 ATP/WTA, 150 Challenger here).
-- **Crossed candles:** 84 historical Challenger candles on 2026-05-13 have ask < bid. They inflate the
-  group-1 arb counts until Data's normalizer guard lands. They probably matter little for the swing
-  results (one afternoon in 6 months), but that is unverified until the cleaned re-run.
+- **Crossed candles:** 84 historical Challenger candles on 2026-05-13 had ask < bid. The normalizer
+  now drops them (#46) and the group-1 arb counts are cleaned. Non-crossed candles from the same
+  11:00–15:00 window (POLSTR) remain. The swing grid and walk-forward were **not** re-run on the
+  cleaned data; they probably change little (one afternoon in 6 months), but that is unverified.
 - **Fee constants** (0.07 / 0.0175) still await the owner's confirmation at kalshi.com/fee-schedule.
-- **Scope:** ATP/WTA and Challenger/WTA 125, 6 months each (2026-04-24 → 10-24). Older months, ITF
+- **Scope:** ATP/WTA and Challenger/WTA 125, 6 months each (2026-04-24 → 10-24). Older months, ITF (descoped)
   and real order-book depth are not covered yet.
 - Kalshi data is for the owner's private research only; this report must not be published.
 
 ## Next steps
-1. Cleaned group-1 arb counts once the crossed-candle guard is in (replaces the §5 arb rows).
-2. Re-run on recorded order books (real depth, 10 s snapshots) once the VPS recorder has history.
-3. ITF and older months as the backfill completes.
-4. Score-state and favorite/underdog splits; a maker-order variant only if the owner wants it
+1. Re-run on recorded order books (real depth, 10 s snapshots) once the VPS recorder has history.
+2. ITF and older months only if the owner asks (group 2 is descoped; see CLAUDE.md Decisions).
+3. Score-state and favorite/underdog splits; a maker-order variant only if the owner wants it
    (it needs queue assumptions the data can't verify).
