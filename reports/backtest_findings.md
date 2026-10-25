@@ -1,13 +1,16 @@
 # Backtest findings: do tennis arbs and swing locks exist after fees?
 
-**Status: PRELIMINARY.** Kalshi 1-minute candles, no order-book depth, ATP + WTA only, 6 months.
-Run locally by the Data role with `python -m swinglock.backtest.run`; this report holds aggregates
-only (Kalshi data stays private). Numbers are copied from `docs/WORK_PLAN.md` "Findings so far"
-(reads of 2026-10-24). The Challenger section is **interim** (2 months).
+**Status: PRELIMINARY.** Kalshi 1-minute candles, no order-book depth, each leg carried forward
+≤ 1,800 s. Research set: **13,019 matches** over 6 months (group 0 = ATP/WTA 4,686; group 1 =
+ATP Challenger + WTA 125 8,333). Run locally by the Data role with `python -m swinglock.backtest.run`;
+this report holds aggregates only (Kalshi data stays private). ATP/WTA numbers are copied from
+`docs/WORK_PLAN.md` "Findings so far" (2026-10-24); Challenger numbers are from Data's group-1 read
+(2026-10-25), relayed by the Lead.
 
 ## The answer
-**No.** On 6 months of Kalshi ATP/WTA match markets (4,686 matches), neither true arbs nor swing
-locks show an edge after fees and the ask spread.
+**No.** On 6 months of Kalshi tennis match markets (13,019 matches: ATP/WTA and Challenger/WTA 125),
+neither true arbs nor swing locks show an edge after fees and the ask spread. The walk-forward gate
+fails on sign in every fold of both groups.
 - **True arbs** (buy both players at once for under $1 after fees) show up 98 times in 40 matches,
   almost all for one candle. They're tiny ($2.49 in total on 1-contract fills), and the biggest ones
   look like stale or carried quotes, not offers you could actually fill. 98 is an upper bound; the
@@ -17,13 +20,15 @@ locks show an edge after fees and the ask spread.
   tested on the next, they lose in **all 6 of 6 months** (−$0.32/trade, 95% CI −$0.37 to −$0.28;
   −$0.47 at 1¢ slippage).
 - Restricting entries to in-play only, or to the first hour of play, doesn't change that (still 0 of 6).
-- **Challenger (interim, 2 months, 3,000 matches)** looks the same: tiny one-candle arbs, every swing
-  rule negative, walk-forward 0 of 2 folds positive.
+- **Challenger + WTA 125 (6 months, 8,333 matches)** looks the same or slightly worse: every swing rule
+  negative, walk-forward **0 of 6** folds positive (−$0.39/trade OOS, CI −$0.42 to −$0.35; −$0.53 at
+  1¢). Its biggest after-fee "arbs" are a data glitch (crossed historical candles on one day); cleaned
+  arb counts are pending.
 - The gate fails on the **sign** of the result, not just on sample size. The loss per contract,
   ~3–4¢, is roughly the ask spread plus the taker fee, which is what trading a fairly priced market
   costs.
 
-## Data used
+## Data used (group 0: ATP/WTA; §1–4 use this set, §5 is group 1)
 | Item | Value |
 |---|---|
 | Venue / series | Kalshi KXATPMATCH, KXWTAMATCH ("group 0") |
@@ -108,26 +113,41 @@ unchanged on the next month.
 | Phase | In-play-only entries: still 0/6 folds, −$0.27/trade OOS (0¢). The earlier 2,000-match read had live entries losing more in total than pre-match ones (−$455 vs −$150 at X = 0.20/Y = 0.92). |
 | Entry price | < 10¢ entries are 1–3% and slightly positive; ≥ 10¢ entries lose at every X (2,000-match read). |
 | Favorite vs underdog | not reported yet |
-| Tier | ATP vs WTA split not reported yet; Challenger/ITF not run yet |
+| Tier | Challenger + WTA 125 (§5) loses a little more per trade than ATP/WTA (OOS −$0.39 vs −$0.32 at 0¢); ATP vs WTA split not reported yet; ITF not run yet |
 | Score state | needs the recorder's score history (no history before recording started) |
 
-## 5. Challenger (INTERIM: 2 months, 0/2 folds)
-Same method on the first 3,000 Challenger matches: ATP Challenger 2,298 + WTA 125: 702, market close
-2026-08-24 → 2026-10-24; 1.25 M aligned observations, 29% live; 51 fair-price settlements.
-**Interim**: two months gives only 2 walk-forward folds (the gate needs ≥ 4), so it fails the gate
-on fold count alone; both folds were also negative. Read it for direction.
+## 5. Challenger + WTA 125 (group 1, 6 months)
+Same method on KXATPCHALLENGERMATCH + KXWTACHALLENGERMATCH: **8,333 matches** (ATP Challenger 6,667,
+WTA 125: 1,666), market close 2026-04-24 → 2026-10-24; 150 fair-price settlements; 3.56 M aligned
+observations (pre-match 2.44 M, live 1.12 M). PRELIMINARY: 1-minute candles, no depth, carry 1,800 s.
+This replaces the interim 2-month read.
+
+**True arb** (arb rows below are **pending cleanup**, see the note):
 
 | Metric | Value |
 |---|---|
-| Combined ask < $1 before fees | 1.97% of observations |
-| After-fee arb episodes, 0¢ | 31 in 15 matches, $0.71 total 1-contract profit (best 6¢, live) |
-| After-fee arb episodes, 1¢ | 17 ($0.23) |
-| Leg-age 60 s | 18 episodes, all live, $0.34 |
-| Swing grid (in sample) | every rule negative; best first / X = 0.20 / Y = 0.96: 2,934 trades, 58% locked, −$1,067 at 0¢ |
-| Walk-forward | FAIL, 0 of 2 folds positive; OOS mean at 0¢: default −$0.38/trade, live-only −$0.32, first hour −$0.31 |
+| Combined ask < $1 before fees | 2.11% of observations (99¢: 63,507; 98¢: 9,329; 97¢: 1,702; 96¢: 185; ≤ 95¢: 166) |
+| After-fee arb episodes, 0¢ | 112 in 59 matches, $4.30 total 1-contract profit, best 34¢ |
+| After-fee arb episodes, 1¢ | 47 in 30 matches, $2.53 |
+| Leg-age 60 s, 0¢ | 50 in 40 matches, $2.09 |
 
-No 20¢ stale outliers like the ATP/WTA ones. Same picture as ATP/WTA. The full Challenger read
-replaces this section.
+**Data glitch:** the top hits (SAKMUL 34¢, ZAKBOU 26¢, MONAND 25¢) come from **crossed historical
+candles** (ask < bid). There are 84 such candles out of 13.8 M two-sided candles, in 5 markets, all on
+2026-05-13 between 11:00 and 15:00 UTC; post-cutoff candles have none. They are not real offers. Data
+is adding a normalizer guard, and these arb numbers will be replaced by the cleaned counts. Even
+uncleaned, $4.30 over 6 months on 1-contract fills is not a tradeable edge.
+
+**Swing lock** (default grid, mode "first"):
+
+| Metric | Value |
+|---|---|
+| Best rule in sample | X = 0.20 / Y = 0.90: 8,156 trades, 46.8% locked, −$3,031 at 0¢, −$4,242 at 1¢ |
+| Walk-forward (default) | **FAIL, 0 of 6 folds**; OOS 7,748 trades, mean −$0.39/trade (CI −0.42 to −0.35) at 0¢, −$0.53 (CI −0.57 to −0.50) at 1¢ |
+| `entry_phase: live` | FAIL 0/6; OOS −$0.32 at 0¢ (CI −0.35 to −0.28), −$0.47 at 1¢ |
+| First hour of play (window 0–60 min) | FAIL 0/6; OOS 5,355 trades, −$0.30 at 0¢ (CI −0.35 to −0.26), −$0.45 at 1¢ |
+
+Same picture as ATP/WTA: the loss per trade is about the spread plus the taker fee, and no variant
+gets a single positive fold.
 
 ## 6. Caveats (read next to every number)
 - **Candles, not order books.** 1-minute closes of YES bid/ask per market, with no depth. Fills
@@ -140,14 +160,17 @@ replaces this section.
   latency, partial fills or market impact. Maker (resting-order) strategies were not tested.
 - **Settlement time** is each match's last aligned quote (proxy for capital and drawdown timing).
 - **Retirements:** a retirement after the first ball settles the retiring player's market to No;
-  matches that never started are settled at Kalshi's fair price (161 here).
+  matches that never started are settled at Kalshi's fair price (161 ATP/WTA, 150 Challenger here).
+- **Crossed candles:** 84 historical Challenger candles on 2026-05-13 have ask < bid. They inflate the
+  group-1 arb counts until Data's normalizer guard lands. They probably matter little for the swing
+  results (one afternoon in 6 months), but that is unverified until the cleaned re-run.
 - **Fee constants** (0.07 / 0.0175) still await the owner's confirmation at kalshi.com/fee-schedule.
-- **Scope:** ATP/WTA 6 months; Challenger 2 months (interim). Older months, ITF and real order-book
-  depth are not covered yet.
+- **Scope:** ATP/WTA and Challenger/WTA 125, 6 months each (2026-04-24 → 10-24). Older months, ITF
+  and real order-book depth are not covered yet.
 - Kalshi data is for the owner's private research only; this report must not be published.
 
 ## Next steps
-1. Full Challenger read (replaces the interim section).
+1. Cleaned group-1 arb counts once the crossed-candle guard is in (replaces the §5 arb rows).
 2. Re-run on recorded order books (real depth, 10 s snapshots) once the VPS recorder has history.
 3. ITF and older months as the backfill completes.
 4. Score-state and favorite/underdog splits; a maker-order variant only if the owner wants it
