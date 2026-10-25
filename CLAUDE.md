@@ -333,3 +333,6 @@ the newest 200. Format changes go through the Lead (Scanner proposes, Dashboard 
   `reports/upsets_kalshi_preview.md`): betting early-round underdogs against a ≥ 75¢ favourite lost
   −15.7% (ATP+WTA, 688 bets) and −16.7% (Challenger+WTA 125, 1,151 bets). Underdogs are overpriced, not
   underpriced. 128 tests passing.
+- 2026-10-25: Results source: Sackmann's repos now 404; the owner forked the mirror `phat-d0/tennis-sackmann-archive`
+  (ATP/WTA 1968 → May 2026, seeds/ranks/rounds, no odds; CC BY-NC-SA). Public, so it's an anonymous git
+  clone. tennis-data.co.uk is dropped (Cloudflare blocks cloud IPs).

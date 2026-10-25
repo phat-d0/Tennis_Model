@@ -92,9 +92,12 @@ Plan, method, gate and data blockers: `docs/upsets_plan.md`. Code: `upsets/` (Le
   underdog against a ≥ 75¢ favourite at the closing ask with the fee. ATP+WTA: 688 bets, −15.7% ROI
   (CI −29% to −1%); WTA −32.5%; ATP +4.0% (CI −18% to +29%, noise). Challenger+WTA 125: 1,151 bets, −16.7%
   (CI −27% to −6%). Underdogs win less often than their price implies (favourite–longshot bias).
-- **Replacement data (owner to decide):** tennis-data.co.uk blocks cloud IPs, and the owner may be blocked
-  too. Proposal: results from Jeff Sackmann's ATP/WTA repos (the owner forks them), plus DraftKings history
-  from one month of The Odds API paid plan (~$30, ~5–8k credits).
+- **Results data (2026-10-25):** Jeff Sackmann's repos now return 404. The owner forked the archival
+  mirror `phat-d0/tennis-sackmann-archive` (CC BY-NC-SA 4.0, non-commercial, attribute Sackmann; never
+  commit the CSVs). It covers ATP/WTA 1968 → tournaments starting by 2026-05-25, with seeds, ranks, rounds
+  and scores, but no odds. Public, so it's an anonymous git clone (~900 MB). Upsets is on Phase A (loader,
+  Elo, seeded-player base rates) and Phase B (Elo vs Kalshi closing prices, run by Data). DraftKings
+  history still needs the paid Odds API month (~$30), so the owner decides.
 - Next: download 2013–2026, calibration table + walk-forward, `reports/upsets_findings.md`.
 
 ## How to continue in a new session
