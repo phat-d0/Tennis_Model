@@ -3,7 +3,7 @@
  "odds_fetched_at": "2026-10-26T05:55:00Z",
  "status": "ok",
  "credits": {
-  "left": 18250,
+  "left": null,
   "used_this_month": 143,
   "month_cap": 600
  },
