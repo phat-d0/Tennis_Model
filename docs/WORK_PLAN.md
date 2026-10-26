@@ -188,6 +188,12 @@ The owner asked for a public phone page like the soccer app, refreshed every 3 h
   - Margin DK 5.06% vs Pinnacle 2.71%.
   - Log loss: Pinnacle 0.5566 < DK 0.5583 < Elo 0.5867. Elo walk-forward FAIL (2,313 OOS, −14.6%).
   - `reports/upsets_dk_all.md` waits on Data's Jun–Oct results.
+- **Portfolio tab** (owner asked Upsets directly; phat-d0/Tennis_Model#96): $10 automatic paper trades for 3 rules (Elo edge ≥ 5%,
+  DK beats Pinnacle-fair ≥ 1%, every dog as a control), settled only by The Odds API `/scores` (2 credits a key, inside the 3,000
+  cap). It covers only the tournaments `/scores` covers, so the live ledger stays empty until about Jan 2027. The ledger lives in the
+  Actions cache (lost if the cache is evicted). The backtest view shows aggregates only (Sackmann-resolved). In-sample, the line rule is
+  +9.2% (328 bets, expected +9.3%). That is the job (A) test below, not a result yet.
+- **Closing-price pull (C): done.** 4,297 snapshots, 42,960 credits; balance 4,938,958.
 - **Queued (owner 2026-10-26), Upsets:**
   - **(C) Closing-price snapshots.** All tiers, cap 50k credits.
   - **(A) Line-shopping test.** Bet DK only when its odds beat Pinnacle's de-vigged price by t. 0 credits, pre-registered, walk-forward,
