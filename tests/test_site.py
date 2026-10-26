@@ -117,9 +117,13 @@ def test_site_is_static_and_self_contained():
 
 
 def test_no_kalshi_anywhere_in_page_code():
-    """Hard rule: the public page carries no Kalshi data (findings.json is the Lead's prose)."""
-    for path in [*(SITE / n for n in OWN_FILES), SAMPLE]:
-        assert "kalshi" not in path.read_text().lower(), path.name
+    """Hard rule: the public page carries no Kalshi data. Covers every published file and every
+    fixture, so new tabs and data files are checked too (findings.json is the Lead's prose)."""
+    files = [p for p in SITE.rglob("*") if p.is_file() and p.suffix != ".png" and p.name != "findings.json"]
+    files += list(SAMPLE.parent.glob("*.json"))
+    assert len(files) >= len(OWN_FILES) + 2
+    for path in files:
+        assert "kalshi" not in path.read_text().lower(), path.relative_to(ROOT)
 
 
 # ---------------------------------------------------------------- browser
