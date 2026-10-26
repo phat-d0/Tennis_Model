@@ -20,7 +20,7 @@ SITE = ROOT / "site"
 SAMPLE = Path(__file__).parent / "test_site_data" / "odds.json"
 OWN_FILES = ["index.html", "app.js", "style.css", "manifest.webmanifest", "sw.js", "icons/icon.svg"]
 
-STATUSES = {"ok", "no_key", "cap_reached", "below_floor", "no_tournaments"}
+STATUSES = {"ok", "no_key", "cap_reached", "below_floor", "paced", "no_tournaments"}
 BOOK_KEYS = {"odds_1", "odds_2", "last_update", "margin"}
 MATCH_KEYS = {"event_id", "sport_key", "tournament", "tour", "commence_time", "player_1", "player_2",
               "draftkings", "pinnacle", "fair_1", "dk_implied_1", "model_p1", "model_n1", "model_n2"}
@@ -145,6 +145,7 @@ const VIEWPORTS = { phone: { width: 390, height: 844 }, laptop: { width: 1280, h
     const grab = () => page.evaluate(() => ({
       overflow: document.documentElement.scrollWidth - window.innerWidth,
       banners: [...document.querySelectorAll("#banners .banner b")].map((b) => b.textContent),
+      bannerKinds: [...document.querySelectorAll("#banners .banner")].map((b) => b.classList.contains("bad") ? "bad" : "calm"),
       groups: [...document.querySelectorAll("#view h2.section-title > span:first-child")].map((s) => s.textContent),
       cards: document.querySelectorAll("#view article.match").length,
       notProven: [...document.querySelectorAll("#view .tag")].filter((t) => t.textContent === "model: not proven").length,
@@ -251,8 +252,8 @@ def test_page_ok(site, tmp_path):
         _common(res)
         assert res["banners"] == []
         assert res["cards"] == len(d["matches"]) == res["notProven"]
-        # tournaments ordered by first start time (the Challenger match started 30 min before the build)
-        assert res["groups"] == ["ATP Brest Challenger", "ATP Paris Masters", "WTA Finals"]
+        # tournaments ordered by first start time (the Stockholm match started 30 min before the build)
+        assert res["groups"] == ["ATP Stockholm Open", "ATP Paris Masters", "WTA Finals"]
         assert res["wtaCards"] == 2
         assert res["updated"].startswith("Odds ") and "143 of 600" in res["footer"]
         assert "2026-10-19" in res["footer"]
@@ -280,6 +281,19 @@ def test_page_error_status_null_books_and_model(site, tmp_path):
         _common(res)
         assert res["banners"] == ["The last update failed", "Odds time unknown"]
         assert res["cards"] == len(d["matches"])
+
+
+@needs_browser
+def test_page_paced(site, tmp_path):
+    """`paced`: under the monthly cap but today's share is spent; a calm banner, odds still shown."""
+    d = shifted(sample())
+    d["status"] = "paced"
+    assert d["credits"]["left"] is None          # the balance is never published
+    for res in _check(tmp_path, site(d), "paced"):
+        _common(res)
+        assert res["banners"] == ["Odds refresh later today"]
+        assert res["bannerKinds"] == ["calm"]
+        assert res["cards"] == len(d["matches"]) and "143 of 600" in res["footer"]
 
 
 @needs_browser

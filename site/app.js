@@ -88,6 +88,7 @@ const STATUS_TEXT = {
   no_key: ["Odds aren't refreshing", "No API key is set for the build, so these are the last saved odds."],
   cap_reached: ["Monthly odds budget used up", "Odds stop refreshing until next month. These are the last saved odds."],
   below_floor: ["Odds aren't refreshing", "The shared credit balance is at its reserve. These are the last saved odds."],
+  paced: ["Odds refresh later today", "Today's share of the monthly budget is used. These are the last saved odds."],
   no_tournaments: ["No tournaments right now", "No ATP or WTA tournament has a match in the next 36 hours."],
 };
 
