@@ -253,3 +253,21 @@ def test_api_error_stops_pull_and_caches_nothing(tmp_path):
     with pytest.raises(requests.HTTPError):
         dh.pull(api, "events", todo, cap=1000, root=tmp_path, pause_s=0)
     assert not list(tmp_path.glob("events/**/*.json.gz"))
+
+
+def test_projection_beyond_sackmann_and_other_tier():
+    sack = sack_frame()
+    t = dh.tournaments(sack, KEYS, project_until=pd.Timestamp("2025-06-01"))
+    proj = t[t["projected"]]
+    # every edition from the last year whose next edition isn't in the data: AO 2024 (both tours)
+    # -> 2025, Indian Wells 2023 -> 2024
+    assert sorted(zip(proj["key"], proj["date"].dt.date.astype(str))) == [
+        ("tennis_atp_aus_open_singles", "2025-01-13"), ("tennis_atp_indian_wells", "2024-03-06"),
+        ("tennis_wta_aus_open_singles", "2025-01-13")]
+    assert proj.set_index("key").loc["tennis_atp_aus_open_singles", "n_r12"] == 3
+    # 250/500 keys are out of scope unless "other" has a history start
+    s2 = sack.copy()
+    s2.loc[s2["tourney_id"] == "2024-580", "level_group"] = "other"
+    assert dh.tournaments(s2, KEYS).empty
+    hs = {**dh.HIST_START, "other": pd.Timestamp("2024-01-01")}
+    assert len(dh.tournaments(s2, KEYS, hist_start=hs)) == 2
