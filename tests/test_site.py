@@ -251,8 +251,8 @@ def test_page_ok(site, tmp_path):
         _common(res)
         assert res["banners"] == []
         assert res["cards"] == len(d["matches"]) == res["notProven"]
-        # tournaments ordered by first start time (the Challenger match started 30 min before the build)
-        assert res["groups"] == ["ATP Brest Challenger", "ATP Paris Masters", "WTA Finals"]
+        # tournaments ordered by first start time (the Stockholm match started 30 min before the build)
+        assert res["groups"] == ["ATP Stockholm Open", "ATP Paris Masters", "WTA Finals"]
         assert res["wtaCards"] == 2
         assert res["updated"].startswith("Odds ") and "143 of 600" in res["footer"]
         assert "2026-10-19" in res["footer"]

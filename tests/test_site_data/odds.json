@@ -20,8 +20,8 @@
    "tour": "WTA"
   },
   {
-   "sport_key": "tennis_atp_brest",
-   "title": "ATP Brest Challenger",
+   "sport_key": "tennis_atp_stockholm",
+   "title": "ATP Stockholm Open",
    "tour": "ATP"
   }
  ],
@@ -174,8 +174,8 @@
   },
   {
    "event_id": "e07",
-   "sport_key": "tennis_atp_brest",
-   "tournament": "ATP Brest Challenger",
+   "sport_key": "tennis_atp_stockholm",
+   "tournament": "ATP Stockholm Open",
    "tour": "ATP",
    "commence_time": "2026-10-26T05:30:00Z",
    "player_1": "Nils Berger",
