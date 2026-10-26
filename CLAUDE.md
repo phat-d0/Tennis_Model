@@ -21,9 +21,9 @@ match winners first) and alert when one appears live.
 2. Fills are realistic: buy at the ask, sell at the bid, fees per order, plus slippage.
    **Never fill at mid or last.**
 3. DraftKings: no scraping of DraftKings itself (its ToU bans it). DraftKings **Sportsbook**
-   prices come only through **The Odds API** (a free-plan key used only by this project, ~500
-   credits/month, no historical odds; owner 2026-10-25). Only the Data and Upsets roles spend credits,
-   within the budget in WORK_PLAN, and log every spend.
+   prices come only through **The Odds API** (since 2026-10-26 the owner's **shared paid plan**, also used by their
+   soccer and baseball apps; **never take the balance below the 5,000 reserve**). Only the Data and Upsets roles
+   spend credits, within the budget in WORK_PLAN, and log every spend.
 4. **Kalshi data is for the owner's personal, private research** (owner decision 2026-10-24, made
    knowing the Kalshi Data ToU): low request rates, never redistributed or published, only tiny
    test fixtures in git. Datasets go on the `data-store` branch **only while the repo is
@@ -56,7 +56,7 @@ Each role also owns its own `tests/test_<area>*.py`.
    dashboard PRs attach 390×844 and 1280×800 screenshots in light and dark mode, with no page errors.
 4. **API budgets:** Kalshi: Data stays under ½ of the read limit, Scanner under ¼; everyone
    else reuses data from the `data-store` branch. Back off on 429. The Odds API: credits are limited
-   (free plan, this project only); only Data and Upsets spend them, within the budget in
+   (shared paid plan, 5,000 reserve); only Data and Upsets spend them, within the budget in
    `docs/WORK_PLAN.md`, never below the floor, and logs each spend (date, endpoint, credits,
    balance after) in `docs/data_inventory.md`. The key comes from the env var `ODDS_API_KEY`; never commit it.
 5. **Results go in `docs/` or `reports/`** with numbers, bad ones included.
@@ -363,3 +363,6 @@ the newest 200. Format changes go through the Lead (Scanner proposes, Dashboard 
   Example timelines/charts go to the owner privately (Kalshi data never committed).
 - 2026-10-26: Bet tracker published as a private claude.ai page ("Tennis Bet Ledger", link in WORK_PLAN): manual bet log
   with P&L/ROI/CLV. Its data lives in the page's own store, never in git.
+- 2026-10-26 (owner): `ODDS_API_KEY` is now the shared paid plan (≈ 10.9k left). Reserve 5,000. DK history for 250/500s
+  approved (≈ 5.4k budget); live recorder capped at 481. Planner extended to all 48 tennis keys
+  (phat-d0/Tennis_Model#79, #81).
