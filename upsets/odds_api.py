@@ -93,6 +93,11 @@ class OddsApi:
         return self._get(f"/sports/{sport}/odds", {"markets": "h2h", "oddsFormat": "decimal",
                                                     "bookmakers": ",".join(bookmakers)}, cost)
 
+    def scores(self, sport: str, days_from: int = 3) -> list[dict]:
+        """Live and recently completed events with scores; 2 credits with daysFrom (1 without)."""
+        return self._get(f"/sports/{sport}/scores", {"daysFrom": days_from, "dateFormat": "iso"},
+                         2 if days_from else 1)
+
     def historical_events(self, sport: str, when: str) -> dict:
         """Events listed at ISO time `when`: {"timestamp", "data": [...]}; 1 credit, 0 if none."""
         return self._get(f"/historical/sports/{sport}/events", {"date": when}, 1)

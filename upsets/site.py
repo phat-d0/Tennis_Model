@@ -37,7 +37,7 @@ from pathlib import Path
 
 import pandas as pd
 
-from . import elo, sackmann
+from . import elo, portfolio, sackmann
 from .names import match_names, player_table
 from .odds_api import KEY_NAMES, BudgetError, OddsApi, parse_h2h
 
@@ -302,7 +302,6 @@ def build(out: Path, cache: Path, archive: Path, floor: int = 5000, month_cap: i
             status = f"error: {type(e).__name__}" + (f" {code}" if code else "")
         if api.remaining is not None:
             led["left"] = api.remaining
-    _write_json(cache / "ledger.json", led)
     rows = pd.concat([r for r in new_rows if len(r)], ignore_index=True) if any(len(r) for r in new_rows) \
         else pd.DataFrame()
     snaps = append_snapshots(cache, rows)
@@ -325,7 +324,33 @@ def build(out: Path, cache: Path, archive: Path, floor: int = 5000, month_cap: i
         "matches": matches,
     }
     _write_json(out / "odds.json", doc)
+    trades = paper(cache, matches, now, doc["odds_fetched_at"], api, led, month_cap)
+    _write_json(cache / "ledger.json", led)
+    _write_json(out / "portfolio.json", portfolio.page(trades, now, titles))
     return doc
+
+
+def paper(cache: Path, matches: list[dict], now: pd.Timestamp, fetched_at: str | None, api, led: dict,
+          month_cap: int) -> list[dict]:
+    """Paper portfolio: open/refresh trades from this build's matches, settle the finished ones
+    (/scores, within the page's monthly cap and the floor). A failure here never breaks the build."""
+    path = cache / "portfolio.json"
+    trades = _read_json(path, [])
+    try:
+        trades = portfolio.update(trades, matches, now, fetched_at)
+        if api is not None:
+            def budget_ok(cost):
+                return (led["used"] + cost <= month_cap
+                        and (api.remaining is None or api.remaining - cost >= api.floor))
+
+            portfolio.settle(trades, api, now, budget_ok, lambda c: record_spend(led, c, now))
+            if api.remaining is not None:
+                led["left"] = api.remaining
+    except Exception as e:  # same rule as the odds: never str(e), it can carry the key
+        code = getattr(getattr(e, "response", None), "status_code", None)
+        print(f"[portfolio: {type(e).__name__}{f' {code}' if code else ''}]")
+    _write_json(path, trades)
+    return trades
 
 
 def main(argv=None) -> None:

@@ -1,0 +1,1223 @@
+{
+ "note": "Backtest of the same rules on past seasons: DraftKings and Pinnacle at the last snapshot at least 5 minutes before the start (one price per match, so not the live rule's first qualifying moment), rounds 1\u20132 of Slams from 2020 and 1000s and 250/500s from 2024, results from Jeff Sackmann's files (events through May 2026). Matches where DraftKings' and Pinnacle's fair chances differ by more than 10 points are skipped as quote errors, as live. In-sample: no rule here has passed the project's walk-forward test. 1 unit = one $10 bet. Expected = each bet's value at Pinnacle's fair price.",
+ "strategies": {
+  "model": {
+   "rule": "Bet the player whose Elo model chance \u00d7 DraftKings odds \u2212 1 is at least 5%.",
+   "bets": 3518,
+   "period": "Aug 2020 \u2013 May 2026",
+   "roi": -0.13136441159749856,
+   "roi_ci": [
+    -0.18769130187606595,
+    -0.07416706935758954
+   ],
+   "expected_roi": -0.06376311667464425,
+   "luck_units": -237.82,
+   "win_rate": 0.30045480386583284,
+   "expected_win_rate": 0.31253947013030486,
+   "curve": [
+    {
+     "date": "2020-08-31",
+     "n": 79,
+     "realized": -32.35,
+     "expected": -6.39
+    },
+    {
+     "date": "2021-02-08",
+     "n": 84,
+     "realized": -55.46,
+     "expected": -11.56
+    },
+    {
+     "date": "2021-05-24",
+     "n": 92,
+     "realized": -46.89,
+     "expected": -17.06
+    },
+    {
+     "date": "2021-05-31",
+     "n": 1,
+     "realized": -47.89,
+     "expected": -17.17
+    },
+    {
+     "date": "2021-06-21",
+     "n": 33,
+     "realized": -47.92,
+     "expected": -18.77
+    },
+    {
+     "date": "2021-06-28",
+     "n": 80,
+     "realized": -56.34,
+     "expected": -23.85
+    },
+    {
+     "date": "2021-08-30",
+     "n": 73,
+     "realized": -73.53,
+     "expected": -28.68
+    },
+    {
+     "date": "2022-01-17",
+     "n": 77,
+     "realized": -80.77,
+     "expected": -33.74
+    },
+    {
+     "date": "2022-05-16",
+     "n": 86,
+     "realized": -85.08,
+     "expected": -40.7
+    },
+    {
+     "date": "2022-05-23",
+     "n": 36,
+     "realized": -95.64,
+     "expected": -43.13
+    },
+    {
+     "date": "2022-06-20",
+     "n": 36,
+     "realized": -100.79,
+     "expected": -45.23
+    },
+    {
+     "date": "2022-06-27",
+     "n": 88,
+     "realized": -113.83,
+     "expected": -50.23
+    },
+    {
+     "date": "2022-08-22",
+     "n": 22,
+     "realized": -107.33,
+     "expected": -51.44
+    },
+    {
+     "date": "2022-08-29",
+     "n": 63,
+     "realized": -92.08,
+     "expected": -55.86
+    },
+    {
+     "date": "2023-01-16",
+     "n": 74,
+     "realized": -113.57,
+     "expected": -63.05
+    },
+    {
+     "date": "2023-05-22",
+     "n": 69,
+     "realized": -144.69,
+     "expected": -67.69
+    },
+    {
+     "date": "2023-05-29",
+     "n": 41,
+     "realized": -159.71,
+     "expected": -70.76
+    },
+    {
+     "date": "2023-07-03",
+     "n": 118,
+     "realized": -175.09,
+     "expected": -78.84
+    },
+    {
+     "date": "2023-08-28",
+     "n": 106,
+     "realized": -175.31,
+     "expected": -87.55
+    },
+    {
+     "date": "2024-01-08",
+     "n": 20,
+     "realized": -183.02,
+     "expected": -89.53
+    },
+    {
+     "date": "2024-01-15",
+     "n": 86,
+     "realized": -163.55,
+     "expected": -97.18
+    },
+    {
+     "date": "2024-05-20",
+     "n": 77,
+     "realized": -179.02,
+     "expected": -101.49
+    },
+    {
+     "date": "2024-05-27",
+     "n": 57,
+     "realized": -211.06,
+     "expected": -104.76
+    },
+    {
+     "date": "2024-07-01",
+     "n": 129,
+     "realized": -264.41,
+     "expected": -114.83
+    },
+    {
+     "date": "2024-08-05",
+     "n": 38,
+     "realized": -256.37,
+     "expected": -117.36
+    },
+    {
+     "date": "2024-08-12",
+     "n": 41,
+     "realized": -250.59,
+     "expected": -120.6
+    },
+    {
+     "date": "2024-08-26",
+     "n": 113,
+     "realized": -268.26,
+     "expected": -130.76
+    },
+    {
+     "date": "2024-09-23",
+     "n": 50,
+     "realized": -279.55,
+     "expected": -133.81
+    },
+    {
+     "date": "2024-09-30",
+     "n": 3,
+     "realized": -282.55,
+     "expected": -133.82
+    },
+    {
+     "date": "2024-10-07",
+     "n": 16,
+     "realized": -284.24,
+     "expected": -134.79
+    },
+    {
+     "date": "2024-10-28",
+     "n": 10,
+     "realized": -288.34,
+     "expected": -135.5
+    },
+    {
+     "date": "2025-01-06",
+     "n": 16,
+     "realized": -299.71,
+     "expected": -136.92
+    },
+    {
+     "date": "2025-01-13",
+     "n": 100,
+     "realized": -308.0,
+     "expected": -143.63
+    },
+    {
+     "date": "2025-02-10",
+     "n": 4,
+     "realized": -307.5,
+     "expected": -143.89
+    },
+    {
+     "date": "2025-02-17",
+     "n": 24,
+     "realized": -314.15,
+     "expected": -145.39
+    },
+    {
+     "date": "2025-02-24",
+     "n": 7,
+     "realized": -315.5,
+     "expected": -145.98
+    },
+    {
+     "date": "2025-03-03",
+     "n": 63,
+     "realized": -314.46,
+     "expected": -149.82
+    },
+    {
+     "date": "2025-03-17",
+     "n": 56,
+     "realized": -296.72,
+     "expected": -153.01
+    },
+    {
+     "date": "2025-04-07",
+     "n": 26,
+     "realized": -300.92,
+     "expected": -154.34
+    },
+    {
+     "date": "2025-04-21",
+     "n": 67,
+     "realized": -294.92,
+     "expected": -157.9
+    },
+    {
+     "date": "2025-05-05",
+     "n": 65,
+     "realized": -324.17,
+     "expected": -162.32
+    },
+    {
+     "date": "2025-05-19",
+     "n": 23,
+     "realized": -331.83,
+     "expected": -164.62
+    },
+    {
+     "date": "2025-05-26",
+     "n": 102,
+     "realized": -333.29,
+     "expected": -172.93
+    },
+    {
+     "date": "2025-06-30",
+     "n": 106,
+     "realized": -323.47,
+     "expected": -177.61
+    },
+    {
+     "date": "2025-07-28",
+     "n": 41,
+     "realized": -313.82,
+     "expected": -179.56
+    },
+    {
+     "date": "2025-08-04",
+     "n": 51,
+     "realized": -323.41,
+     "expected": -182.23
+    },
+    {
+     "date": "2025-08-11",
+     "n": 1,
+     "realized": -324.41,
+     "expected": -182.3
+    },
+    {
+     "date": "2025-08-18",
+     "n": 20,
+     "realized": -333.35,
+     "expected": -183.92
+    },
+    {
+     "date": "2025-08-25",
+     "n": 74,
+     "realized": -337.99,
+     "expected": -189.33
+    },
+    {
+     "date": "2025-09-22",
+     "n": 42,
+     "realized": -345.85,
+     "expected": -191.66
+    },
+    {
+     "date": "2025-09-29",
+     "n": 29,
+     "realized": -343.4,
+     "expected": -193.18
+    },
+    {
+     "date": "2025-10-06",
+     "n": 22,
+     "realized": -339.14,
+     "expected": -194.43
+    },
+    {
+     "date": "2025-10-27",
+     "n": 17,
+     "realized": -340.41,
+     "expected": -194.99
+    },
+    {
+     "date": "2026-01-12",
+     "n": 12,
+     "realized": -336.81,
+     "expected": -195.73
+    },
+    {
+     "date": "2026-01-19",
+     "n": 101,
+     "realized": -352.8,
+     "expected": -201.92
+    },
+    {
+     "date": "2026-02-02",
+     "n": 7,
+     "realized": -352.23,
+     "expected": -202.41
+    },
+    {
+     "date": "2026-02-09",
+     "n": 26,
+     "realized": -340.34,
+     "expected": -204.16
+    },
+    {
+     "date": "2026-02-16",
+     "n": 27,
+     "realized": -352.11,
+     "expected": -205.25
+    },
+    {
+     "date": "2026-02-23",
+     "n": 13,
+     "realized": -358.38,
+     "expected": -205.95
+    },
+    {
+     "date": "2026-03-02",
+     "n": 77,
+     "realized": -380.38,
+     "expected": -209.44
+    },
+    {
+     "date": "2026-03-16",
+     "n": 55,
+     "realized": -398.1,
+     "expected": -209.43
+    },
+    {
+     "date": "2026-03-30",
+     "n": 6,
+     "realized": -397.63,
+     "expected": -209.81
+    },
+    {
+     "date": "2026-04-06",
+     "n": 26,
+     "realized": -396.27,
+     "expected": -210.29
+    },
+    {
+     "date": "2026-04-13",
+     "n": 24,
+     "realized": -400.21,
+     "expected": -212.05
+    },
+    {
+     "date": "2026-04-20",
+     "n": 77,
+     "realized": -432.85,
+     "expected": -215.61
+    },
+    {
+     "date": "2026-05-04",
+     "n": 80,
+     "realized": -456.42,
+     "expected": -217.63
+    },
+    {
+     "date": "2026-05-18",
+     "n": 43,
+     "realized": -468.9,
+     "expected": -219.91
+    },
+    {
+     "date": "2026-05-25",
+     "n": 90,
+     "realized": -462.14,
+     "expected": -224.32
+    }
+   ]
+  },
+  "line": {
+   "rule": "Bet the player whose DraftKings odds \u00d7 Pinnacle's fair chance \u2212 1 is at least 1% (line shopping).",
+   "bets": 328,
+   "period": "Aug 2020 \u2013 May 2026",
+   "roi": 0.09201219512195119,
+   "roi_ci": [
+    -0.16109146341463415,
+    0.3816288109756097
+   ],
+   "expected_roi": 0.09263788624245367,
+   "luck_units": -0.21,
+   "win_rate": 0.29878048780487804,
+   "expected_win_rate": 0.29729355882439173,
+   "curve": [
+    {
+     "date": "2020-08-31",
+     "n": 5,
+     "realized": 5.65,
+     "expected": 0.09
+    },
+    {
+     "date": "2021-02-08",
+     "n": 17,
+     "realized": 12.03,
+     "expected": 0.94
+    },
+    {
+     "date": "2021-05-24",
+     "n": 15,
+     "realized": 26.08,
+     "expected": 1.58
+    },
+    {
+     "date": "2021-06-21",
+     "n": 4,
+     "realized": 22.08,
+     "expected": 1.69
+    },
+    {
+     "date": "2021-06-28",
+     "n": 8,
+     "realized": 24.43,
+     "expected": 2.53
+    },
+    {
+     "date": "2021-08-30",
+     "n": 11,
+     "realized": 18.6,
+     "expected": 2.83
+    },
+    {
+     "date": "2022-01-17",
+     "n": 5,
+     "realized": 21.49,
+     "expected": 3.01
+    },
+    {
+     "date": "2022-05-16",
+     "n": 2,
+     "realized": 19.49,
+     "expected": 3.06
+    },
+    {
+     "date": "2022-06-20",
+     "n": 6,
+     "realized": 21.93,
+     "expected": 3.3
+    },
+    {
+     "date": "2022-06-27",
+     "n": 4,
+     "realized": 23.2,
+     "expected": 3.69
+    },
+    {
+     "date": "2022-08-29",
+     "n": 6,
+     "realized": 27.2,
+     "expected": 3.91
+    },
+    {
+     "date": "2023-01-16",
+     "n": 4,
+     "realized": 25.25,
+     "expected": 4.01
+    },
+    {
+     "date": "2023-05-22",
+     "n": 7,
+     "realized": 29.42,
+     "expected": 4.23
+    },
+    {
+     "date": "2023-05-29",
+     "n": 1,
+     "realized": 30.72,
+     "expected": 4.27
+    },
+    {
+     "date": "2023-07-03",
+     "n": 2,
+     "realized": 31.27,
+     "expected": 4.31
+    },
+    {
+     "date": "2023-08-28",
+     "n": 12,
+     "realized": 39.94,
+     "expected": 4.56
+    },
+    {
+     "date": "2024-01-08",
+     "n": 1,
+     "realized": 40.74,
+     "expected": 4.57
+    },
+    {
+     "date": "2024-01-15",
+     "n": 11,
+     "realized": 40.83,
+     "expected": 4.98
+    },
+    {
+     "date": "2024-05-20",
+     "n": 6,
+     "realized": 39.53,
+     "expected": 5.24
+    },
+    {
+     "date": "2024-05-27",
+     "n": 12,
+     "realized": 32.13,
+     "expected": 5.77
+    },
+    {
+     "date": "2024-07-01",
+     "n": 5,
+     "realized": 27.13,
+     "expected": 6.25
+    },
+    {
+     "date": "2024-08-05",
+     "n": 2,
+     "realized": 30.63,
+     "expected": 6.3
+    },
+    {
+     "date": "2024-08-12",
+     "n": 1,
+     "realized": 32.13,
+     "expected": 6.49
+    },
+    {
+     "date": "2024-08-26",
+     "n": 4,
+     "realized": 38.46,
+     "expected": 6.64
+    },
+    {
+     "date": "2024-09-23",
+     "n": 6,
+     "realized": 35.61,
+     "expected": 6.84
+    },
+    {
+     "date": "2024-09-30",
+     "n": 1,
+     "realized": 34.61,
+     "expected": 6.92
+    },
+    {
+     "date": "2024-10-07",
+     "n": 2,
+     "realized": 33.87,
+     "expected": 6.94
+    },
+    {
+     "date": "2024-10-28",
+     "n": 1,
+     "realized": 32.87,
+     "expected": 6.98
+    },
+    {
+     "date": "2025-01-06",
+     "n": 1,
+     "realized": 31.87,
+     "expected": 7.03
+    },
+    {
+     "date": "2025-01-13",
+     "n": 8,
+     "realized": 42.29,
+     "expected": 7.57
+    },
+    {
+     "date": "2025-02-17",
+     "n": 1,
+     "realized": 41.29,
+     "expected": 7.59
+    },
+    {
+     "date": "2025-03-03",
+     "n": 1,
+     "realized": 41.62,
+     "expected": 7.62
+    },
+    {
+     "date": "2025-03-17",
+     "n": 4,
+     "realized": 37.62,
+     "expected": 7.86
+    },
+    {
+     "date": "2025-04-21",
+     "n": 4,
+     "realized": 37.82,
+     "expected": 8.02
+    },
+    {
+     "date": "2025-05-05",
+     "n": 4,
+     "realized": 33.82,
+     "expected": 8.59
+    },
+    {
+     "date": "2025-05-26",
+     "n": 12,
+     "realized": 40.72,
+     "expected": 9.62
+    },
+    {
+     "date": "2025-06-30",
+     "n": 21,
+     "realized": 56.41,
+     "expected": 14.44
+    },
+    {
+     "date": "2025-07-28",
+     "n": 9,
+     "realized": 58.69,
+     "expected": 14.73
+    },
+    {
+     "date": "2025-08-04",
+     "n": 7,
+     "realized": 57.89,
+     "expected": 15.11
+    },
+    {
+     "date": "2025-08-18",
+     "n": 3,
+     "realized": 57.72,
+     "expected": 15.22
+    },
+    {
+     "date": "2025-08-25",
+     "n": 5,
+     "realized": 62.72,
+     "expected": 15.54
+    },
+    {
+     "date": "2025-09-22",
+     "n": 5,
+     "realized": 57.72,
+     "expected": 15.99
+    },
+    {
+     "date": "2025-09-29",
+     "n": 3,
+     "realized": 54.72,
+     "expected": 16.3
+    },
+    {
+     "date": "2025-10-06",
+     "n": 4,
+     "realized": 54.61,
+     "expected": 16.51
+    },
+    {
+     "date": "2025-10-27",
+     "n": 2,
+     "realized": 52.61,
+     "expected": 16.88
+    },
+    {
+     "date": "2026-01-12",
+     "n": 1,
+     "realized": 60.91,
+     "expected": 16.89
+    },
+    {
+     "date": "2026-01-19",
+     "n": 11,
+     "realized": 59.52,
+     "expected": 18.32
+    },
+    {
+     "date": "2026-02-09",
+     "n": 2,
+     "realized": 57.52,
+     "expected": 18.37
+    },
+    {
+     "date": "2026-02-16",
+     "n": 3,
+     "realized": 54.52,
+     "expected": 18.7
+    },
+    {
+     "date": "2026-02-23",
+     "n": 1,
+     "realized": 53.52,
+     "expected": 18.72
+    },
+    {
+     "date": "2026-03-02",
+     "n": 8,
+     "realized": 45.52,
+     "expected": 19.13
+    },
+    {
+     "date": "2026-03-16",
+     "n": 5,
+     "realized": 42.71,
+     "expected": 22.12
+    },
+    {
+     "date": "2026-04-06",
+     "n": 5,
+     "realized": 42.33,
+     "expected": 23.18
+    },
+    {
+     "date": "2026-04-13",
+     "n": 1,
+     "realized": 41.33,
+     "expected": 23.32
+    },
+    {
+     "date": "2026-04-20",
+     "n": 13,
+     "realized": 33.08,
+     "expected": 24.58
+    },
+    {
+     "date": "2026-05-04",
+     "n": 7,
+     "realized": 36.01,
+     "expected": 27.52
+    },
+    {
+     "date": "2026-05-18",
+     "n": 3,
+     "realized": 34.66,
+     "expected": 27.71
+    },
+    {
+     "date": "2026-05-25",
+     "n": 13,
+     "realized": 30.18,
+     "expected": 30.39
+    }
+   ]
+  },
+  "dogs": {
+   "rule": "Bet the longer DraftKings price in every match. Expect to lose about DraftKings' margin.",
+   "bets": 5637,
+   "period": "Aug 2020 \u2013 May 2026",
+   "roi": -0.102258293418485,
+   "roi_ci": [
+    -0.14309393294305478,
+    -0.05668746673762643
+   ],
+   "expected_roi": -0.07019643509586847,
+   "luck_units": -180.73,
+   "win_rate": 0.2937732836615221,
+   "expected_win_rate": 0.2939393191257731,
+   "curve": [
+    {
+     "date": "2020-08-31",
+     "n": 120,
+     "realized": -51.03,
+     "expected": -10.16
+    },
+    {
+     "date": "2021-02-08",
+     "n": 119,
+     "realized": -83.78,
+     "expected": -17.8
+    },
+    {
+     "date": "2021-05-24",
+     "n": 117,
+     "realized": -87.09,
+     "expected": -25.84
+    },
+    {
+     "date": "2021-05-31",
+     "n": 1,
+     "realized": -88.09,
+     "expected": -25.95
+    },
+    {
+     "date": "2021-06-21",
+     "n": 42,
+     "realized": -95.76,
+     "expected": -28.43
+    },
+    {
+     "date": "2021-06-28",
+     "n": 111,
+     "realized": -115.04,
+     "expected": -35.18
+    },
+    {
+     "date": "2021-08-23",
+     "n": 1,
+     "realized": -116.04,
+     "expected": -35.22
+    },
+    {
+     "date": "2021-08-30",
+     "n": 121,
+     "realized": -123.19,
+     "expected": -43.2
+    },
+    {
+     "date": "2022-01-17",
+     "n": 113,
+     "realized": -141.03,
+     "expected": -50.95
+    },
+    {
+     "date": "2022-05-16",
+     "n": 113,
+     "realized": -152.22,
+     "expected": -60.42
+    },
+    {
+     "date": "2022-05-23",
+     "n": 62,
+     "realized": -166.22,
+     "expected": -64.85
+    },
+    {
+     "date": "2022-06-20",
+     "n": 54,
+     "realized": -165.92,
+     "expected": -67.96
+    },
+    {
+     "date": "2022-06-27",
+     "n": 126,
+     "realized": -185.92,
+     "expected": -77.19
+    },
+    {
+     "date": "2022-08-22",
+     "n": 32,
+     "realized": -182.47,
+     "expected": -78.86
+    },
+    {
+     "date": "2022-08-29",
+     "n": 91,
+     "realized": -151.57,
+     "expected": -86.39
+    },
+    {
+     "date": "2023-01-16",
+     "n": 121,
+     "realized": -185.76,
+     "expected": -97.73
+    },
+    {
+     "date": "2023-05-22",
+     "n": 118,
+     "realized": -199.79,
+     "expected": -105.95
+    },
+    {
+     "date": "2023-05-29",
+     "n": 63,
+     "realized": -210.63,
+     "expected": -111.45
+    },
+    {
+     "date": "2023-07-03",
+     "n": 179,
+     "realized": -228.77,
+     "expected": -125.38
+    },
+    {
+     "date": "2023-08-28",
+     "n": 180,
+     "realized": -233.57,
+     "expected": -142.95
+    },
+    {
+     "date": "2024-01-08",
+     "n": 31,
+     "realized": -245.52,
+     "expected": -145.74
+    },
+    {
+     "date": "2024-01-15",
+     "n": 149,
+     "realized": -228.57,
+     "expected": -159.16
+    },
+    {
+     "date": "2024-05-20",
+     "n": 104,
+     "realized": -244.46,
+     "expected": -165.88
+    },
+    {
+     "date": "2024-05-27",
+     "n": 81,
+     "realized": -273.0,
+     "expected": -170.86
+    },
+    {
+     "date": "2024-07-01",
+     "n": 186,
+     "realized": -341.63,
+     "expected": -186.26
+    },
+    {
+     "date": "2024-08-05",
+     "n": 64,
+     "realized": -332.23,
+     "expected": -191.02
+    },
+    {
+     "date": "2024-08-12",
+     "n": 77,
+     "realized": -330.87,
+     "expected": -196.89
+    },
+    {
+     "date": "2024-08-26",
+     "n": 184,
+     "realized": -348.22,
+     "expected": -214.44
+    },
+    {
+     "date": "2024-09-23",
+     "n": 83,
+     "realized": -367.97,
+     "expected": -219.73
+    },
+    {
+     "date": "2024-09-30",
+     "n": 8,
+     "realized": -375.97,
+     "expected": -220.13
+    },
+    {
+     "date": "2024-10-07",
+     "n": 41,
+     "realized": -375.07,
+     "expected": -223.09
+    },
+    {
+     "date": "2024-10-28",
+     "n": 27,
+     "realized": -374.92,
+     "expected": -224.94
+    },
+    {
+     "date": "2025-01-06",
+     "n": 22,
+     "realized": -387.27,
+     "expected": -227.12
+    },
+    {
+     "date": "2025-01-13",
+     "n": 162,
+     "realized": -411.23,
+     "expected": -239.85
+    },
+    {
+     "date": "2025-02-10",
+     "n": 14,
+     "realized": -404.73,
+     "expected": -240.81
+    },
+    {
+     "date": "2025-02-17",
+     "n": 48,
+     "realized": -409.63,
+     "expected": -244.08
+    },
+    {
+     "date": "2025-02-24",
+     "n": 15,
+     "realized": -407.48,
+     "expected": -245.05
+    },
+    {
+     "date": "2025-03-03",
+     "n": 123,
+     "realized": -405.17,
+     "expected": -253.22
+    },
+    {
+     "date": "2025-03-17",
+     "n": 120,
+     "realized": -388.36,
+     "expected": -260.65
+    },
+    {
+     "date": "2025-04-07",
+     "n": 37,
+     "realized": -393.24,
+     "expected": -262.66
+    },
+    {
+     "date": "2025-04-21",
+     "n": 110,
+     "realized": -382.1,
+     "expected": -269.32
+    },
+    {
+     "date": "2025-05-05",
+     "n": 107,
+     "realized": -408.05,
+     "expected": -276.83
+    },
+    {
+     "date": "2025-05-19",
+     "n": 37,
+     "realized": -423.05,
+     "expected": -280.37
+    },
+    {
+     "date": "2025-05-26",
+     "n": 141,
+     "realized": -428.2,
+     "expected": -292.8
+    },
+    {
+     "date": "2025-06-30",
+     "n": 165,
+     "realized": -398.51,
+     "expected": -302.96
+    },
+    {
+     "date": "2025-07-28",
+     "n": 77,
+     "realized": -388.76,
+     "expected": -307.8
+    },
+    {
+     "date": "2025-08-04",
+     "n": 83,
+     "realized": -391.76,
+     "expected": -313.36
+    },
+    {
+     "date": "2025-08-11",
+     "n": 2,
+     "realized": -393.76,
+     "expected": -313.49
+    },
+    {
+     "date": "2025-08-18",
+     "n": 33,
+     "realized": -410.21,
+     "expected": -316.37
+    },
+    {
+     "date": "2025-08-25",
+     "n": 137,
+     "realized": -417.78,
+     "expected": -326.54
+    },
+    {
+     "date": "2025-09-22",
+     "n": 82,
+     "realized": -432.27,
+     "expected": -331.33
+    },
+    {
+     "date": "2025-09-29",
+     "n": 62,
+     "realized": -431.11,
+     "expected": -334.95
+    },
+    {
+     "date": "2025-10-06",
+     "n": 38,
+     "realized": -428.5,
+     "expected": -337.37
+    },
+    {
+     "date": "2025-10-27",
+     "n": 38,
+     "realized": -436.71,
+     "expected": -339.12
+    },
+    {
+     "date": "2026-01-12",
+     "n": 27,
+     "realized": -437.16,
+     "expected": -341.26
+    },
+    {
+     "date": "2026-01-19",
+     "n": 158,
+     "realized": -480.43,
+     "expected": -351.02
+    },
+    {
+     "date": "2026-02-02",
+     "n": 12,
+     "realized": -478.48,
+     "expected": -351.84
+    },
+    {
+     "date": "2026-02-09",
+     "n": 37,
+     "realized": -475.04,
+     "expected": -354.39
+    },
+    {
+     "date": "2026-02-16",
+     "n": 46,
+     "realized": -500.27,
+     "expected": -357.13
+    },
+    {
+     "date": "2026-02-23",
+     "n": 21,
+     "realized": -506.33,
+     "expected": -358.47
+    },
+    {
+     "date": "2026-03-02",
+     "n": 123,
+     "realized": -533.89,
+     "expected": -364.55
+    },
+    {
+     "date": "2026-03-16",
+     "n": 100,
+     "realized": -534.89,
+     "expected": -367.2
+    },
+    {
+     "date": "2026-03-30",
+     "n": 13,
+     "realized": -539.11,
+     "expected": -368.07
+    },
+    {
+     "date": "2026-04-06",
+     "n": 33,
+     "realized": -546.7,
+     "expected": -368.97
+    },
+    {
+     "date": "2026-04-13",
+     "n": 45,
+     "realized": -557.45,
+     "expected": -372.15
+    },
+    {
+     "date": "2026-04-20",
+     "n": 119,
+     "realized": -571.97,
+     "expected": -378.59
+    },
+    {
+     "date": "2026-05-04",
+     "n": 121,
+     "realized": -589.28,
+     "expected": -383.58
+    },
+    {
+     "date": "2026-05-18",
+     "n": 70,
+     "realized": -602.83,
+     "expected": -387.44
+    },
+    {
+     "date": "2026-05-25",
+     "n": 140,
+     "realized": -576.43,
+     "expected": -395.7
+    }
+   ]
+  }
+ }
+}

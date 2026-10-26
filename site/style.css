@@ -177,6 +177,39 @@ table.odds .na { color: var(--text-muted); }
 .verdict.no-edge { color: var(--bad-edge); }
 .verdict.in-progress { color: var(--warn); }
 
+/* ---------- portfolio ---------- */
+.rule { font-size: 13px; color: var(--text-secondary); margin-top: 10px; }
+.tiles { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; margin: 10px 0; }
+@media (min-width: 560px) { .tiles { grid-template-columns: repeat(4, minmax(0, 1fr)); } }
+.tile { background: var(--surface-2); border-radius: 12px; box-shadow: var(--shadow); padding: 10px 12px; min-width: 0; }
+.t-label { font-size: 12px; color: var(--text-muted); }
+.t-value { font-size: 20px; font-weight: 650; letter-spacing: -0.01em; margin-top: 2px; }
+.t-sub { font-size: 11px; color: var(--text-muted); margin-top: 2px; overflow-wrap: anywhere; }
+.pos { color: var(--accent); }
+.neg { color: var(--bad-edge); }
+.chart { outline: none; touch-action: pan-y; }
+.chart svg { width: 100%; height: auto; max-height: 240px; display: block; }
+.c-zero { stroke: var(--border); stroke-width: 1; }
+.c-lab { fill: var(--text-muted); font-size: 10px; font-variant-numeric: tabular-nums; }
+.c-real { fill: none; stroke: var(--p1); stroke-width: 2; stroke-linejoin: round; }
+.c-exp { fill: none; stroke: var(--text-muted); stroke-width: 1.5; stroke-dasharray: 4 3; }
+.c-cursor { stroke: var(--text-muted); stroke-width: 0.75; }
+.c-dot { fill: var(--p1); }
+.c-legend { display: flex; flex-wrap: wrap; gap: 4px 14px; font-size: 12px; color: var(--text-secondary); margin-top: 6px; }
+.c-legend span::before { content: ""; display: inline-block; width: 14px; height: 0; margin-right: 6px; vertical-align: 3px; }
+.c-legend .k-real::before { border-top: 2px solid var(--p1); }
+.c-legend .k-exp::before { border-top: 2px dashed var(--text-muted); }
+.c-readout { font-size: 12px; color: var(--text-secondary); margin-top: 4px; min-height: 1.4em; font-variant-numeric: tabular-nums; }
+.list { padding: 4px 14px; }
+.trade { display: flex; justify-content: space-between; gap: 10px; padding: 9px 0; }
+.trade + .trade { border-top: 0.5px solid var(--border); }
+.r-who { min-width: 0; display: flex; flex-direction: column; }
+.r-who b { font-size: 15px; }
+.meta { font-size: 12px; color: var(--text-muted); overflow-wrap: anywhere; }
+.r-val { flex: none; text-align: right; display: flex; flex-direction: column; font-variant-numeric: tabular-nums; }
+.r-val small { font-size: 11px; color: var(--text-muted); }
+.more { display: block; width: 100%; border: 0; background: var(--surface-2); color: var(--accent); border-radius: 10px; padding: 10px; box-shadow: var(--shadow); cursor: pointer; margin-bottom: 10px; }
+
 /* ---------- footer ---------- */
 .footer { padding-top: 8px; padding-bottom: 20px; font-size: 12px; color: var(--text-muted); }
 .footer p { margin: 4px 4px; }
