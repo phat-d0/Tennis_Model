@@ -12,7 +12,7 @@ ATP/WTA match odds from DraftKings and Pinnacle, refreshed every 3 hours. URL on
   Actions cache (`site-cache-*`). It is never committed, and it is never uploaded as an artifact.
 - **Credits.** The page uses the shared paid key (repo secret `ODDS_API_KEY`) under these limits:
   - The **5,000 reserve** applies to every call: `OddsApi(floor=5000)`.
-  - The page may spend at most **600 credits a calendar month**, paced so a busy week can't use the whole month.
+  - The page may spend at most **3,000 credits a calendar month** (raised from 600 after the owner's 5M upgrade), paced so a busy week can't use the whole month.
   - One `/odds` call per tournament key with `bookmakers=draftkings,pinnacle` costs 1 credit, and is only made when
     that key has a match starting in the next 36 h. `/sports` and `/events` are free.
   - This replaces `upsets.dk_live` and its 481-credit cap.
@@ -30,7 +30,7 @@ ATP/WTA match odds from DraftKings and Pinnacle, refreshed every 3 hours. URL on
 ## Build command (the workflow runs exactly this)
 ```
 python -m upsets.site build --out _site/data --cache data/site_cache \
-    --archive data/sackmann --floor 5000 --month-cap 600
+    --archive data/sackmann --floor 5000 --month-cap 3000
 cp -r site/* _site/
 ```
 - With no `ODDS_API_KEY`, or under the cap or floor, it makes no paid calls. It writes `odds.json` from the
@@ -42,7 +42,7 @@ cp -r site/* _site/
 ```json
 {"generated_at": "ISO-8601 UTC", "odds_fetched_at": "ISO-8601 UTC | null",
  "status": "ok | no_key | cap_reached | below_floor | no_tournaments | error: ...",
- "credits": {"left": 0, "used_this_month": 0, "month_cap": 600},
+ "credits": {"left": 0, "used_this_month": 0, "month_cap": 3000},
  "ratings_through": "YYYY-MM-DD",
  "tournaments": [{"sport_key": "tennis_atp_paris", "title": "ATP Paris Masters", "tour": "ATP"}],
  "matches": [{"event_id": "", "sport_key": "", "tournament": "", "tour": "ATP|WTA",

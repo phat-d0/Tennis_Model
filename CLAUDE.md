@@ -43,7 +43,7 @@ Session IDs are in `docs/team/lead.md`.
 | **Backtest** | True-arb scan, swing-lock grid, walk-forward gate, findings report | `swinglock/backtest/`, `reports/`, `docs/edge_*.md` | `team/backtest` |
 | **Scanner** | Live scan loop, alerts, positions → lock quotes, `state.json`, VPS deploy (Docker/systemd) | `swinglock/scanner/`, `deploy/`, `docs/scanner_*.md` | `team/scanner` |
 | **Dashboard** | Live HTML view of `state.json` | `swinglock/dashboard/`, `docs/ui_*.md` | `team/ui` |
-| **Upsets** | Early-round upset study: tennis-data.co.uk download, model, walk-forward, findings. **May spend Odds API credits only within the budget in WORK_PLAN** (currently 0) | `upsets/`, `tests/test_upsets.py`, `docs/upsets_*.md`, `reports/upsets_*.md` | `team/upsets` |
+| **Upsets** | Early-round upset study, model, walk-forward, findings, and the public page's odds builder. **May spend Odds API credits only within the budget in WORK_PLAN** | `upsets/`, `tests/test_upsets.py`, `docs/upsets_*.md`, `reports/upsets_*.md` | `team/upsets` |
 
 Each role also owns its own `tests/test_<area>*.py`.
 
@@ -366,3 +366,11 @@ the newest 200. Format changes go through the Lead (Scanner proposes, Dashboard 
 - 2026-10-26 (owner): `ODDS_API_KEY` is now the shared paid plan (≈ 10.9k left). Reserve 5,000. DK history for 250/500s
   approved (≈ 5.4k budget); live recorder capped at 481. Planner extended to all 48 tennis keys
   (phat-d0/Tennis_Model#79, #81).
+- 2026-10-26: DK 250/500 study (phat-d0/Tennis_Model#83, #86; `reports/upsets_dk_small.md`, PRELIMINARY): every early-round
+  dog −18.7% at DK (417 bets, CI −32% to −6%), −15.6% at Pinnacle; DK margin 4.84% vs Pinnacle 2.82%; Elo WF FAIL (77 OOS,
+  −20.5%). 1,646 credits, balance 9,258. Results for Jun–Oct 2026 came from Kalshi settlements (Data), aggregates only.
+- 2026-10-26: CI on every push/PR (`.github/workflows/ci.yml`, pandas 3.1 caught a list-truthiness bug). Public Tennis Odds page
+  planned (docs/site_plan.md, phat-d0/Tennis_Model#84); page UI merged (phat-d0/Tennis_Model#85); builder + publish workflow pending.
+  The page and its build never touch Kalshi data; the builder's `status` must never contain the API key or a URL.
+- 2026-10-26 (owner): Odds API plan upgraded to **5M credits/month** (shared with soccer ≈ 5k/month and baseball). 5,000 floor
+  kept as a safety net; budgets are now per-job caps in WORK_PLAN. Slams + 1000s DK history approved.
