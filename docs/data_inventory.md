@@ -69,6 +69,9 @@ Historical cutoff (`GET /historical/cutoff`, market_settled_ts): 2026-08-25T00:0
 before it come from `/historical/markets` + `/historical/markets/{t}/candlesticks`.
 Milestones (scheduled start) cover start dates from ~Feb 2025 onward.
 
+**Set winners (group 0)** → `data/processed/kalshi_g0/sets.parquet`: 9,350 set rows for 4,465 of 4,695 matches
+(decided 8,914, fair price 436). No set-winner series exist for Challenger/WTA 125, so group 1 has none.
+
 ### Kalshi recorder trial (not kept for analysis)
 `data/recorded/kalshi_trial/`: 3 minutes on 2026-10-24 10:34 UTC, 90 matches, 1,980 quote rows,
 18,865 depth rows. A test of the recorder only; the real recording runs on the VPS.
@@ -95,6 +98,8 @@ Milestones (scheduled start) cover start dates from ~Feb 2025 onward.
 | 2026-10-24 16:21–19:56 | Kalshi backfill groups 1–2 | Challenger | ≈ 4,000 | container reclaimed 19:56 |
 | 2026-10-24 20:30–23:35 | Kalshi backfill groups 1–2 (relaunches) | Challenger | ≈ 650 | reclaimed again 20:34; keep-alive from 22:02; 2 listing-phase relaunches (network, 429) |
 | 2026-10-24 23:35 → 2026-10-25 08:52 | Kalshi backfill `--groups 1` (Lead: stop after group 1) | Challenger | 8,280 | 902 × 429; group 2 not started |
+
+| 2026-10-26 01:10–01:40 | Kalshi `/series`, set-winner listings (KXATP/KXWTASETWINNER events + `/historical/markets`) | all settled | ≈ 85 | 13 × 429 in one burst, then resumed from cache; `sets.parquet` for group 0 |
 
 ## The Odds API spends
 None. No key, no budget yet.
