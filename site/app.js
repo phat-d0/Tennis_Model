@@ -215,7 +215,7 @@ function tourLevelView(head) {
   }
   const out = [...head, ...grouped(shown, matchCard)];
   out.push(el("p", { class: "note" },
-    "Decimal odds. Fair chance = the book's implied chance with its margin removed. The model is a surface-weighted Elo rating that has not beaten the market in any test, so treat it as context, not a tip."));
+    "Decimal odds. Fair chance = the book's implied chance with its margin removed. The model (since 26 Oct 2026) blends a surface-weighted Elo rating with each player's recent serve and return points won. It has not beaten the market in any test, so treat it as context, not a tip."));
   return out;
 }
 
