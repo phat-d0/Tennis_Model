@@ -182,7 +182,18 @@ The owner asked for a public phone page like the soccer app, refreshed every 3 h
   - Merged: UI #85/#92, builder #89/#90, publish #91.
   - First run: ok, 29 matches, 3 credits.
   - Refresh is every 3 h, capped at 3,000 credits a month; the balance is never published.
-- **Slams + 1000s DK pull:** running (Upsets). The plan is ≤ 23,916 credits against a 40k cap; the account shows 5M credits.
+- **Slams + 1000s DK pull: done.** 17,563 credits, plus a 506-credit 250/500 top-up after a qualifying-week fix in `needed()`;
+  balance ≈ 4.98M.
+  - Preview (5,897 Sackmann-resolved bets): dogs −9.3% at DK, −5.3% at Pinnacle.
+  - Margin DK 5.06% vs Pinnacle 2.71%.
+  - Log loss: Pinnacle 0.5566 < DK 0.5583 < Elo 0.5867. Elo walk-forward FAIL (2,313 OOS, −14.6%).
+  - `reports/upsets_dk_all.md` waits on Data's Jun–Oct results.
+- **Queued (owner 2026-10-26), Upsets:**
+  - **(C) Closing-price snapshots.** All tiers, cap 50k credits.
+  - **(A) Line-shopping test.** Bet DK only when its odds beat Pinnacle's de-vigged price by t. 0 credits, pre-registered, walk-forward,
+    scored on ROI, expected ROI and CLV vs Pinnacle's close.
+  - **(B) Elo upgrades.** Margin of victory, inactivity decay, K/surface tuning, fatigue, serve/return. Judged on log loss vs Pinnacle and
+    walk-forward. The public page's model changes only if a variant wins out of sample (Lead approves).
 
 ## How to continue in a new session
 Read `CLAUDE.md`, this file, and your brief in `docs/team/`. Check open PRs into `main` and the
