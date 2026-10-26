@@ -84,7 +84,10 @@ Plan, method, gate and data blockers: `docs/upsets_plan.md`. Code: `upsets/` (Le
 - 2026-10-25: the owner allowed tennis-data.co.uk and added `ODDS_API_KEY`. It's the **free plan** (~500
   credits/month, no historical odds), so there's no DraftKings history; Bet365/Pinnacle closing odds stand
   in for DraftKings. **Odds API budget (key used only by this project, owner 2026-10-25): ≤ 400 credits/month, never below
-  a balance of 50.** Spent by Upsets/Data only, each spend logged in docs/data_inventory.md. Run by the Upsets role (session in docs/team/lead.md).
+  a balance of 50.** **DraftKings history test (owner 2026-10-26: "let's test on draftkings odds"):** the owner
+  upgrades to the 20K plan (~$30/month). One-off pull budget **≤ 15,000 credits, floor 1,000**, covering
+  Slams 2020+ and 1000s 2024+, rounds 1–2, `bookmakers=draftkings,pinnacle`. Upsets builds a dry-run planner
+  first, and the Lead approves the estimate before any paid call. Odds data is never committed. Spent by Upsets/Data only, each spend logged in docs/data_inventory.md. Run by the Upsets role (session in docs/team/lead.md).
 - **Blocked (2026-10-25 17:37):** tennis-data.co.uk's Cloudflare blocks the cloud container's IP (403
   "you have been blocked"; not worked around). The owner downloads the ATP + WTA xlsx files for 2015–2026
   by hand. The Limited network policy also denies api.the-odds-api.com, so it needs adding.
