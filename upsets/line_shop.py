@@ -103,8 +103,11 @@ def bets(long: pd.DataFrame, ev: pd.DataFrame, p_close: pd.Series, threshold: fl
     b = q.drop_duplicates(["event_id", "side"], keep="first").merge(ev, on="event_id")
     b["threshold"] = threshold
     b["win"] = (b["winner"] == b["side"]).astype(int)
-    b["pnl"] = np.where(b["void"], 0.0, np.where(b["win"] == 1, b["odds"] - 1, -1.0))
-    pc = b["event_id"].map(p_close)
+    b["odds"] = b["odds"].astype(float)
+    b["pnl"] = np.where(b["void"].astype(bool), 0.0, np.where(b["win"] == 1, b["odds"] - 1, -1.0))
+    # a plain dict and an explicit float cast: under pandas 3.1, mapping a string column can come
+    # back as strings
+    pc = pd.to_numeric(b["event_id"].map(p_close.to_dict()), errors="coerce").astype(float)
     b["p_close"] = np.where(b["side"] == "home", pc, 1 - pc)
     b["clv"] = b["odds"] * b["p_close"] - 1
     return b.reset_index(drop=True)
