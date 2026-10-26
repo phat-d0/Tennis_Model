@@ -150,6 +150,49 @@ def results_from_kalshi(ml: pd.DataFrame, matches: pd.DataFrame, sets: pd.DataFr
     return out
 
 
+def same_player(a: str, b: str) -> bool:
+    """Names match when their word sets (accent/hyphen-insensitive) are equal, or one holds the
+    other with >= 2 words ('Camila Osorio' ~ 'Maria Camila Osorio Serrano', 'Bu Yunchaokete' ~
+    'Yunchaokete Bu')."""
+    x, y = set(ke.name_key(a).split()), set(ke.name_key(b).split())
+    return x == y or (min(len(x), len(y)) >= 2 and (x <= y or y <= x))
+
+
+def results_from_table(ml: pd.DataFrame, tbl: pd.DataFrame, max_days: float = 1.0) -> pd.DataFrame:
+    """Data's results table (tournament, scheduled_start, tour, round, player_a, player_b, winner A|B,
+    settle_a, settle_b, not_started, set1_status) -> event_id, winner (home|away), void, set1_missing,
+    round. Joined on both players' names (same_player) within max_days, nearest start first.
+    void = not started, or a winner with set 1 settled at a fair price (retirement in set 1, which
+    DraftKings voids). set1_missing = no set-1 market, so an early retirement can't be ruled out."""
+    t = tbl.copy()
+    t["tour"] = t["tour"].str.lower()
+    t["start"] = pd.to_datetime(t["scheduled_start"], utc=True).dt.tz_localize(None)
+    rows = []
+    for e in ml.itertuples():
+        com = pd.Timestamp(e.commence)
+        com = com.tz_localize(None) if com.tzinfo else com
+        c = t[(t["tour"] == e.tour) & ((t["start"] - com).abs() <= pd.Timedelta(days=max_days))]
+        best = None
+        for r in c.itertuples():
+            straight = same_player(e.home, r.player_a) and same_player(e.away, r.player_b)
+            swapped = same_player(e.home, r.player_b) and same_player(e.away, r.player_a)
+            if straight or swapped:
+                gap = abs(r.start - com)
+                if best is None or gap < best[0]:
+                    best = (gap, r, straight)
+        if best is None:
+            continue
+        _, r, home_is_a = best
+        not_started = str(r.not_started).lower() == "true"
+        set1 = r.set1_status if isinstance(r.set1_status, str) else "missing"
+        home_won = (r.winner == "A") == home_is_a
+        rows.append({"event_id": e.event_id,
+                     "winner": None if not_started else ("home" if home_won else "away"),
+                     "void": not_started or set1 == "fair_price", "set1_missing": set1 == "missing",
+                     "round": r.round})
+    return pd.DataFrame(rows, columns=["event_id", "winner", "void", "set1_missing", "round"])
+
+
 def pnl(b: pd.DataFrame, haircut: float = 0.0, odds_col: str = "odds_dog_dk") -> pd.Series:
     return settle(b.assign(_o=payout_odds(b[odds_col], haircut)), "_o")
 
@@ -296,11 +339,14 @@ def report(f: pd.DataFrame, priced: pd.DataFrame, oos: pd.DataFrame, seasons: pd
         lines.append(f"| {book} | {len(both):,} | {both[mcol].mean():.2%} | {both[mcol].median():.2%} | "
                      f"{_logloss(y, done[pcol]) if len(done) else float('nan'):.4f} | {done[pcol].mean():.1%} |")
     if len(done):
-        de = done.dropna(subset=["p_model"])
-        lines.append(f"| Elo model (Sackmann-resolved only) | {len(de):,} | | | "
-                     f"{_logloss(de['upset'].to_numpy(), de['p_model']):.4f} | "
-                     f"{de['p_model'].mean():.1%} |")
         lines.append(f"| Realized | {len(done):,} | | | | {y.mean():.1%} |")
+        de = done.dropna(subset=["p_model"])
+        if len(de):
+            ye = de["upset"].to_numpy()
+            lines += ["", f"Same {len(de):,} matches with an Elo model price (Sackmann-resolved): log loss "
+                      f"DraftKings {_logloss(ye, de['p_dk']):.4f}, Pinnacle {_logloss(ye, de['p_pin']):.4f}, "
+                      f"Elo {_logloss(ye, de['p_model']):.4f}; mean p(dog) DK {de['p_dk'].mean():.1%}, "
+                      f"Pinnacle {de['p_pin'].mean():.1%}, Elo {de['p_model'].mean():.1%}, realized {ye.mean():.1%}."]
     lines += ["", "Margin by tour:", "", "| Tour | DK margin | Pinnacle margin |", "|---|---|---|"]
     for t, b in both.groupby("tour"):
         lines.append(f"| {t.upper()} | {b['margin_dk'].mean():.2%} | {b['margin_pin'].mean():.2%} |")
@@ -356,6 +402,11 @@ def main(argv=None) -> None:
     res = None
     if a.results:
         res = pd.read_parquet(a.results) if a.results.suffix == ".parquet" else pd.read_csv(a.results)
+        if "player_a" in res:  # Data's raw results table: join it to the match list here
+            ml = match_list(priced.attrs.get("unresolved", pd.DataFrame()))
+            res = results_from_table(ml, res)
+            print(f"[results join: {len(res)} of {len(ml)} listed post-Sackmann events matched; "
+                  f"{int(res['void'].sum())} void; {int(res['set1_missing'].sum())} with no set-1 market]")
     text, _ = run(priced, sack_elo, a.min_history, results=res)
     print(text)
     if a.out:
