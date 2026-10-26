@@ -49,8 +49,14 @@
  },
  {
   "title": "Line shopping: DraftKings vs Pinnacle",
-  "verdict": "In progress",
-  "summary": "Bet at DraftKings only when its odds beat Pinnacle's margin-free price. Results are being checked; the Portfolio tab paper-trades the rule live.",
-  "report": ""
+  "verdict": "Fragile",
+  "summary": "Bet at DraftKings only when its odds beat Pinnacle's margin-free price: passes the walk-forward test (+6.4%, 379 bets), but rests on ~40 bets where the books disagreed by 5+ points, which look like stale DraftKings lines; +0.9% otherwise. Forward test on the Portfolio tab.",
+  "report": "reports/upsets_line_shop.md"
+ },
+ {
+  "title": "Better Elo vs the market",
+  "verdict": "No edge",
+  "summary": "Nine Elo upgrades (surface, margin of victory, fatigue, serve/return): the best cuts log loss by 0.010 vs our Elo but stays 0.020 worse than Pinnacle, and every variant loses 11–15% betting its edge at DraftKings.",
+  "report": "reports/upsets_elo_plus.md"
  }
 ]
