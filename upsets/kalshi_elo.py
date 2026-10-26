@@ -227,6 +227,10 @@ def timeline(sack: pd.DataFrame, km: pd.DataFrame) -> tuple[pd.DataFrame, pd.Dat
     sack_end = coverage_end(sack)
 
     rest = km[km["sack_row"] < 0]
+    # Unjoined Kalshi matches inside Sackmann's span are no-read: their time can't be ordered
+    # safely against the event's unjoined Sackmann rows (estimated times), so they neither
+    # update Elo nor get bet on.
+    km["no_read"] = (km["sack_row"] < 0) & (km["start"] <= sack_end)
     key = lambda side: rest[f"id_{side}"].astype("string").fillna(  # noqa: E731
         "k:" + rest[f"player_{side}"].map(name_key))
     a_first = rest["a_won"].fillna(1.0) == 1.0
@@ -291,7 +295,7 @@ def fit_calibration(sack_elo: pd.DataFrame, before: pd.Timestamp, from_season: i
 
 def add_model(bets: pd.DataFrame, km: pd.DataFrame, cal: model.Logit) -> pd.DataFrame:
     """Merge Elo/model columns onto kalshi_preview.build_bets output (one row per match)."""
-    cols = ["match_id", "elo_a", "elo_b", "n_a", "n_b", "id_a", "id_b", "sack_row", "seed_a",
+    cols = ["match_id", "no_read", "elo_a", "elo_b", "n_a", "n_b", "id_a", "id_b", "sack_row", "seed_a",
             "seed_b", "rank_a", "rank_b", "best_of_s", "a_won", "sack_a_won"]
     b = bets.merge(km[cols], on="match_id", how="inner")
     bo = pd.to_numeric(b["best_of"], errors="coerce").fillna(b["best_of_s"])
@@ -304,6 +308,7 @@ def add_model(bets: pd.DataFrame, km: pd.DataFrame, cal: model.Logit) -> pd.Data
     b["p_mkt_dog"] = b["dog_ask"] / (b["dog_ask"] + b["fav_ask"])
     b["edge"] = b["p_dog"] - b["breakeven"]
     b["both_matched"] = b["id_a"].notna() & b["id_b"].notna()
+    b["readable"] = b["both_matched"] & ~b["no_read"]
     b["min_n"] = np.minimum(b["n_a"], b["n_b"])
     b["seed_fav"] = np.where(dog_a, b["seed_b"], b["seed_a"])
     b["seed_dog"] = np.where(dog_a, b["seed_a"], b["seed_b"])
@@ -379,7 +384,7 @@ def report(km: pd.DataFrame, b: pd.DataFrame, oos: pd.DataFrame, months: pd.Data
     joined = km["sack_row"] >= 0
     agree = (km.loc[joined & km["a_won"].notna(), "a_won"] ==
              km.loc[joined & km["a_won"].notna(), "sack_a_won"]).mean()
-    early = b[(b["group"] == "early") & b["both_matched"] & (b["min_n"] >= min_n)]
+    early = b[(b["group"] == "early") & b["readable"] & (b["min_n"] >= min_n)]
     done = early[early["dog_pay"].isin([0.0, 1.0])]
     lines = [
         "# Elo vs Kalshi closing prices, early rounds (ATP + WTA)", "",
@@ -394,7 +399,9 @@ def report(km: pd.DataFrame, b: pd.DataFrame, oos: pd.DataFrame, months: pd.Data
         f"Kalshi's settlement in {agree:.1%} of settled joined matches. Joined rows moved later "
         f"to keep round order within their event: {km.attrs.get('moved_joined', 0):,}.",
         f"- Early-round bets with both players matched and ≥ {min_n} prior matches each: {len(early):,} "
-        f"(of {int((b['group'] == 'early').sum()):,} early-round matches with closing asks).",
+        f"(of {int((b['group'] == 'early').sum()):,} early-round matches with closing asks; "
+        f"{int(((b['group'] == 'early') & b['no_read']).sum()):,} unjoined inside Sackmann's span "
+        "are left out as no-read).",
         f"- Model: P(win) = logistic(Elo logit, Elo logit × best-of-5), coefficients fitted on "
         f"Sackmann rounds 1–2 before the Kalshi window: {np.round(cal.coef, 3).tolist()} (standardized).",
         "", "## Out-of-sample walk-forward (threshold on earlier months only)", "",
@@ -446,7 +453,7 @@ def run(matches, quotes, details, sack_elo_src: pd.DataFrame, cfg: dict, min_n: 
     bets = kp.build_bets(matches[matches["series"].isin(TOURS)], quotes, details, cfg, contracts,
                          max_age_h)
     b = add_model(bets, km, cal)
-    use = b[(b["group"] == "early") & b["both_matched"] & (b["min_n"] >= min_n)]
+    use = b[(b["group"] == "early") & b["readable"] & (b["min_n"] >= min_n)]
     oos, months = walk_forward(use, min_select_bets=min_select_bets)
     g = gate(oos, months)
     return report(km, b, oos, months, g, cal, min_n), dict(km=km, bets=b, oos=oos, months=months,

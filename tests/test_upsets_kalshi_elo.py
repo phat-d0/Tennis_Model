@@ -210,3 +210,25 @@ def test_round_monotone():
     assert t[0] == s["time"][0] and t[1] == s["time"][1] and t[4] == s["time"][4]
     assert t[2] > s["time"][1]            # R2 moved after the latest R1
     assert t[3] == s["time"][3]           # qualifying stays at the start
+
+
+def test_unjoined_kalshi_match_inside_sackmann_span_is_no_read():
+    """A Kalshi-only match inside Sackmann's span could see a later-round unjoined Sackmann
+    result timed before it: it must neither update Elo nor be bet on."""
+    sack = sack_frame([srow("ev", 20260601, "q", "r", num=20, rnd="R16")])
+    pl = ke.player_table(sack)
+    m = kmatches([("K1", "2026-06-03 12:00", "Quinn Quill", "Sam Sole", 1.0),    # in span, unjoined
+                  ("K2", "2026-07-01 12:00", "Pedro Perez", "Xavier One", 1.0)])  # after the span
+    km = ke.kalshi_matches(m, pl)
+    _, km = ke.timeline(sack, km)
+    assert list(km["no_read"]) == [True, False]
+    q = pd.DataFrame([{"ts": pd.Timestamp(t, tz="UTC") - pd.Timedelta(minutes=30), "match_id": mid,
+                       "side": side, "ask": ask}
+                      for mid, t in (("K1", "2026-06-03 12:00"), ("K2", "2026-07-01 12:00"))
+                      for side, ask in (("A", 0.30), ("B", 0.72))])
+    d = pd.DataFrame({"match_id": ["K1", "K2"], "round": ["Round 1"] * 2, "best_of": ["3"] * 2,
+                      "tournament_name": ["T1", "T2"], "gender": ["men"] * 2})
+    _, parts = ke.run(m, q, d, sack, load_config(), min_n=0, min_select_bets=1, fit_min_n=0)
+    b = parts["bets"].set_index("match_id")
+    assert not b.loc["K1", "readable"] and b.loc["K2", "readable"]
+    assert "K1" not in set(parts["oos"]["match_id"])
