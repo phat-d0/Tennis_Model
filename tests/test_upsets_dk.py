@@ -271,3 +271,28 @@ def test_projection_beyond_sackmann_and_other_tier():
     assert dh.tournaments(s2, KEYS).empty
     hs = {**dh.HIST_START, "other": pd.Timestamp("2024-01-01")}
     assert len(dh.tournaments(s2, KEYS, hist_start=hs)) == 2
+
+
+def test_needed_covers_first_days_of_projected_events():
+    j = pd.DataFrame({
+        "key": ["k"] * 4 + ["s"], "tourney_id": ["p+52w"] * 4 + ["2024-580"],
+        "commence": pd.to_datetime(["2026-06-15 10:00", "2026-06-17 12:00", "2026-06-18 09:00",
+                                    "2026-06-20 12:00", "2024-01-15 01:00"]),
+        "sack_row": [-1, -1, -1, -1, 7], "round_idx": [np.nan] * 4 + [1.0]})
+    t = pd.DataFrame({"key": ["k", "s"], "tourney_id": ["p+52w", "2024-580"], "projected": [True, False],
+                      "r12_days": [3, 5]})
+    assert list(dh.needed(j, t)) == [True, True, False, False, True]   # days 1-3 of the projected event
+
+
+def test_pull_stops_if_an_empty_listing_costs_credits(tmp_path):
+    class Costly(Session):
+        def get(self, url, params=None, timeout=None):
+            if "/historical/" in url and url.endswith("/events"):
+                self.remaining -= 1
+                return Resp({"timestamp": params["date"], "data": []}, 1, self.remaining)
+            return super().get(url, params, timeout)
+
+    api = OddsApi(floor=100, key="K", session=Costly({}, {}), spend_log=tmp_path / "spend.log")
+    todo = pd.DataFrame([{"key": A_KEY, "when": f"2024-01-1{i}T00:00:00Z"} for i in range(3)])
+    res = dh.pull(api, "events", todo, cap=1000, root=tmp_path, pause_s=0)
+    assert res["done"] == 1 and "empty listing cost credits" in res["stopped"]

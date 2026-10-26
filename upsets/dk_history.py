@@ -147,6 +147,8 @@ def tournaments(sack: pd.DataFrame, keys: list[str], end: pd.Timestamp | None = 
             # before for early listings
             slam, big = r.level_group == "slam", r.draw >= 96
             first, last = (-2, 5) if slam else ((-1, 5) if big else (-1, 3))
+            if r.projected:  # real dates unknown (shifted +52 w): look a week either side; empty listings cost 0
+                first, last = first - 7, last + 7
             days = 5 if slam else (4 if big or (r.level_group == "other" and r.draw >= 48) else 3)
             rows.append({"key": key, "tourney_id": r.tourney_id, "tour": tour, "name": r.name,
                          "date": r.date, "draw": r.draw, "level_group": r.level_group,
@@ -219,10 +221,23 @@ def join_events(ev: pd.DataFrame, sack: pd.DataFrame, players: pd.DataFrame | No
     return j
 
 
+def needed(j: pd.DataFrame, t: pd.DataFrame | None = None, early_rounds: int = 2) -> pd.Series:
+    """Events that need a price: Sackmann rounds 1-2, or, for a projected event (no Sackmann rows;
+    results come from Kalshi), every listed match in its first r12_days days of play."""
+    sel = (j["sack_row"] >= 0) & (j["round_idx"] <= early_rounds)
+    if t is not None and len(t) and "projected" in t and t["projected"].any():
+        pr = t[t["projected"]].set_index(["key", "tourney_id"])["r12_days"]
+        idx = pd.MultiIndex.from_frame(j[["key", "tourney_id"]])
+        days = pd.Series(pr.reindex(idx).to_numpy(), index=j.index)
+        first = j.groupby(["key", "tourney_id"])["commence"].transform("min")
+        sel |= days.notna() & (j["commence"] < first.dt.floor("D") + pd.to_timedelta(days.fillna(0), unit="D"))
+    return sel
+
+
 def snapshot_plan(j: pd.DataFrame, snap_h: float = 6.0, lead_min: float = 5.0,
-                  early_rounds: int = 2) -> tuple[pd.DataFrame, pd.DataFrame]:
+                  early_rounds: int = 2, t: pd.DataFrame | None = None) -> tuple[pd.DataFrame, pd.DataFrame]:
     """(requests: key, when; per-match: sack_row, deadline, planned snapshot, planned staleness)."""
-    need = j[(j["sack_row"] >= 0) & (j["round_idx"] <= early_rounds)].copy()
+    need = j[needed(j, t, early_rounds)].copy()
     need["deadline"] = need["commence"] - pd.Timedelta(minutes=lead_min)
     need["cell"] = need["deadline"].dt.floor(pd.Timedelta(hours=snap_h))
     need["snap"] = need.groupby(["key", "cell"])["deadline"].transform("min")
@@ -240,7 +255,7 @@ def dry_run(t: pd.DataFrame, sack: pd.DataFrame, events_step_h: float, snap_h: f
     sched["cached"] = [cache_path("events", k, w, root).exists() for k, w in zip(sched["key"], sched["when"])]
     ev = load_events(sched, root)
     j = join_events(ev, sack) if len(ev) else ev
-    req, need = snapshot_plan(j, snap_h, lead_min) if len(ev) else (pd.DataFrame(columns=["key", "tourney_id", "when"]), pd.DataFrame())
+    req, need = snapshot_plan(j, snap_h, lead_min, t=t) if len(ev) else (pd.DataFrame(columns=["key", "tourney_id", "when"]), pd.DataFrame())
     if len(req):
         req["cached"] = [cache_path("odds", k, w, root).exists() for k, w in zip(req["key"], req["when"])]
     est_cells = int(np.ceil(13.0 / snap_h))  # cells per play day (~13 h of play) until listings are cached
@@ -274,7 +289,7 @@ def dry_run(t: pd.DataFrame, sack: pd.DataFrame, events_step_h: float, snap_h: f
               f"≤ {credits_new:,}** (listing calls before a key's history starts cost 0)."]
     if len(need):
         st = need["planned_stale_min"]
-        n_r12 = int(((j["sack_row"] >= 0) & (j["round_idx"] <= 2)).sum())
+        n_r12 = int(needed(j, t).sum())
         lines += [f"Rounds 1–2 matches with a listed event: {n_r12:,} (events listed {len(j):,}, joined to "
                   f"Sackmann {int((j['sack_row'] >= 0).sum()):,}). Planned price age before commence: median "
                   f"{st.median():.0f} min, p90 {st.quantile(0.9):.0f} min, max {st.max():.0f} min "
@@ -304,9 +319,13 @@ def pull(api, kind: str, todo: pd.DataFrame, cap: float, root: Path = CACHE, pau
             continue
         if logged_total(api.spend_log) + cost > cap:
             return {"done": done, "cached": skipped, "stopped": f"cap {cap:,.0f} reached"}
+        before = api.spent
         body = (api.historical_events(r.key, r.when) if kind == "events"
                 else api.historical_odds(r.key, r.when, bookmakers=books))
         write_cache(p, body)
+        if kind == "events" and not (body.get("data") or []) and api.spent > before:
+            return {"done": done + 1, "cached": skipped,
+                    "stopped": "an empty listing cost credits (docs say 0): stopped to re-check costs"}
         done += 1
         time.sleep(pause_s)
     return {"done": done, "cached": skipped, "stopped": None}
@@ -389,11 +408,31 @@ def collect(t: pd.DataFrame, sack: pd.DataFrame, events_step_h: float = 24.0, le
     j = join_events(ev, sack)
     need = j[(j["sack_row"] >= 0) & (j["round_idx"] <= 2)]
     out = prices(need, snaps, sack, lead_min)
+    open_ = j[needed(j, t) & (j["sack_row"] < 0)]
+    out.attrs["unresolved"] = unresolved_prices(open_, snaps, lead_min)
     if len(out):
         meta = need.drop_duplicates("sack_row").set_index("sack_row")[["key", "tourney_id"]]
         out = out.join(meta, on="sack_row")
     out.attrs.update(listed=len(ev), joined=int((j["sack_row"] >= 0).sum()), r12=len(need))
+    out.attrs.setdefault("unresolved", pd.DataFrame())
     return out
+
+
+def unresolved_prices(ev: pd.DataFrame, snaps: pd.DataFrame, lead_min: float = 5.0) -> pd.DataFrame:
+    """Priced events with no Sackmann result (projected events): one row per event with home/away
+    names and odds per book at the last snapshot >= lead_min before commence. Results come from
+    elsewhere (Kalshi settlements, in Data's container); see dk_study.results_from_table."""
+    if not len(ev) or not len(snaps):
+        return pd.DataFrame()
+    m = ev[["key", "tourney_id", "event_id", "commence", "home", "away"]].merge(
+        snaps[["key", "event_id", "book", "snapshot_ts", "odds_1", "odds_2"]], on=["key", "event_id"])
+    m = m[m["snapshot_ts"] <= m["commence"] - pd.Timedelta(minutes=lead_min)]
+    m = m.sort_values("snapshot_ts").drop_duplicates(["event_id", "book"], keep="last")
+    m["age_min"] = (m["commence"] - m["snapshot_ts"]).dt.total_seconds() / 60
+    w = m.pivot(index=["key", "tourney_id", "event_id", "commence", "home", "away"], columns="book",
+                values=["odds_1", "odds_2", "age_min"])
+    w.columns = [f"{v.replace('odds_1', 'odds_home').replace('odds_2', 'odds_away')}_{b}" for v, b in w.columns]
+    return w.reset_index()
 
 
 # --- CLI -------------------------------------------------------------------------------------
@@ -419,6 +458,7 @@ def main(argv=None) -> None:
                     help="also plan 250/500 keys, with history assumed from this date (e.g. 2024-01-01)")
     ap.add_argument("--project-until", default=None,
                     help="also plan editions after Sackmann's end up to this date (results from Kalshi)")
+    ap.add_argument("--tiers", default=None, help="comma list of level groups to keep: slam,1000,other")
     ap.add_argument("--yes", action="store_true", help="required for paid stages")
     a = ap.parse_args(argv)
 
@@ -429,6 +469,8 @@ def main(argv=None) -> None:
     hs = {**HIST_START, "other": pd.Timestamp(a.other_from)} if a.other_from else None
     t = tournaments(sack, _keys(api), hist_start=hs,
                     project_until=pd.Timestamp(a.project_until) if a.project_until else None)
+    if a.tiers:
+        t = t[t["level_group"].isin(a.tiers.split(","))].reset_index(drop=True)
     text, parts = dry_run(t, sack, a.events_step_h, a.snap_h, a.lead_min, a.cache)
     if api is not None:
         text += (f"\nBalance now: {api.remaining:,.0f} credits; floor {a.floor:,}; this pull's cap "
@@ -441,6 +483,7 @@ def main(argv=None) -> None:
     todo = parts["sched"] if a.stage == "events" else parts["req"]
     if a.stage == "odds" and not len(todo):
         raise SystemExit("no odds snapshots planned: pull the event listings first")
+    todo = todo.sort_values("when", ascending=False)  # most recent first: a cap stop drops the oldest
     res = pull(api, a.stage, todo, a.cap, a.cache)
     print(f"{a.stage}: fetched {res['done']}, already cached {res['cached']}"
           + (f", STOPPED: {res['stopped']}" if res["stopped"] else "")
