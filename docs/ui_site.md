@@ -1,9 +1,10 @@
 # Tennis Odds page (public, GitHub Pages)
 
 Static PWA in `site/`, published by the Lead's `publish.yml` as described in `docs/site_plan.md`. It reads
-`data/odds.json` (built by `python -m upsets.site`) and `findings.json` (the Lead's). There is no build step,
+`data/odds.json` and `data/portfolio.json` (built by `python -m upsets.site`), the static `portfolio_backtest.json` (Upsets) and
+`findings.json` (the Lead's). There is no build step,
 no CDN, and no request to any other origin. Links to reports and the licence are plain `<a>` links.
-**No Kalshi data:** the page code and its fixture never mention Kalshi, and a test enforces it.
+**No Kalshi data:** no published file except the Lead's `findings.json` prose, and no fixture, mentions Kalshi; a test enforces it over all of `site/`.
 
 ## Files
 | File | What |
@@ -21,6 +22,12 @@ no CDN, and no request to any other origin. Links to reports and the licence are
   - both players and a bar for the fair chance;
   - DraftKings and Pinnacle decimal odds, the fair chance, and the model chance with a **"model: not proven"** tag;
   - margins, the source of the fair chance, and the model's rated-match counts (or why there is no model).
+- **Portfolio** (built by Upsets in phat-d0/Tennis_Model#96, at the owner's request): paper trades ($10 each, at
+  DraftKings' price) per strategy (Elo model, DK vs Pinnacle, Underdogs), each tagged "not proven". Tiles show realized and
+  expected profit, luck, ROI, CLV, win rate and drawdown, followed by a realized-vs-expected chart (drag or arrow keys to
+  read it) and open and settled trades. A Backtest view (`site/portfolio_backtest.json`, static aggregates) shows the
+  same rules on past seasons. Data: `data/portfolio.json` from the builder; when it's missing, the tab shows a
+  message and the other tabs are unaffected.
 - **Findings:** the "Every test so far: no edge after fees" line, then one card per entry with its verdict tag
   and a "Read the report" link to `github.com/.../blob/main/<report>`. Only `reports/...` paths become links.
 - **Footer:** odds age and build age, credits this month against the cap, the ratings date, "Refreshes every
