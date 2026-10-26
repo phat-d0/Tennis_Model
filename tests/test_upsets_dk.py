@@ -391,3 +391,17 @@ def test_structural_cost_table():
     # expected = mean(0.4*2.4-1, 0.25*3.6-1) = mean(-0.04, -0.10) = -0.07; realized = mean(+1.4, -1) = +0.2
     assert "| 2 |" in all_row and "-7.0%" in all_row and "+20.0%" in all_row
     assert any("results from Kalshi" in x for x in lines) and not any("250/500" in x for x in lines)
+
+
+def test_close_plan_reuses_cache_and_groups_cells():
+    j = pd.DataFrame({"key": ["k"] * 4, "tourney_id": ["p"] * 4, "event_id": list("abcd"),
+                      "commence": pd.to_datetime(["2026-07-01 12:00", "2026-07-01 12:04", "2026-07-01 12:30",
+                                                  "2026-07-01 15:00"]),
+                      "sack_row": [1, 2, 3, 4], "round_idx": [1.0] * 4})
+    t = pd.DataFrame({"key": ["k"], "tourney_id": ["p"], "projected": [False], "r12_days": [3]})
+    # a cached snapshot 3 min before event a's target covers it; d's cached snapshot is 2 h old
+    snaps = pd.DataFrame({"key": ["k", "k"], "event_id": ["a", "d"],
+                          "snapshot_ts": pd.to_datetime(["2026-07-01 11:52", "2026-07-01 12:55"])})
+    req, need = dh.close_plan(j, t, snaps, gran_min=10)
+    assert list(req["ts"].dt.strftime("%H:%M")) == ["11:59", "12:25", "14:55"]   # b; c; d (a covered)
+    assert need.set_index("event_id")["close_age_min"].round().to_dict() == {"a": 3, "b": 0, "c": 0, "d": 0}

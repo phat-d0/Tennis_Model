@@ -266,6 +266,47 @@ def snapshot_plan(j: pd.DataFrame, snap_h: float = 6.0, lead_min: float = 5.0,
     return req.reset_index(drop=True), need.reset_index(drop=True)
 
 
+# --- closing snapshots -------------------------------------------------------------------------
+
+def close_plan(j: pd.DataFrame, t: pd.DataFrame, snaps: pd.DataFrame, gran_min: float = 60.0,
+               lead_min: float = 5.0) -> tuple[pd.DataFrame, pd.DataFrame]:
+    """Closing-price plan. Per needed match the target is commence - lead_min. A match is already
+    covered when a cached snapshot that lists it is at most gran_min older than the target. The rest
+    are grouped per key into gran_min cells, one request at each cell's earliest target, so a planned
+    close is at most gran_min (+ the API's 5-10 min snapshot step) older than its target.
+    -> (requests: key, tourney_id, ts, when; per match: target, cached_close, planned_close, close_age_min)."""
+    need = j[needed(j, t)].copy()
+    need["target"] = need["commence"] - pd.Timedelta(minutes=lead_min)
+    best = pd.Series(pd.NaT, index=need.index, dtype="datetime64[ns]")
+    if len(snaps):
+        m = need[["key", "event_id", "target"]].reset_index().merge(
+            snaps[["key", "event_id", "snapshot_ts"]].drop_duplicates(), on=["key", "event_id"])
+        m = m[m["snapshot_ts"] <= m["target"]]
+        best = m.groupby("index")["snapshot_ts"].max().reindex(need.index)
+    need["cached_close"] = best
+    gran = pd.Timedelta(minutes=gran_min)
+    covered = need["cached_close"].notna() & (need["target"] - need["cached_close"] <= gran)
+    todo = need[~covered].copy()
+    todo["cell"] = todo["target"].dt.floor(gran)
+    todo["snap"] = todo.groupby(["key", "cell"])["target"].transform("min")
+    need["planned_close"] = need["cached_close"].where(covered)
+    need.loc[todo.index, "planned_close"] = todo["snap"]
+    need["close_age_min"] = (need["target"] - need["planned_close"]).dt.total_seconds() / 60
+    req = todo[["key", "tourney_id", "snap"]].drop_duplicates(["key", "snap"]).rename(columns={"snap": "ts"})
+    req["when"] = req["ts"].map(iso)
+    return req.reset_index(drop=True), need.reset_index(drop=True)
+
+
+def close_inputs(t: pd.DataFrame, sack: pd.DataFrame, events_step_h: float = 24.0,
+                 root: Path = CACHE) -> tuple[pd.DataFrame, pd.DataFrame]:
+    """(joined events incl. ones seen only in snapshots, every cached snapshot) for close_plan."""
+    snaps = all_snapshots(root)
+    ev = pd.concat([load_events(events_schedule(t, events_step_h), root), snapshot_events(snaps, t)],
+                   ignore_index=True)
+    ev = ev.sort_values("listed").drop_duplicates(["key", "event_id"], keep="last")
+    return join_events(ev, sack), snaps
+
+
 # --- dry run ---------------------------------------------------------------------------------
 
 def dry_run(t: pd.DataFrame, sack: pd.DataFrame, events_step_h: float, snap_h: float,
@@ -468,7 +509,7 @@ def _keys(api=None) -> list[str]:
 
 def main(argv=None) -> None:
     ap = argparse.ArgumentParser(description=__doc__.split("\n\n")[0])
-    ap.add_argument("stage", choices=["plan", "events", "odds"])
+    ap.add_argument("stage", choices=["plan", "events", "odds", "close"])
     ap.add_argument("--sackmann", type=Path, default=Path("/home/user/phat-d0/tennis-sackmann-archive"))
     ap.add_argument("--cache", type=Path, default=CACHE)
     ap.add_argument("--events-step-h", type=float, default=24.0)
@@ -482,6 +523,8 @@ def main(argv=None) -> None:
     ap.add_argument("--project-until", default=None,
                     help="also plan editions after Sackmann's end up to this date (results from Kalshi)")
     ap.add_argument("--tiers", default=None, help="comma list of level groups to keep: slam,1000,other")
+    ap.add_argument("--close-min", type=float, default=10.0,
+                    help="close stage: cell size in minutes (a close is at most this old)")
     ap.add_argument("--yes", action="store_true", help="required for paid stages")
     a = ap.parse_args(argv)
 
@@ -494,6 +537,24 @@ def main(argv=None) -> None:
                     project_until=pd.Timestamp(a.project_until) if a.project_until else None)
     if a.tiers:
         t = t[t["level_group"].isin(a.tiers.split(","))].reset_index(drop=True)
+    if a.stage == "close":
+        j, snaps = close_inputs(t, sack, a.events_step_h, a.cache)
+        req, need = close_plan(j, t, snaps, a.close_min, a.lead_min)
+        req["cached"] = [cache_path("odds", k, w, a.cache).exists() for k, w in zip(req["key"], req["when"])]
+        new = int((~req["cached"]).sum())
+        age = need["close_age_min"]
+        print(f"Close plan, {a.close_min:g} min cells: {len(need):,} matches; {len(req):,} snapshots "
+              f"({new:,} to pull) = {10 * new:,} credits; close age median {age.median():.0f}, p90 "
+              f"{age.quantile(0.9):.0f}, max {age.max():.0f} min."
+              + (f" Balance {api.remaining:,.0f}; cap {a.cap:,.0f}; logged {logged_total(api.spend_log):,.0f}."
+                 if api is not None and api.remaining is not None else ""))
+        if not a.yes:
+            return
+        res = pull(api, "odds", req.sort_values("ts", ascending=False), a.cap, a.cache)
+        print(f"close: fetched {res['done']}, already cached {res['cached']}"
+              + (f", STOPPED: {res['stopped']}" if res["stopped"] else "")
+              + f". Spent this run {api.spent:,.0f}; balance {api.remaining:,.0f}.")
+        return
     text, parts = dry_run(t, sack, a.events_step_h, a.snap_h, a.lead_min, a.cache)
     if api is not None:
         text += (f"\nBalance now: {api.remaining:,.0f} credits; floor {a.floor:,}; this pull's cap "
