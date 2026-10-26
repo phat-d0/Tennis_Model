@@ -147,8 +147,8 @@ def tournaments(sack: pd.DataFrame, keys: list[str], end: pd.Timestamp | None = 
             # before for early listings
             slam, big = r.level_group == "slam", r.draw >= 96
             first, last = (-2, 5) if slam else ((-1, 5) if big else (-1, 3))
-            if r.projected:  # real dates unknown (shifted +52 w): look a week either side; empty listings cost 0
-                first, last = first - 7, last + 7
+            if r.projected:  # real dates unknown (shifted +52 w; 2026 events often a week later):
+                first, last = first - 7, last + 10  # look either side; empty listings cost 0
             days = 5 if slam else (4 if big or (r.level_group == "other" and r.draw >= 48) else 3)
             rows.append({"key": key, "tourney_id": r.tourney_id, "tour": tour, "name": r.name,
                          "date": r.date, "draw": r.draw, "level_group": r.level_group,
@@ -221,9 +221,13 @@ def join_events(ev: pd.DataFrame, sack: pd.DataFrame, players: pd.DataFrame | No
     return j
 
 
-def needed(j: pd.DataFrame, t: pd.DataFrame | None = None, early_rounds: int = 2) -> pd.Series:
+def needed(j: pd.DataFrame, t: pd.DataFrame | None = None, early_rounds: int = 2,
+           margin_days: int = 2) -> pd.Series:
     """Events that need a price: Sackmann rounds 1-2, or, for a projected event (no Sackmann rows;
-    results come from Kalshi), every listed match in its first r12_days days of play."""
+    results come from Kalshi), every listed match in its first r12_days + margin_days days of play.
+    Play starts at the first listing on or after the projected date - 1 day, so a qualifying week
+    listed under the same key (Wimbledon) doesn't count; qualifying days and round 3 that still fall
+    inside the window are dropped later by Kalshi's round labels (dk_study.frame_unresolved)."""
     sel = (j["sack_row"] >= 0) & (j["round_idx"] <= early_rounds)
     inside = pd.Series(True, index=j.index)
     if t is not None and len(t) and {"win_start", "win_end"} <= set(t.columns):
@@ -236,11 +240,16 @@ def needed(j: pd.DataFrame, t: pd.DataFrame | None = None, early_rounds: int = 2
         inside = ((j["commence"] >= ws - pd.Timedelta(days=1)) & (j["commence"] <= we + pd.Timedelta(days=3))) | ws.isna()
         sel &= inside
     if t is not None and len(t) and "projected" in t and t["projected"].any():
-        pr = t[t["projected"]].set_index(["key", "tourney_id"])["r12_days"]
+        pt = t[t["projected"]].set_index(["key", "tourney_id"])
         idx = pd.MultiIndex.from_frame(j[["key", "tourney_id"]])
-        days = pd.Series(pr.reindex(idx).to_numpy(), index=j.index)
-        first = j["commence"].where(inside).groupby([j["key"], j["tourney_id"]]).transform("min")
-        sel |= inside & days.notna() & (j["commence"] < first.dt.floor("D") + pd.to_timedelta(days.fillna(0), unit="D"))
+        days = pd.Series(pt["r12_days"].reindex(idx).to_numpy(), index=j.index)
+        play = inside
+        if "date" in pt:
+            start = pd.Series(pt["date"].reindex(idx).to_numpy(), index=j.index)
+            play = inside & ~(j["commence"] < start - pd.Timedelta(days=1))
+        first = j["commence"].where(play).groupby([j["key"], j["tourney_id"]]).transform("min")
+        sel |= play & days.notna() & (j["commence"] < first.dt.floor("D") + pd.to_timedelta(
+            days.fillna(0) + margin_days, unit="D"))
     return sel
 
 
@@ -423,7 +432,8 @@ def collect(t: pd.DataFrame, sack: pd.DataFrame, events_step_h: float = 24.0, le
     if len(out):
         meta = need.drop_duplicates("sack_row").set_index("sack_row")[["key", "tourney_id"]]
         out = out.join(meta, on="sack_row")
-    open_ = j[needed(j, t) & (j["sack_row"] < 0)]
+    open_ = j[needed(j, t) & (j["sack_row"] < 0)].merge(
+        t[["key", "tourney_id", "level_group"]], on=["key", "tourney_id"], how="left")
     out.attrs.update(listed=len(ev), joined=int((j["sack_row"] >= 0).sum()), r12=len(need),
                      unresolved=unresolved_prices(open_, snaps, lead_min))
     return out
@@ -435,12 +445,14 @@ def unresolved_prices(ev: pd.DataFrame, snaps: pd.DataFrame, lead_min: float = 5
     elsewhere (Kalshi settlements, in Data's container); see dk_study.results_from_table."""
     if not len(ev) or not len(snaps):
         return pd.DataFrame()
-    m = ev[["key", "tourney_id", "event_id", "commence", "home", "away"]].merge(
+    if "level_group" not in ev:
+        ev = ev.assign(level_group="other")
+    m = ev[["key", "tourney_id", "level_group", "event_id", "commence", "home", "away"]].merge(
         snaps[["key", "event_id", "book", "snapshot_ts", "odds_1", "odds_2"]], on=["key", "event_id"])
     m = m[m["snapshot_ts"] <= m["commence"] - pd.Timedelta(minutes=lead_min)]
     m = m.sort_values("snapshot_ts").drop_duplicates(["event_id", "book"], keep="last")
     m["age_min"] = (m["commence"] - m["snapshot_ts"]).dt.total_seconds() / 60
-    w = m.pivot(index=["key", "tourney_id", "event_id", "commence", "home", "away"], columns="book",
+    w = m.pivot(index=["key", "tourney_id", "level_group", "event_id", "commence", "home", "away"], columns="book",
                 values=["odds_1", "odds_2", "age_min"])
     w.columns = [f"{v.replace('odds_1', 'odds_home').replace('odds_2', 'odds_away')}_{b}" for v, b in w.columns]
     return w.astype(float).reset_index()

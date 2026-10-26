@@ -19,6 +19,7 @@ time a bet is placed). Prints aggregates only.
 from __future__ import annotations
 
 import argparse
+import re
 from pathlib import Path
 
 import numpy as np
@@ -80,19 +81,45 @@ def frame(priced: pd.DataFrame, sack_elo: pd.DataFrame, fit_min_n: int = 10) -> 
     return f
 
 
+def round_size(label) -> float:
+    """Kalshi round label -> players in that round ('Round Of 64' -> 64, 'Quarterfinal' -> 8)."""
+    if not isinstance(label, str):
+        return np.nan
+    m = re.search(r"round of (\d+)", label.lower())
+    if m:
+        return float(m.group(1))
+    return {"quarterfinal": 8.0, "semifinal": 4.0, "final": 2.0}.get(label.strip().lower(), np.nan)
+
+
+def early_round_mask(r: pd.DataFrame) -> pd.Series:
+    """Rows in the two largest rounds seen for their event (rounds 1-2; seeds' byes put their first
+    match in round 2). Void rows without a round label stay."""
+    size = r["round"].map(round_size)
+    top = size.groupby([r["key"], r["tourney_id"]]).transform(
+        lambda x: sorted(set(x.dropna()), reverse=True)[1] if x.nunique() > 1 else x.max())
+    return (size >= top) | size.isna()
+
+
 def frame_unresolved(u: pd.DataFrame, results: pd.DataFrame) -> pd.DataFrame:
     """Projected-event price rows (dk_history.unresolved_prices) + a results table
-    (event_id, winner = 'home' | 'away', void) -> rows shaped like frame(); no Sackmann seeds or Elo."""
-    r = u.merge(results[["event_id", "winner", "void"]], on="event_id", how="inner")
+    (event_id, winner = 'home' | 'away', void[, round = Kalshi label]) -> rows shaped like frame();
+    no Sackmann seeds or Elo. With `round`, only each event's first two rounds are kept."""
+    cols = ["event_id", "winner", "void"] + (["round"] if "round" in results else [])
+    r = u.merge(results[cols], on="event_id", how="inner")
+    if "round" in r:
+        r = r[early_round_mask(r)]
     r = r.dropna(subset=["odds_home_draftkings", "odds_away_draftkings"])
     r = r[r["winner"].isin(["home", "away"]) | r["void"].astype(bool)]
     h, a = r["odds_home_draftkings"], r["odds_away_draftkings"]
     dog_home = h > a
+    tour = r["key"].str.extract(r"tennis_(atp|wta)_")[0]
+    level = r["level_group"].fillna("other") if "level_group" in r else pd.Series("other", index=r.index)
     pick = lambda x, y, dog: np.where(dog_home, x, y) if dog else np.where(dog_home, y, x)  # noqa: E731
     f = pd.DataFrame({
         "sack_row": -1, "key": r["key"].to_numpy(), "season": r["commence"].dt.year.to_numpy(),
-        "tour": r["key"].str.extract(r"tennis_(atp|wta)_")[0].to_numpy(), "level_group": "other",
-        "tournament": r["tourney_id"].to_numpy(), "round_idx": np.nan, "best_of": 3.0,
+        "tour": tour.to_numpy(), "level_group": level.to_numpy(),
+        "tournament": r["tourney_id"].to_numpy(), "round_idx": np.nan,
+        "best_of": np.where((tour == "atp") & (level == "slam"), 5.0, 3.0),
         "upset": (np.where(dog_home, r["winner"] == "home", r["winner"] == "away")).astype(int),
         "void": r["void"].astype(bool).to_numpy(), "seed_dog": np.nan, "seed_fav": np.nan,
         "odds_dog_dk": pick(h, a, True), "odds_fav_dk": pick(h, a, False),
