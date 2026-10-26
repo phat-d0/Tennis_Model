@@ -136,6 +136,13 @@ were the pre-match underdog?
   flips (50¢ crossings with hysteresis); and whether the original favourite wins. Aggregates by set path and by
   flips, an average-path table for a chart, set-end price calibration and ROI, and 3 example timelines (to the
   Lead only, never in git). Code: `upsets/match_path.py` (Upsets); data: Data's `sets` collector.
+- **Match-path result (phat-d0/Tennis_Model#75 rerun, 2026-10-26, 0 requests):** original favourite (higher closing ask)
+  wins ATP bo3 66.2% / bo5 71.8% / WTA 69.8% / ATP-Ch 69.0% / WTA125 69.4%. ~50% of matches have ≥ 1 in-play favourite
+  flip; 75% of first flips come in set 1 (median ~45 min). After 2+ flips the original favourite wins ~60%; if the other
+  player is market favourite at the decider start, 37% (ATP) / 40% (WTA). Deciders: the favourite won the penultimate set →
+  64.9% / 66.6%; lost it → 54.9% / 58.7%. Set-end prices are well calibrated; buying at the ask + fee is about −1% to −3% (no
+  reliable edge). Penultimate winner post-guard: −1.2% at 0¢ (1,359 bets). Reports: `reports/upsets_match_path.md`,
+  `reports/upsets_decider.md` (Data PR). The owner got charts and 3 example timelines privately.
 - Results only (Sackmann 2010–26, ranking favourite): the favourite wins 63.8% (ATP bo3) / 64.7% (WTA) / 72.2%
   (ATP bo5). After losing set 1 they win 28.3% / 26.8% / 41.4%; after winning it, 87–88%.
 - **DK history code merged (phat-d0/Tennis_Model#67):** dry run ≤ 13,073 credits (95 key-events; 6 h snapshot

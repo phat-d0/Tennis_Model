@@ -358,3 +358,6 @@ the newest 200. Format changes go through the Lead (Scanner proposes, Dashboard 
   (WTA), i.e. momentum ≈ +3 pp per set (symmetric test). Kalshi decider price test running. 171 tests.
 - 2026-10-26: Kalshi decider price test: the penultimate-set winner wins 54.8% but costs 53.8% + fee, so
   ROI −0.7% at 0¢ / −2.4% at 1¢ (1,423 bets). Priced in; no edge.
+- 2026-10-26: Match-path timeline study merged (phat-d0/Tennis_Model#73, #74, #75); 193 tests. Original favourite wins
+  66–72%; ~50% of matches have an in-play favourite flip; set-end prices are calibrated, so no edge at the ask + fee.
+  Example timelines/charts go to the owner privately (Kalshi data never committed).
