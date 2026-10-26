@@ -125,3 +125,10 @@ Shared paid-plan key since 2026-10-26 (owner). Global floor 5,000; dk_live reser
 | 2026-10-26 05:41–05:42 | Upsets, 250/500 top-up with the same fix (6 h cells, as the original pull) | events / odds | 36 + 47 | 36 + 470 | 4,981,919 |
 | | **DK history total so far (spend log)** | | 2,894 | **19,715** | 4,981,919 |
 
+**Closing-price snapshots (job C)** (Lead-approved 2026-10-26; job cap 50,000 = spend-log total ≤ 69,715; floor 5,000; plan sent to the Lead before the pull). `python -m upsets.dk_history close --other-from 2024-01-01 --project-until 2026-10-25 --close-min 10`: per round 1–2 match the target is the listed start − 5 min; cached snapshots ≤ 10 min old reused (213); the rest in 10-min cells per key, most recent first. Close age: median 0, p90 4, max 10 min (+ the API's 5–10 min snapshot step).
+
+| Date (UTC) | Who / job | Endpoint | Calls | Credits | Balance after |
+|---|---|---|---|---|---|
+| 2026-10-26 06:07–07:03 | Upsets, closing snapshots, 10,335 matches, `bookmakers=draftkings,pinnacle` | `/historical/sports/{key}/odds` | 4,296 paid (4,297 fetched) | 42,960 | 4,938,958 |
+| | **DK history total so far (spend log)** | | 7,190 | **62,675** | 4,938,958 |
+

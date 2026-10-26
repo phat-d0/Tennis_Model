@@ -405,3 +405,14 @@ def test_close_plan_reuses_cache_and_groups_cells():
     req, need = dh.close_plan(j, t, snaps, gran_min=10)
     assert list(req["ts"].dt.strftime("%H:%M")) == ["11:59", "12:25", "14:55"]   # b; c; d (a covered)
     assert need.set_index("event_id")["close_age_min"].round().to_dict() == {"a": 3, "b": 0, "c": 0, "d": 0}
+
+
+def test_close_drift_report():
+    from upsets import dk_close
+    e = pd.DataFrame({"event_id": ["a", "a", "b"], "hours": [0.5, 30.0, 2.0],
+                      "dk": [0.50, 0.40, 0.60], "pin": [0.50, 0.42, 0.61],
+                      "dk_close": [0.52, 0.52, 0.60], "pin_close": [0.53, 0.53, 0.62],
+                      "home_won": [1.0, 1.0, 0.0]})
+    text = dk_close.report(e)
+    assert "| 0–1 h | 1 | 2.0 |" in text and "| 24–inf h | 1 | 12.0 |" in text
+    assert "Matches with a close and at least one earlier snapshot: 2" in text

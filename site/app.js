@@ -4,6 +4,8 @@
 
 const ODDS_URL = "data/odds.json";
 const FINDINGS_URL = "findings.json";
+const PORTFOLIO_URL = "data/portfolio.json";
+const BACKTEST_URL = "portfolio_backtest.json";
 const STALE_ODDS_H = 6;          // banner when odds are older than this
 const STALE_BUILD_H = 12;        // banner when the page itself hasn't been rebuilt for this long
 const REPORT_BASE = "https://github.com/phat-d0/Tennis_Model/blob/main/";
@@ -17,7 +19,14 @@ let odds = null;        // last good odds.json
 let oddsErr = "";       // why odds.json couldn't be loaded ("" when it could)
 let findings = null;    // last good findings.json (array)
 let findingsErr = "";
-let tab = location.hash === "#findings" ? "findings" : "matches";
+const TABS = ["matches", "portfolio", "findings"];
+let tab = TABS.includes(location.hash.slice(1)) ? location.hash.slice(1) : "matches";
+let portfolio = null;   // last good data/portfolio.json (paper trades, built every 3 h)
+let portfolioErr = "";
+let backtest = null;    // portfolio_backtest.json (static aggregates)
+let pfStrategy = store.get("tennis-pf-strategy", "model");
+let pfView = store.get("tennis-pf-view", "live");
+let pfShown = 20;
 let tour = store.get("tennis-tour", "all");
 
 const $ = (id) => document.getElementById(id);
@@ -88,6 +97,7 @@ const STATUS_TEXT = {
   no_key: ["Odds aren't refreshing", "No API key is set for the build, so these are the last saved odds."],
   cap_reached: ["Monthly odds budget used up", "Odds stop refreshing until next month. These are the last saved odds."],
   below_floor: ["Odds aren't refreshing", "The shared credit balance is at its reserve. These are the last saved odds."],
+  paced: ["Odds refresh later today", "Today's share of the monthly budget is used. These are the last saved odds."],
   no_tournaments: ["No tournaments right now", "No ATP or WTA tournament has a match in the next 36 hours."],
 };
 
@@ -222,6 +232,189 @@ function findingsView() {
   return out;
 }
 
+
+// ---------------------------------------------------------------- portfolio tab
+// Paper trades, $10 each, opened by upsets/portfolio.py at DraftKings' price. "Expected" is each
+// trade's expected value at Pinnacle's fair chance when it was opened; realized minus expected
+// is luck (or Pinnacle being wrong). Closing line value compares the entry odds with the fair
+// chance at the last build before the start.
+
+const money = (x, dp = 0) => {
+  if (!isNum(x)) return "—";
+  const s = Math.abs(x).toFixed(Math.abs(x) < 10 && dp === 0 ? 2 : dp);
+  return (x < 0 ? "−$" : x > 0 ? "+$" : "$") + s;
+};
+const signed = (x, dp = 1) => (isNum(x) ? (x > 0 ? "+" : x < 0 ? "−" : "") + Math.abs(x * 100).toFixed(dp) + "%" : "—");
+const sgnCls = (x) => (isNum(x) ? (x > 0 ? "pos" : x < 0 ? "neg" : "") : "");
+const PF_SHORT = { model: "Elo model", line: "DK vs Pinnacle", dogs: "Underdogs" };
+
+function tile(label, value, sub, cls) {
+  return el("div", { class: "tile" }, el("div", { class: "t-label" }, label),
+    el("div", { class: "t-value num " + (cls || "") }, value), sub ? el("div", { class: "t-sub" }, sub) : null);
+}
+
+// Cumulative realized (solid) and expected (dashed) profit; drag or hover to read a point.
+function pfChart(points, unit) {
+  // only well-formed points reach the SVG markup (dates must be YYYY-MM-DD, values numbers)
+  const ok = Array.isArray(points) ? points.filter((p) => p && /^\d{4}-\d{2}-\d{2}$/.test(p.date) && isNum(p.realized) && isNum(p.expected)) : [];
+  if (!ok.length) return null;
+  const pts = [{ date: null, realized: 0, expected: 0, n: 0 }, ...ok];
+  const W = 340, H = 180, L = 46, R = 12, T = 12, B = 22;
+  const ys = pts.flatMap((p) => [p.realized, p.expected]);
+  const lo = Math.min(0, ...ys), hi = Math.max(0, ...ys), span = hi - lo || 1;
+  const sx = (i) => L + (i / (pts.length - 1 || 1)) * (W - L - R);
+  const sy = (v) => T + (1 - (v - lo) / span) * (H - T - B);
+  const path = (k) => pts.map((p, i) => `${i ? "L" : "M"}${sx(i).toFixed(1)},${sy(p[k]).toFixed(1)}`).join(" ");
+  const fmt = (v) => (unit === "u" ? `${v > 0 ? "+" : v < 0 ? "−" : ""}${Math.abs(v).toFixed(1)}u` : money(v));
+  const last = pts[pts.length - 1];
+  const holder = document.createElement("div");
+  // the HTML parser puts <svg> in the SVG namespace (no namespace URL needed)
+  holder.innerHTML = `<svg viewBox="0 0 ${W} ${H}" role="img"
+    aria-label="Cumulative profit: realized ${fmt(last.realized)}, expected ${fmt(last.expected)}">
+    <line class="c-zero" x1="${L}" x2="${W - R}" y1="${sy(0)}" y2="${sy(0)}"/>
+    <text class="c-lab" x="${L - 4}" y="${sy(0) + 3}" text-anchor="end">0</text>
+    ${hi > span * 0.15 ? `<text class="c-lab" x="${L - 4}" y="${sy(hi) + 3}" text-anchor="end">${fmt(hi)}</text>` : ""}
+    ${lo < -span * 0.15 ? `<text class="c-lab" x="${L - 4}" y="${sy(lo) + 3}" text-anchor="end">${fmt(lo)}</text>` : ""}
+    <path class="c-exp" d="${path("expected")}"/>
+    <path class="c-real" d="${path("realized")}"/>
+    <line class="c-cursor" x1="0" x2="0" y1="${T}" y2="${H - B}" style="display:none"/>
+    <circle class="c-dot" r="4" style="display:none"/>
+    <text class="c-lab" x="${L}" y="${H - 6}">${pts[1].date || ""}</text>
+    <text class="c-lab" x="${W - R}" y="${H - 6}" text-anchor="end">${last.date || ""}</text></svg>`;
+  const svg = holder.firstElementChild;
+  const readout = el("div", { class: "c-readout", "aria-live": "polite" });
+  const show = (i) => {
+    const p = pts[i];
+    readout.textContent = p.date === null ? "Start: 0"
+      : `${p.date}: realized ${fmt(p.realized)}, expected ${fmt(p.expected)} (luck ${fmt(p.realized - p.expected)})`;
+    const cur = svg.querySelector(".c-cursor"), dot = svg.querySelector(".c-dot");
+    cur.setAttribute("x1", sx(i)); cur.setAttribute("x2", sx(i)); cur.style.display = "";
+    dot.setAttribute("cx", sx(i)); dot.setAttribute("cy", sy(p.realized)); dot.style.display = "";
+  };
+  const at = (ev) => {
+    const r = svg.getBoundingClientRect();
+    const x = ((ev.clientX - r.left) / (r.width || 1)) * W;
+    return Math.max(0, Math.min(pts.length - 1, Math.round(((x - L) / (W - L - R)) * (pts.length - 1))));
+  };
+  svg.addEventListener("pointermove", (ev) => show(at(ev)));
+  svg.addEventListener("pointerdown", (ev) => show(at(ev)));
+  const wrap = el("div", { class: "chart", tabindex: "0", role: "slider", "aria-label": "Move along the profit lines",
+    "aria-valuemin": "0", "aria-valuemax": String(pts.length - 1) });
+  let cur = pts.length - 1;
+  wrap.addEventListener("keydown", (ev) => {
+    if (ev.key === "ArrowLeft" || ev.key === "ArrowRight") {
+      cur = Math.max(0, Math.min(pts.length - 1, cur + (ev.key === "ArrowRight" ? 1 : -1)));
+      show(cur); ev.preventDefault();
+    }
+  });
+  wrap.append(svg, el("div", { class: "c-legend" },
+    el("span", { class: "k-real" }, "Realized"), el("span", { class: "k-exp" }, "Expected at Pinnacle's fair price")), readout);
+  show(pts.length - 1);
+  return wrap;
+}
+
+function currentOdds(t) {
+  const m = (odds?.matches || []).find((x) => x && x.event_id === t.event_id);
+  const v = m?.draftkings?.[`odds_${t.side}`];
+  return isNum(v) ? v : null;
+}
+
+function tradeRow(t) {
+  const open = t.status === "open";
+  const right = open
+    ? el("span", { class: "r-val" }, el("b", {}, `$${(t.stake || 10).toFixed(0)}`), el("small", {}, `to win $${((t.stake || 10) * (t.odds - 1)).toFixed(2)}`))
+    : t.status === "void" ? el("span", { class: "r-val" }, el("b", {}, "Void"), el("small", {}, "stake back"))
+    : el("span", { class: "r-val" }, el("b", { class: sgnCls(t.profit) }, money(t.profit, 2)), el("small", {}, t.status));
+  const now = open ? currentOdds(t) : null;
+  const bits = [isNum(t.odds) ? `@ ${t.odds.toFixed(2)}` : "@ —"];
+  if (isNum(t.ev)) bits.push(`EV ${signed(t.ev)}`);
+  if (open && isNum(now) && now !== t.odds) bits.push(`now ${now.toFixed(2)}`);
+  if (isNum(t.clv)) bits.push(`CLV ${signed(t.clv)}${open ? " so far" : ""}`);
+  if (t.score) bits.push(t.score);
+  return el("div", { class: "trade" },
+    el("span", { class: "r-who" }, el("b", {}, t.player || "?"),
+      el("span", { class: "meta" }, `v ${t.opponent || "?"} · ${t.tournament || ""} · ${startText(t.commence_time)}`),
+      el("span", { class: "meta num" }, bits.join(" · "))),
+    right);
+}
+
+function liveView(s) {
+  const out = [];
+  const sum = s.summary || {};
+  const trades = Array.isArray(s.trades) ? s.trades.filter((t) => t && typeof t === "object") : [];
+  if (!trades.length) {
+    const list = (portfolio?.scored_tournaments || []).join(", ");
+    out.push(el("div", { class: "card empty" },
+      el("p", {}, "No paper trades yet."),
+      el("p", { class: "note" }, `Trades open only in tournaments The Odds API reports results for${list ? `: ${list}` : ""}. None of them is running right now; the Backtest view shows how this rule did on past seasons.`)));
+    return out;
+  }
+  const se = isNum(sum.roi_se) ? `± ${(sum.roi_se * 100).toFixed(1)}%` : "per dollar staked";
+  out.push(el("div", { class: "tiles" },
+    tile("Realized profit", money(sum.profit), isNum(sum.staked) ? `on $${sum.staked.toFixed(0)} staked` : "nothing settled yet", sgnCls(sum.profit)),
+    tile("Expected profit", money(sum.expected), "at Pinnacle's fair price", sgnCls(sum.expected)),
+    tile("Realized − expected", money(sum.luck), "luck, or Pinnacle wrong", sgnCls(sum.luck)),
+    tile("ROI", signed(sum.roi), isNum(sum.expected_roi) ? `expected ${signed(sum.expected_roi)} · ${se}` : se, sgnCls(sum.roi)),
+    tile("Closing line value", signed(sum.clv), isNum(sum.beat_close) ? `beat the close ${pct(sum.beat_close)}` : "vs the last price before the start", sgnCls(sum.clv)),
+    tile("Win rate", pct(sum.win_rate), isNum(sum.expected_win_rate) ? `expected ${pct(sum.expected_win_rate)}` : ""),
+    tile("Trades", String(sum.trades || 0), `${sum.open || 0} open · ${sum.settled || 0} settled${sum.void ? ` · ${sum.void} void` : ""}`),
+    tile("Max drawdown", isNum(sum.max_drawdown) ? `$${sum.max_drawdown.toFixed(0)}` : "—", "peak to trough")));
+  const chart = pfChart(s.curve, "$");
+  if (chart) out.push(el("div", { class: "card" }, chart));
+  const open = trades.filter((t) => t.status === "open");
+  const done = trades.filter((t) => t.status !== "open");
+  if (open.length) {
+    out.push(el("h2", { class: "section-title" }, el("span", {}, "Open"), el("span", { class: "count" }, `${open.length}`)));
+    out.push(el("div", { class: "card list" }, open.map(tradeRow)));
+  }
+  if (done.length) {
+    out.push(el("h2", { class: "section-title" }, el("span", {}, "Settled"), el("span", { class: "count" }, `${done.length}`)));
+    out.push(el("div", { class: "card list" }, done.slice(0, pfShown).map(tradeRow)));
+    if (done.length > pfShown) {
+      out.push(el("button", { class: "more", onclick: () => { pfShown += 40; render(); } }, `Show more (${done.length - pfShown} left)`));
+    }
+  }
+  out.push(el("p", { class: "note" },
+    "EV = DraftKings odds × fair chance − 1 when the trade opened. CLV uses the fair chance at the last build before the start (builds run every 3 h, so a close can be a few hours early). Results come from The Odds API; a match without a result after 4 days is void."));
+  return out;
+}
+
+function backtestView(id) {
+  const b = backtest && typeof backtest === "object" ? backtest.strategies?.[id] : null;
+  if (!b) return [el("div", { class: "card empty" }, backtest ? "No backtest for this strategy." : "Backtest unavailable.")];
+  const ci = Array.isArray(b.roi_ci) ? `95% CI ${signed(b.roi_ci[0])} to ${signed(b.roi_ci[1])}` : "";
+  return [
+    el("div", { class: "tiles" },
+      tile("Bets", (b.bets || 0).toLocaleString(), b.period || ""),
+      tile("Realized ROI", signed(b.roi), ci, sgnCls(b.roi)),
+      tile("Expected ROI", signed(b.expected_roi), "at Pinnacle's fair price", sgnCls(b.expected_roi)),
+      tile("Realized − expected", isNum(b.luck_units) ? `${b.luck_units > 0 ? "+" : ""}${b.luck_units.toFixed(1)}u` : "—", "units of $10", sgnCls(b.luck_units))),
+    el("div", { class: "card" }, pfChart(b.curve, "u") || el("p", { class: "muted" }, "No curve.")),
+    el("p", { class: "note" }, backtest.note || ""),
+  ];
+}
+
+function portfolioView() {
+  const strategies = portfolio && Array.isArray(portfolio.strategies) ? portfolio.strategies.filter((s) => s && s.id) : [];
+  const ids = strategies.length ? strategies.map((s) => s.id) : Object.keys(backtest?.strategies || PF_SHORT);
+  if (!ids.includes(pfStrategy)) pfStrategy = ids[0];
+  const seg = (items, cur, onPick, label) => el("div", { class: "segmented", role: "tablist", "aria-label": label },
+    items.map(([k, name]) => el("button", { class: k === cur ? "on" : "", role: "tab", "aria-selected": String(k === cur), onclick: () => onPick(k) }, name)));
+  const out = [
+    seg(ids.map((k) => [k, PF_SHORT[k] || k]), pfStrategy, (k) => { pfStrategy = k; pfShown = 20; store.set("tennis-pf-strategy", k); render(); }, "Strategy"),
+    seg([["live", "Live paper trades"], ["backtest", "Backtest"]], pfView, (k) => { pfView = k; store.set("tennis-pf-view", k); render(); }, "View"),
+  ];
+  const s = strategies.find((x) => x.id === pfStrategy);
+  const rule = s?.rule || backtest?.strategies?.[pfStrategy]?.rule || "";
+  if (rule) out.push(el("div", { class: "card rule" }, el("span", { class: "tag warn" }, "not proven"), " ", rule));
+  if (pfView === "backtest") return [...out, ...backtestView(pfStrategy)];
+  if (!portfolio) {
+    out.push(el("div", { class: "card empty" }, portfolioErr ? `Paper trades unavailable (${portfolioErr}). The first build with the portfolio may not have run yet.` : "Loading…"));
+    return out;
+  }
+  return [...out, ...liveView(s || { trades: [] })];
+}
+
 // ---------------------------------------------------------------- footer + render
 
 function footer() {
@@ -246,7 +439,7 @@ function footer() {
 
 function render() {
   $("banners").replaceChildren(...banners());
-  $("view").replaceChildren(...(tab === "findings" ? findingsView() : matchesView()));
+  $("view").replaceChildren(...(tab === "findings" ? findingsView() : tab === "portfolio" ? portfolioView() : matchesView()));
   $("footer").replaceChildren(...footer());
   const fetched = odds && ageText(odds.odds_fetched_at);
   $("updated").textContent = odds ? (fetched ? `Odds ${fetched}` : "Odds time unknown") : (oddsErr ? "No data" : "Loading…");
@@ -266,7 +459,11 @@ async function getJson(url, force) {
 async function load(force = false) {
   const btn = $("refresh");
   btn.classList.add("spin");
-  const [o, f] = await Promise.allSettled([getJson(ODDS_URL, force), getJson(FINDINGS_URL, force)]);
+  const [o, f, pf, bt] = await Promise.allSettled([getJson(ODDS_URL, force), getJson(FINDINGS_URL, force),
+    getJson(PORTFOLIO_URL, force), getJson(BACKTEST_URL, force)]);
+  if (pf.status === "fulfilled" && pf.value && typeof pf.value === "object" && !Array.isArray(pf.value)) { portfolio = pf.value; portfolioErr = ""; }
+  else portfolioErr = pf.status === "rejected" ? pf.reason.message : "not an object";
+  if (bt.status === "fulfilled" && bt.value && typeof bt.value === "object") backtest = bt.value;
   if (o.status === "fulfilled" && o.value && typeof o.value === "object" && !Array.isArray(o.value)) {
     odds = o.value; oddsErr = "";
   } else {
@@ -281,7 +478,7 @@ async function load(force = false) {
 for (const b of document.querySelectorAll(".tabbar button")) {
   b.addEventListener("click", () => {
     tab = b.dataset.tab;
-    history.replaceState(null, "", tab === "findings" ? "#findings" : location.pathname + location.search);
+    history.replaceState(null, "", tab === "matches" ? location.pathname + location.search : `#${tab}`);
     render();
     window.scrollTo(0, 0);
   });

@@ -178,7 +178,28 @@ The owner asked for a public phone page like the soccer app, refreshed every 3 h
 - **Owner 2026-10-26: plan upgraded to 5M credits/month** (still shared with soccer ≈ 5k/month and baseball), "we don't have to
   skimp". **Approved: DK history for Slams + 1000s** (Upsets), with 3 h cells instead of 6 h for prices closer to the start
   (~25–30k credits; per-job cap 40k; the 5,000 floor stays). The page's monthly cap goes from 600 to 3,000 (still every 3 h).
-- **Page status:** UI merged (#85). Next is `upsets/site.py` (Upsets), then `publish.yml`, which is drafted on team/lead.
+- **Page is live: https://phat-d0.github.io/Tennis_Model/** (2026-10-26 05:07 UTC).
+  - Merged: UI #85/#92, builder #89/#90, publish #91.
+  - First run: ok, 29 matches, 3 credits.
+  - Refresh is every 3 h, capped at 3,000 credits a month; the balance is never published.
+- **Slams + 1000s DK pull: done.** 17,563 credits, plus a 506-credit 250/500 top-up after a qualifying-week fix in `needed()`;
+  balance ≈ 4.98M.
+  - Preview (5,897 Sackmann-resolved bets): dogs −9.3% at DK, −5.3% at Pinnacle.
+  - Margin DK 5.06% vs Pinnacle 2.71%.
+  - Log loss: Pinnacle 0.5566 < DK 0.5583 < Elo 0.5867. Elo walk-forward FAIL (2,313 OOS, −14.6%).
+  - `reports/upsets_dk_all.md` waits on Data's Jun–Oct results.
+- **Portfolio tab** (owner asked Upsets directly; phat-d0/Tennis_Model#96): $10 automatic paper trades for 3 rules (Elo edge ≥ 5%,
+  DK beats Pinnacle-fair ≥ 1%, every dog as a control), settled only by The Odds API `/scores` (2 credits a key, inside the 3,000
+  cap). It covers only the tournaments `/scores` covers, so the live ledger stays empty until about Jan 2027. The ledger lives in the
+  Actions cache (lost if the cache is evicted). The backtest view shows aggregates only (Sackmann-resolved). In-sample, the line rule is
+  +9.2% (328 bets, expected +9.3%). That is the job (A) test below, not a result yet.
+- **Closing-price pull (C): done.** 4,297 snapshots, 42,960 credits; balance 4,938,958.
+- **Queued (owner 2026-10-26), Upsets:**
+  - **(C) Closing-price snapshots.** All tiers, cap 50k credits.
+  - **(A) Line-shopping test.** Bet DK only when its odds beat Pinnacle's de-vigged price by t. 0 credits, pre-registered, walk-forward,
+    scored on ROI, expected ROI and CLV vs Pinnacle's close.
+  - **(B) Elo upgrades.** Margin of victory, inactivity decay, K/surface tuning, fatigue, serve/return. Judged on log loss vs Pinnacle and
+    walk-forward. The public page's model changes only if a variant wins out of sample (Lead approves).
 
 ## How to continue in a new session
 Read `CLAUDE.md`, this file, and your brief in `docs/team/`. Check open PRs into `main` and the
