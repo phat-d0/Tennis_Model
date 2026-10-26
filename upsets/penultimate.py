@@ -91,6 +91,7 @@ def penultimate_frame(df: pd.DataFrame) -> pd.DataFrame:
         "min_n": np.minimum(d["w_n"], d["l_n"]),
     }, index=d.index)
     out["p_set_pen"] = set_prob(out["p_pen"], out["best_of"])
+    out["path_w"] = sets.map(lambda x: "".join("W" if v else "L" for v in x))  # match winner's view
     out["pen_is_fav_elo"] = np.where(out["elo_tie"], np.nan, (pen_by_w == out["w_elo_better"]).astype(float))
     out["pen_is_fav_rank"] = np.where(out["rank_tie"], np.nan, (pen_by_w == out["w_rank_better"]).astype(float))
     out["fav_won_elo"] = np.where(out["elo_tie"], np.nan, out["w_elo_better"].astype(float))
@@ -157,6 +158,86 @@ def _md(t: pd.DataFrame) -> str:
     return "\n".join(lines)
 
 
+def fav_paths(f: pd.DataFrame, by: str = "rank") -> pd.DataFrame:
+    """Matches oriented to the pre-match favourite (better ranking or Elo): path (fav's view),
+    fav_won, won_set1."""
+    win_fav = f[f"w_{by}_better"] & ~f[f"{by}_tie"]
+    keep = ~f[f"{by}_tie"]
+    g = f[keep]
+    flip = lambda s: s.translate(str.maketrans("WL", "LW"))  # noqa: E731
+    path = np.where(win_fav[keep], g["path_w"], g["path_w"].map(flip))
+    return pd.DataFrame({"fmt": g["fmt"], "season": g["season"], "path": path,
+                         "fav_won": win_fav[keep].astype(int).to_numpy(),
+                         "won_set1": pd.Series(path, index=g.index).str[0].eq("W").astype(int)}, index=g.index)
+
+
+def fav_section(f: pd.DataFrame, since: int | None = None, paths: bool = True) -> list[str]:
+    lines = []
+    for by, label in (("rank", "ranking"), ("elo", "Elo")):
+        fp = fav_paths(f, by)
+        if since:
+            fp = fp[fp["season"] >= since]
+        rows = []
+        for fmt, g in fp.groupby("fmt"):
+            w1, l1 = g[g["won_set1"] == 1], g[g["won_set1"] == 0]
+            rows.append({"fmt": fmt, "favourite by": label, "n": len(g), "fav won": g["fav_won"].mean(),
+                         "won set 1": len(w1) / len(g), "→ fav won": w1["fav_won"].mean(),
+                         "lost set 1 → fav won": l1["fav_won"].mean()})
+        lines += [_md_plain(pd.DataFrame(rows)), ""]
+    if not paths:
+        return lines
+    fp = fav_paths(f, "rank")
+    if since:
+        fp = fp[fp["season"] >= since]
+    rows = []
+    for fmt, g in fp.groupby("fmt"):
+        for path, h in g.groupby("path"):
+            if len(h) / len(g) >= 0.005:
+                rows.append({"fmt": fmt, "path (favourite by ranking)": path, "n": len(h), "share": len(h) / len(g)})
+    lines += [_md_plain(pd.DataFrame(rows).sort_values(["fmt", "share"], ascending=[True, False])), "",
+              "Score state while the match is still going (favourite's view, by ranking) → how often the "
+              "favourite still wins:", ""]
+    rows = []
+    for fmt, g in fp.groupby("fmt"):
+        longest = g["path"].str.len().max()
+        for k in range(1, longest):
+            live = g[g["path"].str.len() > k]
+            for pre, h in live.groupby(live["path"].str[:k]):
+                rows.append({"fmt": fmt, "sets so far": pre, "n": len(h), "fav won": h["fav_won"].mean()})
+    lines += [_md_plain(pd.DataFrame(rows)), ""]
+    return lines
+
+
+def _md_plain(t: pd.DataFrame) -> str:
+    cols = list(t.columns)
+    lines = ["| " + " | ".join(cols) + " |", "|" + "---|" * len(cols)]
+    for _, r in t.iterrows():
+        lines.append("| " + " | ".join(
+            f"{int(r[c]):,}" if c == "n" else (f"{100 * r[c]:.1f}%" if isinstance(r[c], float) else str(r[c]))
+            for c in cols) + " |")
+    return "\n".join(lines)
+
+
+def fav_answer(f: pd.DataFrame) -> list[str]:
+    fp = fav_paths(f, "rank")
+
+    def p(fmt, pre):
+        g = fp[(fp["fmt"] == fmt) & (fp["path"].str.len() > len(pre)) & fp["path"].str.startswith(pre)]
+        return f"{100 * g['fav_won'].mean():.1f}%"
+
+    def won(fmt):
+        return f"{100 * fp.loc[fp['fmt'] == fmt, 'fav_won'].mean():.1f}%"
+
+    return [
+        f"4b. **Does the original favourite make it out?** The pre-match favourite (by ranking) wins "
+        f"ATP bo3 {won('ATP bo3')} / ATP bo5 {won('ATP bo5')} / WTA bo3 {won('WTA bo3')}. After losing set 1: "
+        f"{p('ATP bo3', 'L')} / {p('ATP bo5', 'L')} / {p('WTA bo3', 'L')}. At one set all, the favourite who "
+        f"just levelled wins {p('ATP bo3', 'LW')} (ATP) / {p('WTA bo3', 'LW')} (WTA), the one who was just "
+        f"levelled {p('ATP bo3', 'WL')} / {p('WTA bo3', 'WL')}. Best of 5 at 2–2: back from 0–2 "
+        f"{p('ATP bo5', 'LLWW')}, after leading 2–0 {p('ATP bo5', 'WWLL')}.",
+    ]
+
+
 def answer(f: pd.DataFrame, dec: pd.DataFrame) -> list[str]:
     allm, d, sym = table(f, ["fmt"]), table(dec, ["fmt"], p="p_set_pen"), symmetric(dec)
     fav = dec[dec["pen_is_fav_elo"].notna()]
@@ -182,6 +263,7 @@ def answer(f: pd.DataFrame, dec: pd.DataFrame) -> list[str]:
         "4. **This is not a betting edge by itself.** Question 2 (does the levelling player win more "
         "often than the *odds* imply?) needs in-match prices: an in-play market at 1-1 sees the score and "
         "may already price momentum. That's the Kalshi test (`upsets/decider.py`).",
+        *fav_answer(f),
         "5. **Caveats.** Retirements are excluded (~3% of matches; a player fading physically may retire "
         "in the decider, so momentum could be a little larger). The data can't tell psychology from "
         "in-match information (fitness, an injury, tactics, conditions): it only shows the latest set "
@@ -228,6 +310,11 @@ def report(f: pd.DataFrame, first: int, last: int) -> str:
         "### By era", "", _md(table(dec, ["fmt", "era"], p="p_set_pen")), "",
         "### Players with ≥ 20 prior matches each (Elo better informed)", "",
         _md(table(dec[dec["min_n"] >= 20], ["fmt"], p="p_set_pen")), "",
+        f"## The pre-match favourite's path ({first}–{last})", "",
+        "Does the original favourite make it out? Win rate overall, after winning / losing set 1, and by "
+        "set path from the favourite's view (W = favourite won the set; paths under 0.5% left out).", "",
+        *fav_section(f),
+        "Same, 2010 onwards:", "", *fav_section(f, 2010, paths=False),
     ]
     return "\n".join(lines) + "\n"
 
