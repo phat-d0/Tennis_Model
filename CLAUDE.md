@@ -361,3 +361,5 @@ the newest 200. Format changes go through the Lead (Scanner proposes, Dashboard 
 - 2026-10-26: Match-path timeline study merged (phat-d0/Tennis_Model#73, #74, #75); 193 tests. Original favourite wins
   66–72%; ~50% of matches have an in-play favourite flip; set-end prices are calibrated, so no edge at the ask + fee.
   Example timelines/charts go to the owner privately (Kalshi data never committed).
+- 2026-10-26: Bet tracker published as a private claude.ai page ("Tennis Bet Ledger", link in WORK_PLAN): manual bet log
+  with P&L/ROI/CLV. Its data lives in the page's own store, never in git.

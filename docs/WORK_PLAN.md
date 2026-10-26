@@ -152,6 +152,12 @@ were the pre-match underdog?
   cells; price ≤ 6 h before start). It waits on the owner's 20K upgrade, then a Lead OK for listings (≤ 683)
   and then for odds.
 
+## Bet tracker (owner 2026-10-26)
+Private claude.ai page "Tennis Bet Ledger": https://claude.ai/artifact/J1ZK24oNPbxTssTMpfvP6o (owner only). Logs hand-placed
+bets (American/decimal/Kalshi ¢ odds, Kalshi taker fee auto-filled), settles Won/Lost/Void, and tracks P&L, ROI, record,
+closing-line value, cumulative P&L, and breakdowns by book and tag. Data lives in the page's own store (`bets` collection,
+read/write Editor+ only), not in git. Read-only: it never places bets.
+
 ## How to continue in a new session
 Read `CLAUDE.md`, this file, and your brief in `docs/team/`. Check open PRs into `main` and the
 `team/*` branches. The Lead's session ID and the role session IDs are in `docs/team/lead.md`.
