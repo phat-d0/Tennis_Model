@@ -44,11 +44,20 @@ jobs:
           restore-keys: site-cache-
 
       # Sackmann results (CC BY-NC-SA) for the Elo column: match files only, never committed.
+      # The ratings are cached by the archive's commit SHA, so the files are only fetched when the
+      # archive changes (or the cache is lost).
       - name: Fetch the results archive
         run: |
           git clone -q --depth 1 --filter=blob:none --sparse \
             https://github.com/phat-d0/tennis-sackmann-archive data/sackmann
-          git -C data/sackmann sparse-checkout set --no-cone '/atp/atp_matches_[12][0-9][0-9][0-9].csv' '/wta/wta_matches_[12][0-9][0-9][0-9].csv'
+          sha=$(git -C data/sackmann rev-parse HEAD)
+          if [ -f "data/site_cache/ratings_${sha}.parquet" ]; then
+            echo "Ratings for $sha are cached: match files not needed"
+          else
+            git -C data/sackmann sparse-checkout set --no-cone \
+              '/atp/atp_matches_[12][0-9][0-9][0-9].csv' '/atp/atp_matches_qual_chall_[12][0-9][0-9][0-9].csv' \
+              '/wta/wta_matches_[12][0-9][0-9][0-9].csv' '/wta/wta_matches_qual_itf_[12][0-9][0-9][0-9].csv'
+          fi
 
       - name: Build
         env:
