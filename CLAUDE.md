@@ -344,3 +344,6 @@ the newest 200. Format changes go through the Lead (Scanner proposes, Dashboard 
 - 2026-10-25: Upsets phase B code merged (phat-d0/Tennis_Model#60): Elo (Sackmann + Kalshi results) vs Kalshi
   closing asks, early-round underdogs, monthly walk-forward. Review caught a round-order lookahead; fixed
   (`round_monotone`). 149 tests. Data run pending.
+- 2026-10-26: Upsets phase B result (phat-d0/Tennis_Model#63): gate FAIL. OOS 108 bets −15.2% (CI −38% to +7%);
+  the market beats Elo on log loss (0.5845 vs 0.6157) and Elo over-rates dogs. In-span unjoined Kalshi rows are
+  now no-read. `pip install -e .` fixed for a local data/ dir (phat-d0/Tennis_Model#62). 150 tests passing.
