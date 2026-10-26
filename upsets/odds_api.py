@@ -34,7 +34,8 @@ KEY_NAMES = {
     "wuhan_open": ["Wuhan"], "dubai": ["Dubai"], "qatar_open": ["Doha"],
     # 250/500 keys (in scope only with levels including "other")
     "barcelona_open": ["Barcelona"], "halle_open": ["Halle"], "hamburg_open": ["Hamburg"],
-    "japan_open": ["Tokyo"], "pan_pacific_open": ["Tokyo"], "munich": ["Munich"], "queens_club_champ": ["Queen's Club"],
+    "japan_open": ["Tokyo"], "munich": ["Munich"], "queens_club_champ": ["Queen's Club"],
+    "pan_pacific_open": ["Tokyo"],
     "washington_open": ["Washington"], "bad_homburg_open": ["Bad Homburg"],
     "charleston_open": ["Charleston"], "german_open": ["Berlin"], "guadalajara_open": ["Guadalajara"],
     "monterrey_open": ["Monterrey"], "ningbo_open": ["Ningbo"], "singapore_open": ["Singapore"],
