@@ -113,6 +113,7 @@ def dirs(tmp_path):
 
 
 def run(dirs, api, key=KEY, now=NOW, **kw):
+    kw.setdefault("month_cap", 600)
     return site.build(dirs["out"], dirs["cache"], dirs["archive"], now=now, key=key, session=api, **kw)
 
 
@@ -120,6 +121,8 @@ def test_ok_json_shape_model_and_names(dirs):
     api = FakeApi()
     doc = run(dirs, api)
     assert doc == json.loads((dirs["out"] / "odds.json").read_text())
+    assert not any(KEY.encode() in f.read_bytes() for f in [*dirs["cache"].rglob("*"), dirs["out"] / "odds.json"]
+                   if f.is_file())
     assert doc["status"] == "ok"
     assert set(doc) == {"generated_at", "odds_fetched_at", "status", "credits", "ratings_through",
                         "tournaments", "matches"}
@@ -144,6 +147,18 @@ def test_ok_json_shape_model_and_names(dirs):
     assert m["e2"]["fair_1"] == pytest.approx((1 / 1.8) / (1 / 1.8 + 1 / 1.95), abs=1e-4)
     # w1: WTA names not in the archive -> null; no DraftKings quote
     assert m["w1"]["draftkings"] is None and m["w1"]["dk_implied_1"] is None and m["w1"]["model_p1"] is None
+
+
+def test_shape_matches_page_fixture(dirs):
+    """Same keys as the page's contract fixture (tests/test_site_data/odds.json)."""
+    fx = json.loads((Path(__file__).parent / "test_site_data" / "odds.json").read_text())
+    doc = run(dirs, FakeApi())
+    assert set(doc) == set(fx) and set(doc["credits"]) == set(fx["credits"])
+    assert set(doc["tournaments"][0]) == set(fx["tournaments"][0])
+    for m in doc["matches"]:
+        assert set(m) == set(fx["matches"][0])
+    full = next(m for m in doc["matches"] if m["draftkings"] and m["pinnacle"])
+    assert set(full["draftkings"]) == set(fx["matches"][0]["draftkings"])
 
 
 def test_min_rated_matches(dirs):
@@ -217,6 +232,8 @@ def test_error_status_never_leaks_key(dirs):
     doc = run(dirs, FakeApi(fail=True))
     assert doc["status"] == "error: HTTPError 500"
     assert KEY not in (dirs["out"] / "odds.json").read_text()
+    for f in dirs["cache"].rglob("*"):      # nor in anything cached (no URLs, headers or bodies)
+        assert not f.is_file() or KEY.encode() not in f.read_bytes()
 
 
 def test_ratings_cached_by_archive(dirs, monkeypatch):

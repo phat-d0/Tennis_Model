@@ -1,7 +1,7 @@
 """Builder for the public tennis odds page (GitHub Pages; plan and JSON contract: docs/site_plan.md).
 
     python -m upsets.site build --out _site/data --cache data/site_cache \
-        --archive data/sackmann --floor 5000 --month-cap 600
+        --archive data/sackmann --floor 5000 --month-cap 3000
 
 Writes <out>/odds.json: current DraftKings + Pinnacle match odds for tennis keys with a match in the
 next 36 h, the de-vigged fair chance, and an Elo model chance from Jeff Sackmann's results
@@ -259,7 +259,7 @@ def page_matches(snaps: pd.DataFrame, titles: dict, rt: dict | None, now: pd.Tim
     return out
 
 
-def build(out: Path, cache: Path, archive: Path, floor: int = 5000, month_cap: int = 600,
+def build(out: Path, cache: Path, archive: Path, floor: int = 5000, month_cap: int = 3000,
           now: pd.Timestamp | None = None, key: str | None = None, session=None,
           run_every_h: float = 3.0) -> dict:
     now = now or utcnow()
@@ -334,7 +334,7 @@ def main(argv=None) -> None:
     ap.add_argument("--cache", type=Path, default=Path("data/site_cache"))
     ap.add_argument("--archive", type=Path, default=Path("data/sackmann"))
     ap.add_argument("--floor", type=int, default=5000)
-    ap.add_argument("--month-cap", type=int, default=600)
+    ap.add_argument("--month-cap", type=int, default=3000)
     ap.add_argument("--run-every-h", type=float, default=3.0)
     a = ap.parse_args(argv)
     doc = build(a.out, a.cache, a.archive, a.floor, a.month_cap, run_every_h=a.run_every_h)
