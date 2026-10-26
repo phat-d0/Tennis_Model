@@ -162,6 +162,16 @@ bets (American/decimal/Kalshi ¢ odds, Kalshi taker fee auto-filled), settles Wo
 closing-line value, cumulative P&L, and breakdowns by book and tag. Data lives in the page's own store (`bets` collection,
 read/write Editor+ only), not in git. Read-only: it never places bets.
 
+## Tennis Odds page on GitHub Pages (owner 2026-10-26)
+The owner asked for a public phone page like the soccer app, refreshed every 3 h. Plan and data contract are in `docs/site_plan.md`.
+- **What it shows:** DraftKings + Pinnacle odds, margins, the fair chance, an unproven Elo, and the findings. **No Kalshi data.**
+- **Credits:** capped at 600 a month, and never below the 5,000 reserve. This replaces dk_live and its 481 cap.
+- **Owners:** Upsets builds `upsets/site.py`, Dashboard builds `site/`, Lead writes the workflows.
+- **Owner's setup:** the `ODDS_API_KEY` Actions secret is added; Pages → Source "GitHub Actions" is still to do.
+- **DK history pull (250/500s):** done. 1,646 credits spent, balance 9,258. 24 of 62 tournament-years have history:
+  Beijing from 2024, Doha/Dubai from 2025, the rest 2026 only. That gives 434 round 1–2 matches; Data supplies
+  results for the 12 events from Jun–Oct 2026.
+
 ## How to continue in a new session
 Read `CLAUDE.md`, this file, and your brief in `docs/team/`. Check open PRs into `main` and the
 `team/*` branches. The Lead's session ID and the role session IDs are in `docs/team/lead.md`.
