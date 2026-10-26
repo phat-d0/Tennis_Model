@@ -143,3 +143,66 @@ def test_decider_guard_applies_to_match_path():
     r = t.set_index("match_id").loc["M1"]
     assert r["decider"] and not r["decider_ok"]
     assert "| ATP bo3 | all |" not in mp.report(t, load_config())   # no levelling-player bet
+
+
+@pytest.mark.parametrize("letters,bo,won,expect", [
+    ("WW", 3, 1, ("complete", "WW")),
+    ("WL", 3, 0, ("decider", "WLL")),
+    ("WL", 5, 1, ("incomplete", "incomplete")),     # bo5 at 1-1, set 3 unlisted: not a decider
+    ("WLW", 5, 1, ("incomplete", "incomplete")),    # 2-1 in bo5, set 4 missing
+    ("WLWL", 5, 1, ("decider", "WLWLW")),
+    ("WWW", 5, 1, ("complete", "WWW")),
+    ("WW", 3, 0, ("inconsistent", "inconsistent")),  # listed sets disagree with the settlement
+    ("WL", float("nan"), 1, ("incomplete", "incomplete")),
+])
+def test_classify_path(letters, bo, won, expect):
+    assert mp.classify_path(list(letters), bo, won) == expect
+
+
+def test_bo5_at_one_all_is_not_a_decider():
+    m, q, s, d = frames()
+    d.loc[d["match_id"] == "M1", "best_of"] = "5"     # M1 has sets 1-2 listed, 1-1
+    t, _ = mp.path_table(m, q, s, d)
+    r = t.set_index("match_id").loc["M1"]
+    assert not r["decider"] and r["path_kind"] == "incomplete" and r["path_listed"] == "LW"
+
+
+def test_set_end_states_only_while_in_play():
+    m, q, s, d = frames()
+    t, _ = mp.path_table(m, q, s, d)
+    t = t.set_index("match_id")
+    assert t.loc["M1", "set1_live"] and t.loc["M1", "set2_live"]       # 1-1: decider still to play
+    assert t.loc["M2", "set1_live"] and not t.loc["M2", "set2_live"]   # 2-0: match over
+    text = mp.report(t.reset_index(), load_config())
+    price = text.split("## Price test at each set end")[1].split("## Penultimate")[0]
+    assert "| WTA bo3 | 2 |" not in price and "| ATP bo3 | 2 |" in price
+
+
+def test_post_match_junk_is_cleaned():
+    rows = [{"match_id": "J1", "series": "KXATPMATCH", "tier": "x", "scheduled_start": T0, "player_a": "a",
+             "player_b": "b", "settle_a": 1.0, "settle_b": 0.0, "fee_type": "quadratic", "fee_multiplier": 1.0,
+             "tournament": "T"}]
+    q = []
+    for minute, a, b in [(-10, .65, .37), (1, .64, .38), (41, .8, .22), (79, .99, .01),
+                         (81, .04, .97), (85, .03, .98)]:      # after the end: junk book
+        q += [{"ts": at(minute), "match_id": "J1", "side": "A", "ask": a},
+              {"ts": at(minute), "match_id": "J1", "side": "B", "ask": b}]
+    sets = pd.DataFrame({"match_id": "J1", "set_no": [1, 2], "close_time": [at(40), at(80)],
+                         "winner_side": ["A", "A"], "status": "decided"})
+    d = pd.DataFrame({"match_id": ["J1"], "round": "R1", "best_of": ["3"], "tournament_name": "T", "gender": "m"})
+    t, _ = mp.path_table(pd.DataFrame(rows), pd.DataFrame(q), sets, d)
+    r = t.iloc[0]
+    assert r["p_min_raw"] < 0.1 and r["n_flips_raw"] == 1
+    assert r["p_min"] > 0.5 and r["n_flips"] == 0
+    assert "favourite wins with a raw min < 0.10 that the cleaning removed: 1" in mp.report(t, load_config())
+
+
+def test_team_events_and_best_of_default():
+    m, q, s, d = frames()
+    m["tournament"] = ""
+    m.loc[m["match_id"] == "M2", "tournament"] = "Billie Jean King Cup Finals"
+    d = d[d["match_id"] != "M5"]                     # M5 (WTA) has no milestone best_of
+    t, _ = mp.path_table(m, q, s, d)
+    t = t.set_index("match_id")
+    assert t.loc["M2", "tour"] == "WTA team"
+    assert t.loc["M5", "best_of"] == 3 and t.loc["M3", "best_of"] == 3   # WTA / ATP-Ch default
