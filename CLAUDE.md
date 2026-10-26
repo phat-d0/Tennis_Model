@@ -146,6 +146,10 @@ the newest 200. Format changes go through the Lead (Scanner proposes, Dashboard 
   via search snippets, so the owner should confirm at kalshi.com/fee-schedule). Fees are rounded up
   to $0.000001, then balances align to $0.0001 (direct members) or $0.01 (FCM), with a per-order
   rebate accumulator. No settlement fee. Full details: docs/research/kalshi_api.md.
+- Kalshi per-set markets: `KXATPSETWINNER` / `KXWTASETWINNER` (quadratic, mult 1), event `…-N`, one market per
+  player. `close_time` ≈ the set end (median −1 min vs the match's quotes; a few administrative batch closes).
+  Only the sets before the decider are listed (bo3: sets 1–2; bo5: set 3, set 4 if reached). There are no
+  Challenger/WTA 125/ITF set series (checked 2026-10-26).
 - Kalshi tennis structure: a match = one event (`mutually_exclusive: true`,
   `collateral_return_type: MECNET`) with two markets, one per player (YES on `...-FAR` = Faria wins).
   Orderbook returns **bids only** (ascending; best = last). YES ask = 1 − best NO bid;
@@ -347,3 +351,10 @@ the newest 200. Format changes go through the Lead (Scanner proposes, Dashboard 
 - 2026-10-26: Upsets phase B result (phat-d0/Tennis_Model#63): gate FAIL. OOS 108 bets −15.2% (CI −38% to +7%);
   the market beats Elo on log loss (0.5845 vs 0.6157) and Elo over-rates dogs. In-span unjoined Kalshi rows are
   now no-read. `pip install -e .` fixed for a local data/ dir (phat-d0/Tennis_Model#62). 150 tests passing.
+- 2026-10-26: DK history planner/study merged (phat-d0/Tennis_Model#67; dry run ≤ 13,073 credits, waiting on the
+  owner's 20K upgrade). Kalshi set-winner collector merged (phat-d0/Tennis_Model#68): ATP/WTA only (no Challenger
+  set series); set close_time = set end; Kalshi lists only the sets before the decider. Penultimate-set study
+  merged (phat-d0/Tennis_Model#70): the player who levels wins the decider 53.0% (ATP bo3) / 54.5% (bo5) / 53.2%
+  (WTA), i.e. momentum ≈ +3 pp per set (symmetric test). Kalshi decider price test running. 171 tests.
+- 2026-10-26: Kalshi decider price test: the penultimate-set winner wins 54.8% but costs 53.8% + fee, so
+  ROI −0.7% at 0¢ / −2.4% at 1¢ (1,423 bets). Priced in; no edge.
