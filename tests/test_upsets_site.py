@@ -128,7 +128,8 @@ def test_ok_json_shape_model_and_names(dirs):
                         "tournaments", "matches"}
     # soonest first, the 48 h key is never paid for
     assert api.odds_calls() == [f"/sports/{WTA}/odds", f"/sports/{PARIS}/odds"]
-    assert doc["credits"] == {"left": 8998, "used_this_month": 2, "month_cap": 600}
+    assert doc["credits"] == {"left": None, "used_this_month": 2, "month_cap": 600}   # balance not public
+    assert json.loads((dirs["cache"] / "ledger.json").read_text())["left"] == 8998
     assert doc["ratings_through"] == "2025-10-27"
     assert doc["tournaments"] == [{"sport_key": PARIS, "title": "ATP Paris Masters", "tour": "ATP"},
                                   {"sport_key": WTA, "title": "WTA Ningbo Open", "tour": "WTA"}]

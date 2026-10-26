@@ -317,7 +317,8 @@ def build(out: Path, cache: Path, archive: Path, floor: int = 5000, month_cap: i
         "generated_at": _iso(now),
         "odds_fetched_at": _iso(snaps["snapshot_ts"].max()) if len(snaps) else None,
         "status": status,
-        "credits": {"left": None if led.get("left") is None else int(led["left"]),
+        # the balance stays private (shared plan): ledger.json and the log line only
+        "credits": {"left": None,
                     "used_this_month": int(led["used"]), "month_cap": month_cap},
         "ratings_through": rt["through"] if rt else None,
         "tournaments": [{"sport_key": k, "title": titles.get(k, k), "tour": _tour(k)} for k in shown],
@@ -340,7 +341,7 @@ def main(argv=None) -> None:
     doc = build(a.out, a.cache, a.archive, a.floor, a.month_cap, run_every_h=a.run_every_h)
     print(f"[odds.json: status={doc['status']}, {len(doc['matches'])} matches, "
           f"credits used this month {doc['credits']['used_this_month']}/{a.month_cap}, "
-          f"left {doc['credits']['left']}]")
+          f"balance {_read_json(a.cache / 'ledger.json', {}).get('left')}]")
 
 
 if __name__ == "__main__":
