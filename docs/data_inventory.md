@@ -100,6 +100,7 @@ Milestones (scheduled start) cover start dates from ~Feb 2025 onward.
 | 2026-10-24 23:35 → 2026-10-25 08:52 | Kalshi backfill `--groups 1` (Lead: stop after group 1) | Challenger | 8,280 | 902 × 429; group 2 not started |
 
 | 2026-10-26 01:10–01:40 | Kalshi `/series`, set-winner listings (KXATP/KXWTASETWINNER events + `/historical/markets`) | all settled | ≈ 85 | 13 × 429 in one burst, then resumed from cache; `sets.parquet` for group 0 |
+| 2026-10-26 04:30 | Kalshi `/milestones` listing (Data, results for the DK 250/500 study; a new `since` date missed the cache, avoidable) | since 2026-06-13 | 75 | 0 × 429 |
 
 ## The Odds API spends
 Shared paid-plan key since 2026-10-26 (owner). Global floor 5,000; dk_live reserve 481. Per-call log:

@@ -90,7 +90,11 @@ Plan, method, gate and data blockers: `docs/upsets_plan.md`. Code: `upsets/` (Le
   first, and the Lead approves the estimate before any paid call. Odds data is never committed. Spent by Upsets/Data only, each spend logged in docs/data_inventory.md. **Owner 2026-10-26: use up the free key's ~491 credits first
   (floor lowered to 10 for this key) on live DK + Pinnacle pre-match odds (`upsets/dk_live.py`, starts when a tennis
   key goes active), then ask again.** The owner then plans to switch `ODDS_API_KEY` to their shared paid plan (also
-  used by soccer/baseball). The DK history pull (~13k) needs a fresh owner OK on a budget and a floor for that shared key. Run by the Upsets role (session in docs/team/lead.md).
+  used by soccer/baseball). The DK history pull (~13k) needs a fresh owner OK on a budget and a floor for that shared key. **Update (owner 2026-10-26):** the key is now the shared plan
+  (balance ≈ 10,906). **Reserve 5,000: no tennis call may take the balance below it.** Approved: DK history for the
+  **250/500 tier only** (budget ≈ balance − 5,000 − 481 for dk_live ≈ 5,400; listings first, then 6 h cells, else 8 h,
+  else most recent events first). dk_live is capped at 481. Slams/1000s (~14–15k more) wait for an owner decision
+  (a 100K upgrade was suggested). Run by the Upsets role (session in docs/team/lead.md).
 - **Blocked (2026-10-25 17:37):** tennis-data.co.uk's Cloudflare blocks the cloud container's IP (403
   "you have been blocked"; not worked around). The owner downloads the ATP + WTA xlsx files for 2015–2026
   by hand. The Limited network policy also denies api.the-odds-api.com, so it needs adding.
@@ -157,6 +161,16 @@ Private claude.ai page "Tennis Bet Ledger": https://claude.ai/artifact/J1ZK24oNP
 bets (American/decimal/Kalshi ¢ odds, Kalshi taker fee auto-filled), settles Won/Lost/Void, and tracks P&L, ROI, record,
 closing-line value, cumulative P&L, and breakdowns by book and tag. Data lives in the page's own store (`bets` collection,
 read/write Editor+ only), not in git. Read-only: it never places bets.
+
+## Tennis Odds page on GitHub Pages (owner 2026-10-26)
+The owner asked for a public phone page like the soccer app, refreshed every 3 h. Plan and data contract are in `docs/site_plan.md`.
+- **What it shows:** DraftKings + Pinnacle odds, margins, the fair chance, an unproven Elo, and the findings. **No Kalshi data.**
+- **Credits:** capped at 600 a month, and never below the 5,000 reserve. This replaces dk_live and its 481 cap.
+- **Owners:** Upsets builds `upsets/site.py`, Dashboard builds `site/`, Lead writes the workflows.
+- **Owner's setup:** the `ODDS_API_KEY` Actions secret is added; Pages → Source "GitHub Actions" is still to do.
+- **DK history pull (250/500s):** done. 1,646 credits spent, balance 9,258. 24 of 62 tournament-years have history:
+  Beijing from 2024, Doha/Dubai from 2025, the rest 2026 only. That gives 434 round 1–2 matches; Data supplies
+  results for the 12 events from Jun–Oct 2026.
 
 ## How to continue in a new session
 Read `CLAUDE.md`, this file, and your brief in `docs/team/`. Check open PRs into `main` and the
