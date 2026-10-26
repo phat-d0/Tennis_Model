@@ -19,7 +19,7 @@ import pandas as pd
 
 from . import dk_history as dh
 from . import dk_study as ds
-from . import elo, sackmann
+from . import elo, elo_plus, sackmann
 from .portfolio import MAX_BOOK_GAP, STRATEGIES
 
 
@@ -77,12 +77,14 @@ def aggregate(b: pd.DataFrame, rule: str, n_boot: int = 2000) -> dict:
 
 
 def build(root: Path, cache: Path, other_from: str = "2024-01-01") -> dict:
-    sack = sackmann.load(root, start=1990, lower=True)
+    sack = elo_plus.prep(sackmann.load(root, start=1990, lower=True))
     sack_elo = elo.add_elo(sack, keys=("winner_id", "loser_id"))
     hs = {**dh.HIST_START, "other": pd.Timestamp(other_from)}
     t = dh.tournaments(sack, dh._keys(), hist_start=hs)
     priced = dh.collect(t, sack_elo, 24.0, root=cache)
     f = ds.frame(priced, sack_elo)
+    # the page's model since 2026-10-26: Elo + serve/return, walk-forward by season (job B's "+serve")
+    f["p_model"] = elo_plus.walk_forward(sack, f, only=("+serve",))[0]["+serve"]
     f["date"] = pd.to_datetime(priced.set_index("sack_row").loc[f["sack_row"], "commence"].to_numpy())
     by = bets(f)
     return {
@@ -92,7 +94,9 @@ def build(root: Path, cache: Path, other_from: str = "2024-01-01") -> dict:
                  "results from Jeff Sackmann's files (events through May 2026). Matches where DraftKings' and "
                  "Pinnacle's fair chances differ by more than 10 points are skipped as quote errors, as live. "
                  "In-sample: no rule here has passed the project's walk-forward test. 1 unit = one $10 bet. "
-                 "Expected = each bet's value at Pinnacle's fair price."),
+                 "Expected = each bet's value at Pinnacle's fair price. The model is the page's Elo + "
+                 "serve/return model since 2026-10-26 (before that, a plain Elo), refitted before each "
+                 "season on earlier seasons only."),
         "strategies": {s["id"]: aggregate(by[s["id"]], s["rule"]) for s in STRATEGIES},
     }
 

@@ -32,8 +32,6 @@ from pathlib import Path
 import numpy as np
 import pandas as pd
 
-from . import dk_history as dh
-from . import dk_study as ds
 from . import elo, model, sackmann, seeds
 
 LN10_400 = np.log(10) / 400.0
@@ -43,6 +41,11 @@ DECAY_GRID = (0.0, 0.5, 1.0)
 W_GRID = (0.0, 0.25, 0.5, 0.75)
 EDGE_GRID = (0.0, 0.02, 0.05, 0.10)
 FIRST_FIT = 2015
+# The public page's model (owner-approved 2026-10-26): "+serve" with the parameters job B chose for
+# 2026 (K 320, MOV 1, no decay, surface weight 0.25), calibrated on seasons FIRST_FIT..2025.
+PAGE_PARAMS = dict(k=320.0, mov=1.0, decay=0.0, w=0.25)
+PAGE_FIT_BEFORE = 2026
+DEFAULT_SPW = 0.6       # serve points won when a tour has no serve stats at all (tests, odd files)
 
 
 # --- score parsing ----------------------------------------------------------------------------
@@ -65,9 +68,10 @@ def games_sets(score) -> tuple[int, int, int, int]:
 # --- rating engine --------------------------------------------------------------------------
 
 def run(df: pd.DataFrame, keep: np.ndarray, k_scale: float = 250.0, mov: float = 0.0,
-        decay: float = 0.0, keys=("winner_id", "loser_id")) -> dict:
+        decay: float = 0.0, keys=("winner_id", "loser_id"), final: dict | None = None) -> dict:
     """Pre-match overall and surface ratings for the rows where `keep` is True (df in playing
-    order). Same K-factor shape as upsets.elo (K = k_scale / (n + 5) ** 0.4)."""
+    order). Same K-factor shape as upsets.elo (K = k_scale / (n + 5) ** 0.4). If `final` is a
+    dict, it receives the ratings after the last match (rating, s_rating, played)."""
     rating, s_rating = defaultdict(lambda: elo.START), defaultdict(lambda: elo.START)
     played, s_played = defaultdict(int), defaultdict(int)
     last: dict = {}
@@ -114,6 +118,8 @@ def run(df: pd.DataFrame, keep: np.ndarray, k_scale: float = 250.0, mov: float =
         played[l] += 1
         s_played[ws] += 1
         s_played[ls_] += 1
+    if final is not None:
+        final.update(rating=dict(rating), s_rating=dict(s_rating), played=dict(played))
     return out
 
 
@@ -149,9 +155,11 @@ def fatigue(df: pd.DataFrame, rows: np.ndarray) -> tuple[np.ndarray, np.ndarray]
     return out[0], out[1]
 
 
-def serve_return(df: pd.DataFrame, keep: np.ndarray, halflife: float = 30.0, prior: float = 10.0):
+def serve_return(df: pd.DataFrame, keep: np.ndarray, halflife: float = 30.0, prior: float = 10.0,
+                 final: dict | None = None):
     """Pre-match exponentially weighted serve and return points won (per player and tour, shrunk to
-    the tour mean with `prior` pseudo-matches), for the kept rows. -> (spw_w, rpw_w, spw_l, rpw_l, mean_spw)."""
+    the tour mean with `prior` pseudo-matches), for the kept rows. -> (spw_w, rpw_w, spw_l, rpw_l, mean_spw).
+    If `final` is a dict, it receives each player's estimate after the last match (est) and the tour means."""
     a = 0.5 ** (1.0 / halflife)
     S, R, N = defaultdict(float), defaultdict(float), defaultdict(float)
     tours, W, L = df["tour"].to_numpy(), df["winner_id"].to_numpy(), df["loser_id"].to_numpy()
@@ -160,6 +168,7 @@ def serve_return(df: pd.DataFrame, keep: np.ndarray, halflife: float = 30.0, pri
     ok = (df["w_svpt"] > 20) & (df["l_svpt"] > 20) & w_spw.between(0.2, 1) & l_spw.between(0.2, 1)
     mean = {t: float(pd.concat([w_spw[ok & (df["tour"] == t)], l_spw[ok & (df["tour"] == t)]]).mean())
             for t in df["tour"].unique()}
+    mean = {t: (m if np.isfinite(m) else DEFAULT_SPW) for t, m in mean.items()}   # files without serve stats
     ws, ls_, okv = w_spw.to_numpy(), l_spw.to_numpy(), ok.to_numpy()
     pos = np.cumsum(keep) - 1
     out = np.full((keep.sum(), 4), np.nan)
@@ -179,7 +188,16 @@ def serve_return(df: pd.DataFrame, keep: np.ndarray, halflife: float = 30.0, pri
             for p, sp, rp in ((w, ws[i], 1 - ls_[i]), (l, ls_[i], 1 - ws[i])):
                 S[p], R[p], N[p] = a * S[p] + sp, a * R[p] + rp, a * N[p] + 1
     mean_rows = np.array([mean[t] for t in tours[keep]])
+    if final is not None:
+        final.update(est={p: est(p, p[0]) for p in N}, mean=mean)
     return out[:, 0], out[:, 1], out[:, 2], out[:, 3], mean_rows
+
+
+def point_probs(sw, rw, sl, rl, mean_spw):
+    """P(win a point on serve) for each player: own serve skill vs the opponent's return skill."""
+    pa = np.clip(mean_spw + (sw - mean_spw) - (rl - (1 - mean_spw)), 0.3, 0.95)
+    pb = np.clip(mean_spw + (sl - mean_spw) - (rw - (1 - mean_spw)), 0.3, 0.95)
+    return pa, pb
 
 
 def _game(p):
@@ -282,7 +300,41 @@ def features(base: dict, w: float, bo5: np.ndarray, extra: list[np.ndarray]) -> 
     return np.column_stack([z, z * bo5] + extra)
 
 
+# --- the public page's model -------------------------------------------------------------------
+
+def page_model(sack: pd.DataFrame, params: dict = PAGE_PARAMS, fit_before: int = PAGE_FIT_BEFORE) -> dict:
+    """The page's "+serve" model from Sackmann results (prepared by prep()): ratings after the last
+    match, plus the calibration fitted on tour-level rounds 1-2 of seasons FIRST_FIT..fit_before-1
+    (the same fit job B used for season fit_before). -> {"ratings": one row per (tour, id, surface)
+    with elo, n, selo, spw, rpw; "cal": a model.Logit; "mean_spw": {tour: mean}; "params"}."""
+    fit = (sack["level_group"].isin(seeds.LEVELS) & (sack["round_idx"] <= 2) & ~sack["void"]
+           & sack["season"].between(FIRST_FIT, fit_before - 1)).to_numpy()
+    fr, fs = {}, {}
+    r = run(sack, fit, params["k"], params["mov"], params["decay"], final=fr)
+    pa, pb = point_probs(*serve_return(sack, fit, final=fs))
+    bo = sack.loc[fit, "best_of"].fillna(3).to_numpy()
+    X = features(r, params["w"], (bo == 5).astype(float), [logit(match_prob(pa, pb, bo))])
+    cal = fit_sym(X[np.minimum(r["n_w"], r["n_l"]) >= 10])
+    rows = []
+    for (p, s), v in fr["s_rating"].items():
+        spw, rpw = fs["est"].get(p, (fs["mean"][p[0]], 1 - fs["mean"][p[0]]))
+        rows.append((p[0], p[1], s, fr["rating"][p], fr["played"].get(p, 0), v, spw, rpw))
+    ratings = pd.DataFrame(rows, columns=["tour", "id", "surface", "elo", "n", "selo", "spw", "rpw"])
+    return {"ratings": ratings, "cal": cal, "mean_spw": fs["mean"], "params": dict(params)}
+
+
+def page_prob(a, b, mean_spw: float, best_of: int, cal: model.Logit, w: float = PAGE_PARAMS["w"]) -> float:
+    """P(a beats b) under the page model; a and b are mappings with elo, selo (the match surface's
+    rating; pass elo when the surface is unknown), spw and rpw."""
+    z = (w * (a["selo"] - b["selo"]) + (1 - w) * (a["elo"] - b["elo"])) * LN10_400
+    pa, pb = point_probs(np.array([a["spw"]]), np.array([a["rpw"]]), np.array([b["spw"]]),
+                         np.array([b["rpw"]]), mean_spw)
+    sr = logit(match_prob(pa, pb, np.array([best_of])))[0]
+    return float(cal.predict(np.array([[z, z * (best_of == 5), sr]]))[0])
+
+
 def main(argv=None) -> None:
+    from . import dk_history as dh
     ap = argparse.ArgumentParser(description=__doc__.split("\n\n")[0])
     ap.add_argument("--sackmann", type=Path, default=Path("/home/user/phat-d0/tennis-sackmann-archive"))
     ap.add_argument("--cache", type=Path, default=dh.CACHE)
@@ -296,19 +348,42 @@ def main(argv=None) -> None:
         a.out.write_text(text)
 
 
-def study(root: Path, cache: Path, other_from: str, dump: Path | None = None) -> str:
-    sack = sackmann.load(root, start=1990, lower=True)
+def prep(sack: pd.DataFrame) -> pd.DataFrame:
+    """Adds the game share (_share, for MOV) and sets played (_sets, for fatigue) in place."""
     gs = np.array([games_sets(s) for s in sack["score"]])
-    tot = np.maximum(gs[:, 0] + gs[:, 1], 1)
-    sack["_share"] = (gs[:, 0] - gs[:, 1]) / tot
+    sack["_share"] = (gs[:, 0] - gs[:, 1]) / np.maximum(gs[:, 0] + gs[:, 1], 1)
     sack["_sets"] = gs[:, 2] + gs[:, 3]
+    return sack
+
+
+def priced_frame(sack: pd.DataFrame, cache: Path, other_from: str, keep_void: bool = False):
+    """The priced, Sackmann-resolved DK matches (upsets.dk_study.frame) with Pinnacle quoted.
+    -> (frame, the dk_history priced table)."""
+    from . import dk_history as dh
+    from . import dk_study as ds
     sack_elo = elo.add_elo(sack, keys=("winner_id", "loser_id"))
     hs = {**dh.HIST_START, "other": pd.Timestamp(other_from)}
     t = dh.tournaments(sack, dh._keys(), hist_start=hs)
     priced = dh.collect(t, sack_elo, 24.0, root=cache)
     f = ds.frame(priced, sack_elo).dropna(subset=["p_pin"])
-    f = f[~f["void"].astype(bool)].reset_index(drop=True)
+    if not keep_void:
+        f = f[~f["void"].astype(bool)]
+    return f.reset_index(drop=True), priced
 
+
+def study(root: Path, cache: Path, other_from: str, dump: Path | None = None) -> str:
+    sack = prep(sackmann.load(root, start=1990, lower=True))
+    f, _ = priced_frame(sack, cache, other_from)
+    res, chosen = walk_forward(sack, f)
+    if dump is not None:
+        pd.to_pickle({"f": f, "res": res, "chosen": chosen}, dump)
+    return report(f, res, chosen, f["upset"].to_numpy())
+
+
+def walk_forward(sack: pd.DataFrame, f: pd.DataFrame, only: tuple[str, ...] | None = None) -> tuple[dict, dict]:
+    """Walk-forward P(DK underdog wins) per variant for the rows of `f` (sack_row, upset, season),
+    every parameter and calibration chosen on earlier seasons. `only` limits the variants
+    ("tuned" is always run when a "+" variant needs its pick). -> (res, chosen)."""
     tour_r12 = (sack["level_group"].isin(seeds.LEVELS) & (sack["round_idx"] <= 2) & ~sack["void"]
                 & (sack["season"] >= FIRST_FIT - 3)).to_numpy()
     keep = tour_r12.copy()
@@ -319,23 +394,6 @@ def study(root: Path, cache: Path, other_from: str, dump: Path | None = None) ->
     meta = sack.loc[rows, ["season", "date", "best_of", "level_group", "round_idx", "void"]].reset_index(drop=True)
     bo5 = (meta["best_of"] == 5).to_numpy().astype(float)
     is_fit = tour_r12[rows]
-
-    # ratings for every grid point
-    runs = {}
-    for kk, mv, dc in itertools.product(K_GRID, MOV_GRID, DECAY_GRID):
-        runs[(kk, mv, dc)] = run(sack, keep, kk, mv, dc)
-    fw, fl = fatigue(sack, rows)
-    sw, rw, sl, rl, mean_spw = serve_return(sack, keep)
-    pa = np.clip(mean_spw + (sw - mean_spw) - (rl - (1 - mean_spw)), 0.3, 0.95)
-    pb = np.clip(mean_spw + (sl - mean_spw) - (rw - (1 - mean_spw)), 0.3, 0.95)
-    p_sr = match_prob(pa, pb, meta["best_of"].fillna(3).to_numpy())
-    fat = (fw - fl)
-    srz = logit(p_sr)
-
-    # dog orientation for the priced rows: winner-oriented feature x sign
-    dog_is_w = f["upset"].to_numpy() == 1
-    sign = np.where(dog_is_w, 1.0, -1.0)
-    y_dog = f["upset"].to_numpy()
 
     variants = {
         "base": dict(grid=[(250.0, 0.0, 0.0, 0.0)], extra=[]),
@@ -348,7 +406,25 @@ def study(root: Path, cache: Path, other_from: str, dump: Path | None = None) ->
         "+serve": dict(grid="tuned", extra=["sr"]),
         "+both": dict(grid="tuned", extra=["fat", "sr"]),
     }
-    extra_cols = {"fat": fat, "sr": srz}
+    if only is not None:
+        need_tuned = any(variants[v]["grid"] == "tuned" for v in only)
+        variants = {v: spec for v, spec in variants.items() if v in only or (v == "tuned" and need_tuned)}
+    used = {e for spec in variants.values() for e in spec["extra"]}
+    grids = {g[:3] for spec in variants.values()
+             for g in (variants["tuned"]["grid"] if spec["grid"] == "tuned" else spec["grid"])}
+
+    # ratings for every grid point, and the extra features that are used
+    runs = {g: run(sack, keep, *g) for g in sorted(grids)}
+    extra_cols = {}
+    if "fat" in used:
+        fw, fl = fatigue(sack, rows)
+        extra_cols["fat"] = fw - fl
+    if "sr" in used:
+        pa, pb = point_probs(*serve_return(sack, keep))
+        extra_cols["sr"] = logit(match_prob(pa, pb, meta["best_of"].fillna(3).to_numpy()))
+
+    # dog orientation for the priced rows: winner-oriented feature x sign
+    sign = np.where(f["upset"].to_numpy() == 1, 1.0, -1.0)
     seasons = sorted(f["season"].unique())
     res = {v: np.full(len(f), np.nan) for v in variants}
     chosen = {v: {} for v in variants}
@@ -380,9 +456,7 @@ def study(root: Path, cache: Path, other_from: str, dump: Path | None = None) ->
             chosen[v][S] = best
             Xd = best_X[fi[test]] * sign[test][:, None]
             res[v][test] = best_cal.predict(Xd)
-    if dump is not None:
-        pd.to_pickle({"f": f, "res": res, "chosen": chosen}, dump)
-    return report(f, res, chosen, y_dog)
+    return res, chosen
 
 
 def report(f: pd.DataFrame, res: dict, chosen: dict, y: np.ndarray) -> str:
