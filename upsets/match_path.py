@@ -41,6 +41,9 @@ from . import kalshi_preview as kp
 TOURS = {"KXATPMATCH": "ATP", "KXWTAMATCH": "WTA", "KXATPCHALLENGERMATCH": "ATP-Ch",
          "KXWTACHALLENGERMATCH": "WTA125"}
 P_BINS = (0.0, 0.2, 0.4, 0.6, 0.8, 1.0)
+TEAM_RE = r"(?i)billie jean|\bbjk\b|fed cup|davis cup|united cup|laver cup|hopman"
+EXTREME = 0.99          # p >= 0.99 or <= 0.01: the match is effectively over; later quotes are junk
+DECIDER_MAX_MIN = 180   # same bound as decider.guard
 
 
 # --- per-match series ------------------------------------------------------------------------
@@ -110,6 +113,42 @@ def unreliable_sets(sets: pd.DataFrame, last_quote: pd.Series, late_min: float =
     return late | shared
 
 
+def classify_path(letters: list[str], best_of: float, fav_won: float) -> tuple[str, str]:
+    """Listed sets (favourite's view) -> (kind, path label). Kalshi lists only the sets before
+    the decider, so: 'complete' = someone reached the winning count within the listed sets;
+    'decider' = level after exactly best_of - 1 listed sets (the label appends the match result);
+    'incomplete' = sets missing (e.g. bo5 at 1-1 with set 3 unlisted) or best_of unknown;
+    'inconsistent' = the listed sets disagree with the settlement. Only complete/decider paths
+    get a label; the others are 'incomplete' / 'inconsistent'."""
+    if best_of != best_of:
+        return "incomplete", "incomplete"
+    bo = int(best_of)
+    need = (bo + 1) // 2
+    w, l, n = letters.count("W"), letters.count("L"), len(letters)
+    known = fav_won == fav_won
+    if max(w, l) >= need:
+        if known and (w >= need) != (fav_won == 1):
+            return "inconsistent", "inconsistent"
+        return "complete", "".join(letters)
+    if w == l and n == bo - 1:
+        return "decider", "".join(letters) + (("W" if fav_won == 1 else "L") if known else "?")
+    return "incomplete", "incomplete"
+
+
+def in_play_end(st: pd.DataFrame | None, best_of: float) -> pd.Timestamp | None:
+    """Plausible end of play from the listed sets: last set close + 5 min when that set ended the
+    match, + DECIDER_MAX_MIN when a decider followed; None when sets are missing or unreliable."""
+    if st is None or not len(st) or st["unreliable"].any() or (st["status"] != "decided").any():
+        return None
+    last = st["close_time"].max()
+    if best_of != best_of:
+        return last + pd.Timedelta(minutes=DECIDER_MAX_MIN)
+    need = (int(best_of) + 1) // 2
+    sides = list(st.sort_values("set_no")["winner_side"])
+    done = max(sides.count("A"), sides.count("B")) >= need
+    return last + pd.Timedelta(minutes=5 if done else DECIDER_MAX_MIN)
+
+
 def path_table(matches: pd.DataFrame, quotes: pd.DataFrame, sets: pd.DataFrame | None,
                details: pd.DataFrame | None = None, offset_s: float = 90, max_age_s: float = 300,
                prematch_age_h: float = 3.0) -> tuple[pd.DataFrame, dict]:
@@ -119,6 +158,10 @@ def path_table(matches: pd.DataFrame, quotes: pd.DataFrame, sets: pd.DataFrame |
     pre = pre[pre["ask_a"] != pre["ask_b"]]
     m = m.merge(pre, on="match_id")
     m["fav"] = np.where(m["ask_a"] > m["ask_b"], "A", "B")
+    names = m.get("tournament", pd.Series("", index=m.index)).fillna("").astype(str)
+    if details is not None and len(details) and "tournament_name" in details:
+        names = names + " " + m["match_id"].map(details.set_index("match_id")["tournament_name"]).fillna("").astype(str)
+    m["team"] = names.str.contains(TEAM_RE, regex=True)
     q = quotes[quotes["match_id"].isin(m["match_id"])][["ts", "match_id", "side", "ask"]].dropna(subset=["ask"])
     last_quote = q.groupby("match_id")["ts"].max()
     bo = (pd.to_numeric(details.set_index("match_id")["best_of"], errors="coerce")
@@ -135,18 +178,36 @@ def path_table(matches: pd.DataFrame, quotes: pd.DataFrame, sets: pd.DataFrame |
         fa = r.fav == "A"
         a_f, a_o = (r.ask_a, r.ask_b) if fa else (r.ask_b, r.ask_a)
         settle_f = r.settle_a if fa else r.settle_b
-        row = {"match_id": r.match_id, "tour": TOURS[r.series], "start": r.scheduled_start,
+        tour = TOURS[r.series] + (" team" if r.team else "")
+        b = bo.get(r.match_id, np.nan)
+        if b != b and TOURS[r.series] != "ATP":
+            b = 3.0  # WTA, ATP-Ch and WTA 125 singles are best of 3
+        row = {"match_id": r.match_id, "tour": tour, "start": r.scheduled_start,
                "month": r.scheduled_start.strftime("%Y-%m"), "fee_type": r.fee_type,
                "fee_multiplier": r.fee_multiplier, "fav": r.fav, "pre_ask": a_f, "pre_ask_oth": a_o,
                "pre_p": float(implied(a_f, a_o)), "settle_fav": settle_f,
                "fair": settle_f not in (0.0, 1.0), "fav_won": float(settle_f == 1.0) if settle_f in (0.0, 1.0) else np.nan,
-               "best_of": bo.get(r.match_id, np.nan)}
+               "best_of": b}
         qm = q_by.get(r.match_id)
+        st = sets_by.get(r.match_id)
+        cut = in_play_end(st, b)
         if qm is not None:
             s = leg_series(qm)
             live = s[s["ts"] >= r.scheduled_start]
             p = pd.Series(implied(live["ask_a"], live["ask_b"]) if fa else implied(live["ask_b"], live["ask_a"]),
                           index=live.index)
+            fl_raw = flips(live["ts"], p)
+            row["p_min_raw"] = p.min() if p.notna().any() else np.nan
+            row["n_flips_raw"] = len(fl_raw)
+            # clean: both legs <= max_age_s old, before the plausible match end, and nothing after
+            # the price first reaches the extremes (post-match books are junk)
+            keep = (live["age_a"] <= max_age_s) & (live["age_b"] <= max_age_s)
+            if cut is not None:
+                keep &= live["ts"] <= cut
+            p = p.where(keep)
+            ext = p[(p >= EXTREME) | (p <= 1 - EXTREME)]
+            if len(ext):
+                p = p.where(p.index <= ext.index[0])
             row["p_min"], row["p_max"] = (p.min(), p.max()) if p.notna().any() else (np.nan, np.nan)
             fl = flips(live["ts"], p)
             row["n_flips"] = len(fl)
@@ -155,10 +216,11 @@ def path_table(matches: pd.DataFrame, quotes: pd.DataFrame, sets: pd.DataFrame |
             series[r.match_id] = (live["ts"], p)
         else:
             s = None
-            row.update(p_min=np.nan, p_max=np.nan, n_flips=np.nan, first_flip_min=np.nan, _first_flip=pd.NaT)
-        st = sets_by.get(r.match_id)
+            row.update(p_min=np.nan, p_max=np.nan, n_flips=np.nan, first_flip_min=np.nan, _first_flip=pd.NaT,
+                       p_min_raw=np.nan, n_flips_raw=np.nan)
         row.update(has_sets=st is not None, set_fair=False, set_unreliable=False, n_sets_listed=0,
-                   path="", decider=False, pen_fav_won=np.nan, decider_start=pd.NaT)
+                   path="", path_listed="", path_kind="", decider=False, pen_fav_won=np.nan,
+                   decider_start=pd.NaT)
         if st is not None:
             row["set_fair"] = bool((st["status"] == "fair_price").any())
             row["set_unreliable"] = bool(st["unreliable"].any())
@@ -168,15 +230,16 @@ def path_table(matches: pd.DataFrame, quotes: pd.DataFrame, sets: pd.DataFrame |
             if ok:
                 sides = list(dec["winner_side"])
                 letters = ["W" if x == r.fav else "L" for x in sides]
-                row["n_sets_listed"] = len(letters)
-                level = letters.count("W") == letters.count("L")
-                if level and len(letters) >= 2:
+                n = len(letters)
+                row["n_sets_listed"] = n
+                row["path_listed"] = "".join(letters)
+                kind, path = classify_path(letters, b, row["fav_won"])
+                row["path_kind"], row["path"] = kind, path
+                if kind == "decider":
                     row["decider"] = True
                     row["pen_fav_won"] = float(letters[-1] == "W")
                     row["decider_start"] = dec["close_time"].iloc[-1]
-                    if row["fav_won"] == row["fav_won"]:
-                        letters = letters + ["W" if row["fav_won"] == 1 else "L"]
-                row["path"] = "".join(letters)
+                need = (int(b) + 1) // 2 if b == b else None
                 for k, (ct, who) in enumerate(zip(dec["close_time"], sides), 1):
                     t = ct + pd.Timedelta(seconds=offset_s)
                     aa, ab = asof(s, t, max_age_s) if s is not None else (np.nan, np.nan)
@@ -184,6 +247,8 @@ def path_table(matches: pd.DataFrame, quotes: pd.DataFrame, sets: pd.DataFrame |
                     row[f"set{k}_ask"], row[f"set{k}_ask_oth"] = af, ao
                     row[f"set{k}_p"] = float(implied(af, ao))
                     row[f"set{k}_min"] = (ct - r.scheduled_start).total_seconds() / 60
+                    w_k, l_k = letters[:k].count("W"), letters[:k].count("L")
+                    row[f"set{k}_live"] = bool(need) and kind in ("decider", "complete") and max(w_k, l_k) < need
                 if row["_first_flip"] is not pd.NaT:
                     ends = list(dec["close_time"])
                     row["first_flip_set"] = 1 + sum(e < row["_first_flip"] for e in ends)
@@ -265,7 +330,19 @@ def report(full: pd.DataFrame, cfg: dict) -> str:
                  f"{int(g['set_fair'].sum())} (excluded) | "
                  f"{int(g['set_unreliable'].sum())} | {int(g['set_ok'].sum()):,} | "
                  f"{int(g['decider'].sum()):,} ({int((g['decider'] & ~g['decider_ok']).sum())}) |")
-    L += ["", "Win rates leave out fair-price match settlements (not started); ROI keeps them at their "
+    kinds = full["path_kind"].fillna("")
+    changed = full["p_min_raw"].notna() & ((full["p_min_raw"] - full["p_min"]).abs() > 1e-9)
+    junk = changed & (full["fav_won"] == 1) & (full["p_min_raw"] < 0.10) & ~(full["p_min"] < 0.10)
+    L += ["", f"Set paths: complete {int((kinds == 'complete').sum()):,}, decider {int((kinds == 'decider').sum()):,}, "
+          f"incomplete (sets missing, e.g. bo5 at 1–1 with set 3 unlisted) {int((kinds == 'incomplete').sum()):,}, "
+          f"inconsistent with the settlement {int((kinds == 'inconsistent').sum()):,}; only complete and decider "
+          "paths are used.", "",
+          f"In-play cleaning (both legs ≤ 5 min old, cut at the last set close + 5 min or + {DECIDER_MAX_MIN} min "
+          f"for a decider, nothing after p first reaches {EXTREME:.2f}/{1 - EXTREME:.2f}): in-play min changed in "
+          f"{int(changed.sum()):,} matches, flip count in "
+          f"{int((full['n_flips_raw'].notna() & (full['n_flips_raw'] != full['n_flips'])).sum()):,}; favourite wins "
+          f"with a raw min < 0.10 that the cleaning removed: {int(junk.sum()):,}.", "",
+          "Win rates leave out fair-price match settlements (not started); ROI keeps them at their "
           "settle price.", "", "## Original favourite: win rate", "", "| Slice | Matches | Fav won | SE |", "|---|---|---|---|"]
 
     def wr(name, g):
@@ -278,7 +355,7 @@ def report(full: pd.DataFrame, cfg: dict) -> str:
         wr(fmt, g)
     L += ["", "By set path (favourite's view; ATP/WTA with usable sets):", "",
           "| Format | Path | Matches | Share | Fav won |", "|---|---|---|---|---|"]
-    sp = dec[dec["set_ok"] & (dec["path"] != "")]
+    sp = dec[dec["set_ok"] & dec["path_kind"].isin(["complete", "decider"])]
     for fmt, g in sp.groupby("fmt"):
         for path, h in g.groupby("path"):
             L.append(f"| {fmt} | {path} | {len(h):,} | {len(h) / len(g):.1%} | {_p(h['fav_won'].mean())} |")
@@ -313,18 +390,24 @@ def report(full: pd.DataFrame, cfg: dict) -> str:
             L.append(f"| {fmt} | " + " | ".join(_p(c.get(k, 0.0)) for k in range(1, 6)) + " |")
 
     L += ["", "## Average path of the original favourite's price (for a line chart)", "",
-          "Mean p at the pre-match close and after each listed set (close + 90 s), by final outcome.", "",
+          "Mean p at the pre-match close and after each listed set (close + 90 s), by final outcome; a set "
+          "column uses only matches still in play at that set end (n in brackets).", "",
           "| Format | Outcome | Matches | Pre | Min in play | Max in play | After set 1 | After set 2 | After set 3 | After set 4 |",
           "|---|---|---|---|---|---|---|---|---|---|"]
     for fmt, g in dec.groupby("fmt"):
         for won, h in g.groupby("fav_won"):
-            cells = [_p(h.get(f"set{k}_p", pd.Series(dtype=float)).mean()) for k in range(1, 5)]
+            cells = []
+            for k in range(1, 5):
+                v = h.get(f"set{k}_p", pd.Series(dtype=float))[h.get(f"set{k}_live", pd.Series(False, index=h.index))
+                                                               .fillna(False).astype(bool)]
+                cells.append(f"{_p(v.mean())} ({v.notna().sum():,})" if v.notna().any() else "—")
             L.append(f"| {fmt} | {'fav won' if won == 1 else 'fav lost'} | {len(h):,} | {_p(h['pre_p'].mean())} | "
                      f"{_p(h['p_min'].mean())} | {_p(h['p_max'].mean())} | " + " | ".join(cells) + " |")
 
     L += ["", "## Price test at each set end", "",
           "Calibration: the original favourite's live p vs how often they won; ROI of buying them (or "
-          "the original underdog) at the ask + Kalshi fee, 100 contracts.", "",
+          "the original underdog) at the ask + Kalshi fee, 100 contracts. Only matches still in play at "
+          "that set end (e.g. bo3 after set 2 = 1–1 only).", "",
           "| Format | After set | p bin | Matches | Mean p | Fav won | Buy fav ROI 0¢ (95% CI) | ROI 1¢ | Buy dog ROI 0¢ |",
           "|---|---|---|---|---|---|---|---|---|"]
     for fmt, g in dec[dec["set_ok"]].groupby("fmt"):
@@ -332,7 +415,10 @@ def report(full: pd.DataFrame, cfg: dict) -> str:
             col = f"set{k}_p"
             if col not in g or not g[col].notna().any():
                 continue
-            h = g[g[col].notna()]
+            live = g.get(f"set{k}_live", pd.Series(False, index=g.index)).fillna(False).astype(bool)
+            h = g[g[col].notna() & live]  # only states still in play: a finished match isn't tradable
+            if not len(h):
+                continue
             for bucket, x in h.groupby(pd.cut(h[col], P_BINS), observed=True):
                 bf = roi_stats(buy(x, f"set{k}_ask", x["settle_fav"], cfg))
                 bd = roi_stats(buy(x, f"set{k}_ask_oth", 1 - x["settle_fav"], cfg))
