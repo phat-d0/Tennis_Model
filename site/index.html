@@ -1,0 +1,48 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <title>Tennis Odds</title>
+  <meta name="description" content="ATP and WTA match odds from DraftKings and Pinnacle, with fair chances and an unproven Elo model">
+  <meta name="theme-color" content="#fcfcfb" media="(prefers-color-scheme: light)">
+  <meta name="theme-color" content="#1a1a19" media="(prefers-color-scheme: dark)">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="default">
+  <meta name="apple-mobile-web-app-title" content="Tennis Odds">
+  <meta name="application-name" content="Tennis Odds">
+  <link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
+  <link rel="icon" type="image/png" sizes="192x192" href="icons/icon-192.png">
+  <link rel="manifest" href="manifest.webmanifest">
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <header class="topbar">
+    <div>
+      <h1>Tennis Odds</h1>
+      <p id="updated" class="muted">Loading…</p>
+    </div>
+    <button id="refresh" class="icon-btn" aria-label="Reload data">
+      <svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true"><path fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" d="M20 12a8 8 0 1 1-2.34-5.66M20 4v5h-5"/></svg>
+    </button>
+  </header>
+
+  <div id="banners"></div>
+  <main id="view" tabindex="-1"></main>
+  <footer id="footer" class="footer"></footer>
+
+  <nav class="tabbar" aria-label="Sections">
+    <button data-tab="matches" class="active" aria-current="page">
+      <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M5.6 5.6c3 3 3 9.8 0 12.8M18.4 5.6c-3 3-3 9.8 0 12.8"/></svg>
+      <span>Matches</span>
+    </button>
+    <button data-tab="findings">
+      <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 3.5h8l4 4V20.5H6z"/><path d="M14 3.5v4h4M9 12h6M9 16h6"/></svg>
+      <span>Findings</span>
+    </button>
+  </nav>
+
+  <script src="app.js"></script>
+</body>
+</html>

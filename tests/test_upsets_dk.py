@@ -329,3 +329,24 @@ def test_results_from_kalshi_and_unresolved_frame():
     assert r.loc[3.2, "upset"] == 1 and r.loc[3.2, "odds_fav_dk"] == 1.35 and r.loc[3.2, "tour"] == "atp"
     assert r.loc[2.6, "void"]
     assert ds.pnl(f).sum() == pytest.approx(3.2 - 1)
+
+
+def test_results_from_data_table():
+    ml = pd.DataFrame({"event_id": ["e1", "e2", "e3", "e4"], "tour": ["atp", "wta", "wta", "atp"],
+                       "commence": ["2026-10-02 12:30:00", "2026-08-24 21:12:50", "2026-10-22 11:00:00",
+                                    "2026-07-28 15:00:00"],
+                       "home": ["Bu Yunchaokete", "Maria Camila Osorio Serrano", "Elena Rybakina", "Ugo Humbert"],
+                       "away": ["Novak Djokovic", "Ann Li", "Polina Kudermetova", "Andrej Martin"]})
+    tbl = pd.DataFrame({
+        "tournament": ["ATP Beijing", "WTA Monterrey", "WTA Ningbo", "ATP Washington"],
+        "scheduled_start": ["2026-10-02T12:30Z", "2026-08-24T21:00Z", "2026-10-22T11:00Z", "2026-07-28T15:00Z"],
+        "tour": ["ATP", "WTA", "WTA", "ATP"], "round": ["Round Of 16", "Round Of 32", "Round Of 16", "Round Of 32"],
+        "player_a": ["Yunchaokete Bu", "Camila Osorio", "Elena Rybakina", "Ugo Humbert"],
+        "player_b": ["Novak Djokovic", "Ann Li", "Polina Kudermetova", "Andres Martin"],
+        "winner": ["B", "B", "A", "A"], "settle_a": [0.0, 0.0, 1.0, 1.0], "settle_b": [1.0, 1.0, 0.0, 0.0],
+        "not_started": [False, False, False, False], "set1_status": ["decided", "decided", "fair_price", "missing"]})
+    r = ds.results_from_table(ml, tbl).set_index("event_id")
+    assert r.loc["e1", "winner"] == "away" and not r.loc["e1", "void"]       # word order: Bu Yunchaokete
+    assert r.loc["e2", "winner"] == "away"                                    # subset: Camila Osorio
+    assert r.loc["e3", "void"]                                                # retired in set 1
+    assert "e4" not in r.index                                                # Andrej != Andres
