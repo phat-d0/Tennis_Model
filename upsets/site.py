@@ -37,7 +37,9 @@ from pathlib import Path
 
 import pandas as pd
 
-from . import elo, portfolio, sackmann
+import numpy as np
+
+from . import elo, elo_plus, model, portfolio, sackmann
 from .names import match_names, player_table
 from .odds_api import KEY_NAMES, BudgetError, OddsApi, parse_h2h
 
@@ -46,7 +48,8 @@ HORIZON_H = 36.0
 SHOW_PAST_H = 3.0       # keep a match on the page this long after its listed start
 MIN_RATED = 20          # model_p1 is null below this many rated matches for either player
 ACTIVE_YEARS = 2        # name matching tries players active in the last 2 years first
-SURFACE_WEIGHT = 0.5    # model rating difference = 0.5 overall + 0.5 surface
+MODEL_TAG = "eloserve1"  # cache-file prefix: bump when the page model changes (old caches are ignored)
+SLAM_KEYS = {"aus_open_singles", "french_open", "wimbledon", "us_open"}  # ATP: best of 5
 
 
 def utcnow() -> pd.Timestamp:
@@ -167,32 +170,43 @@ def key_surfaces(sack: pd.DataFrame) -> dict:
     return out
 
 
+def best_of(sport_key: str) -> int:
+    m = re.match(r"tennis_(atp|wta)_(.+)$", sport_key)
+    return 5 if m and m.group(1) == "atp" and m.group(2) in SLAM_KEYS else 3
+
+
 def load_ratings(archive: Path, cache: Path) -> dict | None:
-    """{"ratings": per (tour, id, surface) frame, "players": name table, "through", "surfaces"},
-    cached by the archive's commit SHA; None without an archive."""
+    """The page model (upsets.elo_plus.page_model): {"ratings": per (tour, id, surface) frame,
+    "players": name table, "cal", "mean_spw", "through", "surfaces"}, cached by MODEL_TAG and the
+    archive's commit SHA; None without an archive."""
     if not archive.is_dir():
         return None
     sha = archive_sha(archive)
-    rp, mp, pp = (cache / f"ratings_{sha}.parquet", cache / f"ratings_{sha}.json",
+    rp, mp, pp = (cache / f"{MODEL_TAG}_{sha}.parquet", cache / f"{MODEL_TAG}_{sha}.json",
                   cache / f"players_{sha}.parquet")
     if rp.exists() and mp.exists() and pp.exists():
         meta = json.loads(mp.read_text())
-        return {"ratings": pd.read_parquet(rp), "players": pd.read_parquet(pp), **meta}
-    sack = sackmann.load(archive, start=1990, lower=True)
-    r = elo.final_ratings(sack, keys=("winner_id", "loser_id"))
+        c = meta.pop("cal")
+        cal = model.Logit(*(np.array(c[k]) for k in ("coef", "mean", "scale")))
+        return {"ratings": pd.read_parquet(rp), "players": pd.read_parquet(pp), "cal": cal, **meta}
+    sack = elo_plus.prep(sackmann.load(archive, start=1990, lower=True))
+    pm = elo_plus.page_model(sack)
+    r = pm["ratings"]
     r["id"] = r["id"].astype(str)
     players = player_table(sack)
     players["id"] = players["id"].astype(str)
-    meta = {"through": sack["date"].max().strftime("%Y-%m-%d"), "surfaces": key_surfaces(sack)}
+    cal = pm["cal"]
+    meta = {"through": sack["date"].max().strftime("%Y-%m-%d"), "surfaces": key_surfaces(sack),
+            "mean_spw": pm["mean_spw"]}
     cache.mkdir(parents=True, exist_ok=True)
-    for old in cache.glob("ratings_*"):
-        old.unlink()
-    for old in cache.glob("players_*"):
-        old.unlink()
+    for pat in ("ratings_*", "players_*", "eloserve*"):
+        for old in cache.glob(pat):
+            old.unlink()
     r.to_parquet(rp, index=False)
     players.to_parquet(pp, index=False)
-    _write_json(mp, meta)
-    return {"ratings": r, "players": players, **meta}
+    _write_json(mp, {**meta, "cal": {"coef": cal.coef.tolist(), "mean": cal.mean.tolist(),
+                                     "scale": cal.scale.tolist()}})
+    return {"ratings": r, "players": players, "cal": cal, **meta}
 
 
 def model_probs(m: pd.DataFrame, rt: dict | None, now: pd.Timestamp) -> pd.DataFrame:
@@ -207,22 +221,21 @@ def model_probs(m: pd.DataFrame, rt: dict | None, now: pd.Timestamp) -> pd.DataF
     id1 = match_names(m["player_1"], tours, players, since)["id"]
     id2 = match_names(m["player_2"], tours, players, since)["id"]
     r = rt["ratings"]
-    overall = r.drop_duplicates(["tour", "id"]).set_index(["tour", "id"])[["elo", "n"]]
+    overall = r.drop_duplicates(["tour", "id"]).set_index(["tour", "id"])[["elo", "n", "spw", "rpw"]]
     surf = r.set_index(["tour", "id", "surface"])["selo"]
     for i in m.index:
         t, a, b = tours[i], id1[i], id2[i]
         if pd.isna(a) or pd.isna(b) or (t, a) not in overall.index or (t, b) not in overall.index:
             continue
-        ra, rb = overall.loc[(t, a)], overall.loc[(t, b)]
+        ra, rb = overall.loc[(t, a)].to_dict(), overall.loc[(t, b)].to_dict()
         out.at[i, "model_n1"], out.at[i, "model_n2"] = int(ra["n"]), int(rb["n"])
         if min(ra["n"], rb["n"]) < MIN_RATED:
             continue
-        diff = ra["elo"] - rb["elo"]
         s = rt["surfaces"].get(m.at[i, "sport_key"])
-        if s:
-            sd = surf.get((t, a, s), elo.START) - surf.get((t, b, s), elo.START)
-            diff = (1 - SURFACE_WEIGHT) * diff + SURFACE_WEIGHT * sd
-        out.at[i, "model_p1"] = round(1 / (1 + 10 ** (-diff / 400)), 4)
+        for x, pid in ((ra, a), (rb, b)):   # unknown surface: overall rating; no match on it: START
+            x["selo"] = surf.get((t, pid, s), elo.START) if s else x["elo"]
+        p = elo_plus.page_prob(ra, rb, rt["mean_spw"][t], best_of(m.at[i, "sport_key"]), rt["cal"])
+        out.at[i, "model_p1"] = round(p, 4)
     return out
 
 
