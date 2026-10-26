@@ -96,6 +96,9 @@ Plan, method, gate and data blockers: `docs/upsets_plan.md`. Code: `upsets/` (Le
   30.1% (WTA) of the time (2010–2025). Elo expects 27.5% / 28.4%; the gap is mostly qualifiers, and at
   Slams seeds lose less than Elo says. These are base rates, not an edge (no odds). **Next: Phase B**
   (`upsets/kalshi_elo.py`: Elo vs Kalshi closing prices; Upsets writes it, Data runs it).
+- **Phase B code merged (phat-d0/Tennis_Model#60), 149 tests.** The Lead found a lookahead issue: an unjoined later
+  round could sort before a joined earlier round. It's fixed by `round_monotone()`, with a test. Waiting on a
+  Data run over kalshi_g0 (Apr 24 → Oct 24).
 - **Results data (2026-10-25):** Jeff Sackmann's repos now return 404. The owner forked the archival
   mirror `phat-d0/tennis-sackmann-archive` (CC BY-NC-SA 4.0, non-commercial, attribute Sackmann; never
   commit the CSVs). It covers ATP/WTA 1968 → tournaments starting by 2026-05-25, with seeds, ranks, rounds
