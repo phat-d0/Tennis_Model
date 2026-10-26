@@ -171,6 +171,14 @@ The owner asked for a public phone page like the soccer app, refreshed every 3 h
 - **DK history pull (250/500s):** done. 1,646 credits spent, balance 9,258. 24 of 62 tournament-years have history:
   Beijing from 2024, Doha/Dubai from 2025, the rest 2026 only. That gives 434 round 1–2 matches; Data supplies
   results for the 12 events from Jun–Oct 2026.
+- **DK 250/500 study result (#86, PRELIMINARY): no edge.**
+  - Every early-round dog: −18.7% at DraftKings (417 bets), −15.6% at Pinnacle.
+  - Margins: DK 4.84%, Pinnacle 2.82%.
+  - Elo walk-forward: FAIL.
+- **Owner 2026-10-26: plan upgraded to 5M credits/month** (still shared with soccer ≈ 5k/month and baseball), "we don't have to
+  skimp". **Approved: DK history for Slams + 1000s** (Upsets), with 3 h cells instead of 6 h for prices closer to the start
+  (~25–30k credits; per-job cap 40k; the 5,000 floor stays). The page's monthly cap goes from 600 to 3,000 (still every 3 h).
+- **Page status:** UI merged (#85). Next is `upsets/site.py` (Upsets), then `publish.yml`, which is drafted on team/lead.
 
 ## How to continue in a new session
 Read `CLAUDE.md`, this file, and your brief in `docs/team/`. Check open PRs into `main` and the
