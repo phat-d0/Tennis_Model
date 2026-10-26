@@ -22,6 +22,13 @@ no CDN, and no request to any other origin. Links to reports and the licence are
   - both players and a bar for the fair chance;
   - DraftKings and Pinnacle decimal odds, the fair chance, and the model chance with a **"model: not proven"** tag;
   - margins, the source of the fair chance, and the model's rated-match counts (or why there is no model).
+- **Challengers** (Polymarket international, ATP Challenger / WTA 125): a "Tour-level | Challengers" switch at the top of
+  Matches, shown only when `odds.json` has a `challengers` object (shape proposed to Upsets; see the PR). The ATP / WTA
+  filter applies inside it. A blue label reads "Polymarket (international), indicative: not tradable from the US", with
+  the fetch age. Each card shows both players' best bid and ask in cents, with shares at the best level, the spread, and
+  the model chance with a "not proven" tag. **Thin books** (any spread > 5¢, a best level < 20 shares, or an empty side)
+  are dimmed and tagged with the reason, and a "Hide N thin books" chip filters them out (remembered per device). A
+  failed or stale fetch keeps the last prices, with banners inside the view.
 - **Portfolio** (built by Upsets in phat-d0/Tennis_Model#96, at the owner's request): paper trades ($10 each, at
   DraftKings' price) per strategy (Elo model, DK vs Pinnacle, Underdogs), each tagged "not proven". Tiles show realized and
   expected profit, luck, ROI, CLV, win rate and drawdown, followed by a realized-vs-expected chart (drag or arrow keys to
