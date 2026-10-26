@@ -20,16 +20,17 @@ import pandas as pd
 from . import dk_history as dh
 from . import dk_study as ds
 from . import elo, elo_plus, sackmann
+from .odds import devig_power
 from .portfolio import MAX_BOOK_GAP, STRATEGIES
 
 
 def bets(f: pd.DataFrame) -> dict[str, pd.DataFrame]:
     """Per strategy: one row per bet with odds, fair p (Pinnacle, proportional), win, date."""
     f = f[~f["void"].astype(bool)].dropna(subset=["odds_dog_pin", "odds_fav_pin"]).copy()
-    i_d, i_f = 1 / f["odds_dog_pin"], 1 / f["odds_fav_pin"]
-    f["pf_dog"] = i_d / (i_d + i_f)
-    k_d, k_f = 1 / f["odds_dog_dk"], 1 / f["odds_fav_dk"]
-    f = f[(k_d / (k_d + k_f) - f["pf_dog"]).abs() <= MAX_BOOK_GAP]       # the live rule's quote-error filter
+    # power de-vig, as live (upsets.portfolio._fair) and in every study
+    f["pf_dog"] = devig_power(f["odds_dog_pin"].to_numpy(float), f["odds_fav_pin"].to_numpy(float))
+    dk_dog = devig_power(f["odds_dog_dk"].to_numpy(float), f["odds_fav_dk"].to_numpy(float))
+    f = f[np.abs(dk_dog - f["pf_dog"].to_numpy()) <= MAX_BOOK_GAP]       # the live rule's quote-error filter
     sides = []
     for side in ("dog", "fav"):
         sides.append(pd.DataFrame({
@@ -94,7 +95,9 @@ def build(root: Path, cache: Path, other_from: str = "2024-01-01") -> dict:
                  "results from Jeff Sackmann's files (events through May 2026). Matches where DraftKings' and "
                  "Pinnacle's fair chances differ by more than 10 points are skipped as quote errors, as live. "
                  "In-sample: no rule here has passed the project's walk-forward test. 1 unit = one $10 bet. "
-                 "Expected = each bet's value at Pinnacle's fair price. The model is the page's Elo + "
+                 "Expected = each bet's value at Pinnacle's fair price. Fair prices use the power de-vig "
+                 "since 2026-10-26 (before that, proportional: the DraftKings-vs-Pinnacle rule then showed "
+                 "+9.3% expected and +9.2% realized). The model is the page's Elo + "
                  "serve/return model since 2026-10-26 (before that, a plain Elo), refitted before each "
                  "season on earlier seasons only."),
         "strategies": {s["id"]: aggregate(by[s["id"]], s["rule"]) for s in STRATEGIES},

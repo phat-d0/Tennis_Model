@@ -3,11 +3,18 @@
 import json
 import re
 
+import numpy as np
 import pandas as pd
 import pytest
 
 from upsets import portfolio as pf
 from upsets import site
+from upsets.odds import devig_power
+
+
+def pw(o1, o2):
+    """Power de-vig p(player 1), the page's fair chance since 2026-10-26."""
+    return float(devig_power(np.array([o1]), np.array([o2]))[0])
 
 NOW = pd.Timestamp("2026-08-30 10:00", tz="UTC")
 USO = "tennis_atp_us_open"
@@ -25,10 +32,12 @@ def test_pick_rules():
     s = {x["id"]: x for x in pf.STRATEGIES}
     m = match()
     assert pf.pick(s["dogs"], m) == (2, 0.0)
-    # Pinnacle fair p(Bea) = (1/2.95)/(1/1.45+1/2.95) = 0.3296; DK 2.9 x 0.3296 - 1 = -4.4%: no bet
-    assert pf.pick(s["line"], m) is None
-    side, e = pf.pick(s["line"], match(dk=(1.5, 3.2)))          # 3.2 x 0.3296 - 1 = +5.5%
-    assert side == 2 and e == pytest.approx(3.2 * (1 / 2.95) / (1 / 1.45 + 1 / 2.95) - 1)
+    # power de-vig: Pinnacle fair p(Ann) = 0.6778, so DK 1.5 x 0.6778 - 1 = +1.7% (proportional: 0.6704, +0.6%)
+    p = pw(1.45, 2.95)
+    assert pf.pick(s["line"], m) == (1, pytest.approx(1.5 * p - 1))
+    assert pf.pick(s["line"], match(dk=(1.45, 2.9))) is None                  # -1.7% and -6.6%: no bet
+    side, e = pf.pick(s["line"], match(dk=(1.5, 3.2)))          # Bea 3.2 x 0.3222 - 1 = +3.1% beats Ann's +1.7%
+    assert side == 2 and e == pytest.approx(3.2 * (1 - p) - 1)
     assert pf.pick(s["model"], match(model=0.75)) == (1, pytest.approx(0.75 * 1.5 - 1))   # +12.5%
     assert pf.pick(s["model"], match(model=0.66)) is None                               # -1%, +0.3%
     assert pf.pick(s["model"], match(model=None)) is None and pf.pick(s["dogs"], match(dk=None)) is None
@@ -36,15 +45,15 @@ def test_pick_rules():
 
 def test_open_once_refresh_close_and_skip_unscored():
     trades = pf.update([], [match(model=0.75), match("e2", key="tennis_atp_paris_masters")], NOW, None)
-    assert sorted(t["id"] for t in trades) == ["dogs:e1", "model:e1"]   # Paris has no /scores: no trades
+    assert sorted(t["id"] for t in trades) == ["dogs:e1", "line:e1", "model:e1"]   # Paris has no /scores: no trades
     t = next(t for t in trades if t["strategy"] == "model")
-    assert t["odds"] == 1.5 and t["ev"] == pytest.approx(1.5 * (1 / 1.45) / (1 / 1.45 + 1 / 2.95) - 1, abs=1e-4)
+    assert t["odds"] == 1.5 and t["ev"] == pytest.approx(1.5 * pw(1.45, 2.95) - 1, abs=1e-4)
     # an hour later the price moved: no second trade, the close follows the market
     later = NOW + pd.Timedelta(hours=1)
     trades = pf.update(trades, [match(dk=(1.4, 3.1), pin=(1.38, 3.2), model=0.75)], later, None)
-    assert len(trades) == 2
+    assert len(trades) == 3
     t = next(t for t in trades if t["strategy"] == "model")
-    p_close = (1 / 1.38) / (1 / 1.38 + 1 / 3.2)
+    p_close = pw(1.38, 3.2)
     assert t["close"]["odds"] == 1.4 and t["clv"] == pytest.approx(1.5 * p_close - 1, abs=1e-4)
     assert t["close"]["minutes_before"] == 180
     # after the start nothing changes
@@ -154,8 +163,12 @@ def test_backtest_rules_and_aggregate():
     assert list(by["dogs"]["odds"]) == [3.2, 2.9]                 # void match left out
     # model: match 0 dog edge 0.4 x 3.2 - 1 = +28%; match 1 fav edge 0.8 x 1.42 - 1 = +13.6%
     assert list(by["model"]["side"]) == ["dog", "fav"]
-    # line: match 0 dog 3.2 x fair(3.0 v 1.4) = 3.2 x 0.3182 - 1 = +1.8% >= 1%
-    assert list(by["line"]["side"]) == ["dog"]
+    # line, power de-vig: match 0 dog 3.2 x fair(3.0 v 1.4) = 3.2 x 0.3049 - 1 = -2.4% (proportional said
+    # +1.8%): no bet; at DK 3.5 it is +6.7%
+    assert len(by["line"]) == 0
+    g = pb.bets(f.iloc[:1].assign(odds_dog_dk=3.5))["line"]
+    assert list(g["side"]) == ["dog"] and g["ev"].iloc[0] == pytest.approx(3.5 * pw(3.0, 1.4) - 1)
+    assert g["p_fair"].iloc[0] == pytest.approx(pw(3.0, 1.4))
     a = pb.aggregate(by["dogs"], "rule")
     assert a["bets"] == 2 and a["roi"] == pytest.approx((2.2 - 1) / 2)
     assert a["curve"][-1]["realized"] == pytest.approx(1.2) and len(a["curve"]) == 2
