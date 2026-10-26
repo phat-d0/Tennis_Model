@@ -3,7 +3,7 @@
  "odds_fetched_at": "2026-10-26T05:55:00Z",
  "status": "ok",
  "credits": {
-  "left": 18250,
+  "left": null,
   "used_this_month": 143,
   "month_cap": 600
  },
@@ -20,8 +20,8 @@
    "tour": "WTA"
   },
   {
-   "sport_key": "tennis_atp_brest",
-   "title": "ATP Brest Challenger",
+   "sport_key": "tennis_atp_stockholm",
+   "title": "ATP Stockholm Open",
    "tour": "ATP"
   }
  ],
@@ -174,8 +174,8 @@
   },
   {
    "event_id": "e07",
-   "sport_key": "tennis_atp_brest",
-   "tournament": "ATP Brest Challenger",
+   "sport_key": "tennis_atp_stockholm",
+   "tournament": "ATP Stockholm Open",
    "tour": "ATP",
    "commence_time": "2026-10-26T05:30:00Z",
    "player_1": "Nils Berger",

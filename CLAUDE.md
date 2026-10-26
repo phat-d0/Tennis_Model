@@ -374,3 +374,6 @@ the newest 200. Format changes go through the Lead (Scanner proposes, Dashboard 
   The page and its build never touch Kalshi data; the builder's `status` must never contain the API key or a URL.
 - 2026-10-26 (owner): Odds API plan upgraded to **5M credits/month** (shared with soccer ≈ 5k/month and baseball). 5,000 floor
   kept as a safety net; budgets are now per-job caps in WORK_PLAN. Slams + 1000s DK history approved.
+- 2026-10-26: **Tennis Odds page live** at https://phat-d0.github.io/Tennis_Model/ (GitHub Pages, `.github/workflows/publish.yml`,
+  every 3 h, ≤ 3,000 credits/month; phat-d0/Tennis_Model#85, #89–#92). Name matching moved to `upsets/names.py` (token-sorted
+  keys + aliases). The cloud container can't reach github.io (network policy), so check runs via the Actions log.

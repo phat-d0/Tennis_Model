@@ -25,7 +25,7 @@ no CDN, and no request to any other origin. Links to reports and the licence are
   and a "Read the report" link to `github.com/.../blob/main/<report>`. Only `reports/...` paths become links.
 - **Footer:** odds age and build age, credits this month against the cap, the ratings date, "Refreshes every
   3 h, often late", Sackmann attribution (CC BY-NC-SA 4.0, non-commercial), odds source, "Not betting advice".
-  `credits.left` (the shared key's balance) is not shown.
+  `credits.left` (the shared key's balance) is not shown; the builder now always sends it as `null`.
 - **Banners** (the page stays usable in every case):
 
   | State | Banner |
@@ -34,6 +34,7 @@ no CDN, and no request to any other origin. Links to reports and the licence are
   | `odds.json` fails after an earlier load | "Can't refresh the odds" (keeps the old data) |
   | `no_key` / `below_floor` | "Odds aren't refreshing" |
   | `cap_reached` | "Monthly odds budget used up" |
+  | `paced` (under the monthly cap, today's share used) | "Odds refresh later today" (calm) |
   | `no_tournaments` | "No tournaments right now" |
   | `error: …` | "The last update failed" + the message |
   | any other status | "Unexpected data status" |
