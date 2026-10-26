@@ -56,3 +56,32 @@ def test_fatigue_ignores_later_rounds():
     df = pd.concat([df, qf], ignore_index=True)
     fw, fl = ep.fatigue(df, np.array([1]))
     assert list(fw) == [2] and list(fl) == [0]
+
+
+def big_frame():
+    """2015-2025: four players, many round-1 matches; a beats everyone, b beats c and d, c beats d."""
+    rng = np.random.default_rng(0)
+    rows = []
+    for i, d in enumerate(pd.date_range("2015-01-05", "2025-12-01", freq="7D")):
+        x, y = sorted(rng.choice(4, 2, replace=False))
+        w, l = ("abcd"[x], "abcd"[y]) if rng.random() < 0.8 else ("abcd"[y], "abcd"[x])
+        rows.append((d, w, l, "6-4 6-4", f"E{i}", "R32", 1.0))
+    df = pd.DataFrame(rows, columns=["date", "winner_id", "loser_id", "score", "tourney_id", "round", "round_idx"])
+    df["tour"], df["surface"], df["tournament"], df["comment"] = "atp", "Hard", df["tourney_id"], "Completed"
+    df["season"], df["level_group"], df["void"], df["best_of"] = df["date"].dt.year, "other", False, 3
+    df["w_svpt"], df["l_svpt"] = 60.0, 60.0
+    df["w_1stWon"], df["l_1stWon"] = rng.integers(25, 35, len(df)), rng.integers(23, 33, len(df))
+    df["w_2ndWon"], df["l_2ndWon"] = 10.0, 10.0
+    return ep.prep(df)
+
+
+def test_page_model_is_symmetric_and_uses_ratings():
+    pm = ep.page_model(big_frame(), fit_before=2026)
+    r = pm["ratings"].drop_duplicates("id").set_index("id")
+    assert r.loc["a", "elo"] > r.loc["d", "elo"] and r.loc["a", "spw"] > r.loc["a", "rpw"]
+    a, d = (dict(r.loc[x, ["elo", "spw", "rpw"]], selo=r.loc[x, "elo"]) for x in ("a", "d"))
+    m = pm["mean_spw"]["atp"]
+    p = ep.page_prob(a, d, m, 3, pm["cal"])
+    assert 0.6 < p < 1 and abs(p + ep.page_prob(d, a, m, 3, pm["cal"]) - 1) < 0.02
+    # a stronger rating raises the chance
+    assert ep.page_prob(dict(a, elo=a["elo"] + 200, selo=a["selo"] + 200), d, m, 3, pm["cal"]) > p

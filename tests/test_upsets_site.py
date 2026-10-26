@@ -252,3 +252,25 @@ def test_no_kalshi():
     code = "import sys, upsets.site; print([m for m in sys.modules if 'kalshi' in m.lower()])"
     out = subprocess.run([sys.executable, "-c", code], capture_output=True, text=True, check=True).stdout
     assert out.strip() == "[]"
+
+
+def test_page_uses_elo_serve_model(dirs):
+    """Model swap (2026-10-26): model_p1 is upsets.elo_plus's "+serve" page model, not the raw Elo,
+    and a cache written by the old model is ignored."""
+    sha = site.archive_sha(dirs["archive"])
+    dirs["cache"].mkdir(parents=True)
+    (dirs["cache"] / f"ratings_{sha}.parquet").write_text("old model")   # stale cache: must not be read
+    rt = site.load_ratings(dirs["archive"], dirs["cache"])
+    assert (dirs["cache"] / f"{site.MODEL_TAG}_{sha}.parquet").exists()
+    assert not (dirs["cache"] / f"ratings_{sha}.parquet").exists()
+    assert set(rt["ratings"].columns) >= {"elo", "selo", "n", "spw", "rpw"}
+    m = {x["event_id"]: x for x in run(dirs, FakeApi())["matches"]}
+    r = rt["ratings"]
+    one = r[(r["id"] == "1") & (r["surface"] == "Hard")].iloc[0].to_dict()
+    two = r[(r["id"] == "2") & (r["surface"] == "Hard")].iloc[0].to_dict()
+    want = site.elo_plus.page_prob(one, two, rt["mean_spw"]["atp"], 3, rt["cal"])
+    assert m["e1"]["model_p1"] == pytest.approx(want, abs=1e-4)
+    old = 1 / (1 + 10 ** (-(0.5 * (one["elo"] - two["elo"]) + 0.5 * (one["selo"] - two["selo"])) / 400))
+    assert abs(m["e1"]["model_p1"] - old) > 1e-3                        # not the old raw-Elo formula
+    assert site.best_of("tennis_atp_wimbledon") == 5 and site.best_of("tennis_wta_wimbledon") == 3
+    assert site.best_of(PARIS) == 3
