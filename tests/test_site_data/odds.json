@@ -1,0 +1,202 @@
+{
+ "generated_at": "2026-10-26T06:00:00Z",
+ "odds_fetched_at": "2026-10-26T05:55:00Z",
+ "status": "ok",
+ "credits": {
+  "left": 18250,
+  "used_this_month": 143,
+  "month_cap": 600
+ },
+ "ratings_through": "2026-10-19",
+ "tournaments": [
+  {
+   "sport_key": "tennis_atp_paris",
+   "title": "ATP Paris Masters",
+   "tour": "ATP"
+  },
+  {
+   "sport_key": "tennis_wta_finals",
+   "title": "WTA Finals",
+   "tour": "WTA"
+  },
+  {
+   "sport_key": "tennis_atp_brest",
+   "title": "ATP Brest Challenger",
+   "tour": "ATP"
+  }
+ ],
+ "matches": [
+  {
+   "event_id": "e01",
+   "sport_key": "tennis_atp_paris",
+   "tournament": "ATP Paris Masters",
+   "tour": "ATP",
+   "commence_time": "2026-10-26T10:00:00Z",
+   "player_1": "Alex Marlow",
+   "player_2": "Bruno Castellano",
+   "draftkings": {
+    "odds_1": 1.45,
+    "odds_2": 2.8,
+    "last_update": "2026-10-26T05:52:00Z",
+    "margin": 0.0468
+   },
+   "pinnacle": {
+    "odds_1": 1.48,
+    "odds_2": 2.86,
+    "last_update": "2026-10-26T05:52:00Z",
+    "margin": 0.0253
+   },
+   "fair_1": 0.659,
+   "dk_implied_1": 0.6897,
+   "model_p1": 0.66,
+   "model_n1": 212,
+   "model_n2": 180
+  },
+  {
+   "event_id": "e02",
+   "sport_key": "tennis_atp_paris",
+   "tournament": "ATP Paris Masters",
+   "tour": "ATP",
+   "commence_time": "2026-10-26T12:30:00Z",
+   "player_1": "Dmitri Volkonsky-Arranz",
+   "player_2": "Elias Thorsen",
+   "draftkings": {
+    "odds_1": 2.1,
+    "odds_2": 1.74,
+    "last_update": "2026-10-26T05:52:00Z",
+    "margin": 0.0509
+   },
+   "pinnacle": {
+    "odds_1": 2.17,
+    "odds_2": 1.77,
+    "last_update": "2026-10-26T05:52:00Z",
+    "margin": 0.0258
+   },
+   "fair_1": 0.4492,
+   "dk_implied_1": 0.4762,
+   "model_p1": 0.47,
+   "model_n1": 140,
+   "model_n2": 95
+  },
+  {
+   "event_id": "e03",
+   "sport_key": "tennis_atp_paris",
+   "tournament": "ATP Paris Masters",
+   "tour": "ATP",
+   "commence_time": "2026-10-26T15:00:00Z",
+   "player_1": "Felix Ngata",
+   "player_2": "Gustavo Pereira Lima",
+   "draftkings": {
+    "odds_1": 1.2,
+    "odds_2": 4.5,
+    "last_update": "2026-10-26T05:52:00Z",
+    "margin": 0.0556
+   },
+   "pinnacle": null,
+   "fair_1": 0.7895,
+   "dk_implied_1": 0.8333,
+   "model_p1": 0.81,
+   "model_n1": 301,
+   "model_n2": 22
+  },
+  {
+   "event_id": "e04",
+   "sport_key": "tennis_atp_paris",
+   "tournament": "ATP Paris Masters",
+   "tour": "ATP",
+   "commence_time": "2026-10-27T09:00:00Z",
+   "player_1": "Hiro Tanabe",
+   "player_2": "Ivan Kostic",
+   "draftkings": null,
+   "pinnacle": {
+    "odds_1": 1.91,
+    "odds_2": 1.99,
+    "last_update": "2026-10-26T05:52:00Z",
+    "margin": 0.0261
+   },
+   "fair_1": 0.5103,
+   "dk_implied_1": null,
+   "model_p1": null,
+   "model_n1": 12,
+   "model_n2": 88
+  },
+  {
+   "event_id": "e05",
+   "sport_key": "tennis_wta_finals",
+   "tournament": "WTA Finals",
+   "tour": "WTA",
+   "commence_time": "2026-10-26T13:00:00Z",
+   "player_1": "Julia Novak",
+   "player_2": "Kira Andersen",
+   "draftkings": {
+    "odds_1": 1.67,
+    "odds_2": 2.2,
+    "last_update": "2026-10-26T05:52:00Z",
+    "margin": 0.0533
+   },
+   "pinnacle": {
+    "odds_1": 1.7,
+    "odds_2": 2.25,
+    "last_update": "2026-10-26T05:52:00Z",
+    "margin": 0.0327
+   },
+   "fair_1": 0.5696,
+   "dk_implied_1": 0.5988,
+   "model_p1": 0.58,
+   "model_n1": 250,
+   "model_n2": 231
+  },
+  {
+   "event_id": "e06",
+   "sport_key": "tennis_wta_finals",
+   "tournament": "WTA Finals",
+   "tour": "WTA",
+   "commence_time": "2026-10-26T18:00:00Z",
+   "player_1": "Lena Moreau",
+   "player_2": "Maya Okonkwo-Fairbanks",
+   "draftkings": {
+    "odds_1": 3.25,
+    "odds_2": 1.36,
+    "last_update": "2026-10-26T05:52:00Z",
+    "margin": 0.043
+   },
+   "pinnacle": {
+    "odds_1": 3.4,
+    "odds_2": 1.38,
+    "last_update": "2026-10-26T05:52:00Z",
+    "margin": 0.0188
+   },
+   "fair_1": 0.2887,
+   "dk_implied_1": 0.3077,
+   "model_p1": null,
+   "model_n1": 0,
+   "model_n2": 140
+  },
+  {
+   "event_id": "e07",
+   "sport_key": "tennis_atp_brest",
+   "tournament": "ATP Brest Challenger",
+   "tour": "ATP",
+   "commence_time": "2026-10-26T05:30:00Z",
+   "player_1": "Nils Berger",
+   "player_2": "Omar Haddad",
+   "draftkings": {
+    "odds_1": 1.83,
+    "odds_2": 1.95,
+    "last_update": "2026-10-26T05:52:00Z",
+    "margin": 0.0593
+   },
+   "pinnacle": {
+    "odds_1": 1.87,
+    "odds_2": 2.0,
+    "last_update": "2026-10-26T05:52:00Z",
+    "margin": 0.0348
+   },
+   "fair_1": 0.5168,
+   "dk_implied_1": 0.5464,
+   "model_p1": 0.52,
+   "model_n1": 64,
+   "model_n2": 41
+  }
+ ]
+}

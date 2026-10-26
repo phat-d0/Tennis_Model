@@ -1,0 +1,11 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
+  <rect width="512" height="512" fill="#2f7d4f"/>
+  <!-- odds bar motif: player 1 / player 2 -->
+  <g transform="translate(96 352)">
+    <rect width="186" height="40" rx="20" fill="#ffffff"/>
+    <rect x="194" width="126" height="40" rx="20" fill="#9fd4b3"/>
+  </g>
+  <!-- ball -->
+  <circle cx="256" cy="200" r="104" fill="#d9f24a"/>
+  <path d="M170 140c40 30 40 90 0 120M342 140c-40 30-40 90 0 120" fill="none" stroke="#ffffff" stroke-width="12" stroke-linecap="round"/>
+</svg>
