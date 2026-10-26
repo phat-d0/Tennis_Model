@@ -379,6 +379,8 @@ def prices(need: pd.DataFrame, snaps: pd.DataFrame, sack: pd.DataFrame, lead_min
     m["age_min"] = (m["commence"] - m["snapshot_ts"]).dt.total_seconds() / 60
     wide = m.pivot(index="sack_row", columns="book", values=["odds_w", "odds_l", "age_min", "snapshot_ts"])
     wide.columns = [f"{v}_{b}" for v, b in wide.columns]
+    for c in wide.columns:
+        wide[c] = pd.to_datetime(wide[c]) if c.startswith("snapshot_ts") else pd.to_numeric(wide[c])
     out = wide.reset_index()
     out["commence"] = out["sack_row"].map(need.drop_duplicates("sack_row").set_index("sack_row")["commence"])
     return out
@@ -418,13 +420,12 @@ def collect(t: pd.DataFrame, sack: pd.DataFrame, events_step_h: float = 24.0, le
     j = join_events(ev, sack)
     need = j[(j["sack_row"] >= 0) & (j["round_idx"] <= 2)]
     out = prices(need, snaps, sack, lead_min)
-    open_ = j[needed(j, t) & (j["sack_row"] < 0)]
-    out.attrs["unresolved"] = unresolved_prices(open_, snaps, lead_min)
     if len(out):
         meta = need.drop_duplicates("sack_row").set_index("sack_row")[["key", "tourney_id"]]
         out = out.join(meta, on="sack_row")
-    out.attrs.update(listed=len(ev), joined=int((j["sack_row"] >= 0).sum()), r12=len(need))
-    out.attrs.setdefault("unresolved", pd.DataFrame())
+    open_ = j[needed(j, t) & (j["sack_row"] < 0)]
+    out.attrs.update(listed=len(ev), joined=int((j["sack_row"] >= 0).sum()), r12=len(need),
+                     unresolved=unresolved_prices(open_, snaps, lead_min))
     return out
 
 
@@ -442,7 +443,7 @@ def unresolved_prices(ev: pd.DataFrame, snaps: pd.DataFrame, lead_min: float = 5
     w = m.pivot(index=["key", "tourney_id", "event_id", "commence", "home", "away"], columns="book",
                 values=["odds_1", "odds_2", "age_min"])
     w.columns = [f"{v.replace('odds_1', 'odds_home').replace('odds_2', 'odds_away')}_{b}" for v, b in w.columns]
-    return w.reset_index()
+    return w.astype(float).reset_index()
 
 
 # --- CLI -------------------------------------------------------------------------------------

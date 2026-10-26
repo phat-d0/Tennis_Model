@@ -14,3 +14,4 @@ data/live/
 reports/*.csv
 *.egg-info/
 data/recorded/
+data/reports/

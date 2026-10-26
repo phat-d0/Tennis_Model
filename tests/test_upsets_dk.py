@@ -305,3 +305,27 @@ def test_needed_ignores_stale_events_outside_the_window():
     t = pd.DataFrame({"key": ["k"], "tourney_id": ["p+52w"], "projected": [True], "r12_days": [3],
                       "win_start": [pd.Timestamp("2026-09-16")], "win_end": [pd.Timestamp("2026-10-04")]})
     assert list(dh.needed(j, t)) == [False, True, True]   # last year's final in an old snapshot: out
+
+
+def test_results_from_kalshi_and_unresolved_frame():
+    u = pd.DataFrame({"key": ["tennis_atp_halle_open"] * 3, "tourney_id": ["h+52w"] * 3,
+                      "event_id": ["x1", "x2", "x3"],
+                      "commence": pd.to_datetime(["2026-06-16 10:00", "2026-06-16 12:00", "2026-06-17 12:00"]),
+                      "home": ["Jan-Lennard Struff", "Ugo Humbert", "A B"], "away": ["Félix Auger-Aliassime", "C D", "E F"],
+                      "odds_home_draftkings": [3.2, 1.5, 2.0], "odds_away_draftkings": [1.35, 2.6, 1.8],
+                      "odds_home_pinnacle": [3.4, 1.52, np.nan], "odds_away_pinnacle": [1.36, 2.7, np.nan],
+                      "age_min_draftkings": [9.0, 9.0, 9.0], "age_min_pinnacle": [9.0, 9.0, np.nan]})
+    km = pd.DataFrame({"match_id": ["K1", "K2", "K3"], "series": ["KXATPMATCH"] * 3,
+                       "scheduled_start": pd.to_datetime(["2026-06-16 10:30", "2026-06-16 12:10", "2026-06-25 12:00"], utc=True),
+                       "player_a": ["Felix Auger Aliassime", "C D", "A B"], "player_b": ["Jan Lennard Struff", "Ugo Humbert", "E F"],
+                       "settle_a": [0.0, 0.43, 1.0], "settle_b": [1.0, 0.57, 0.0]})
+    res = ds.results_from_kalshi(ds.match_list(u), km).set_index("event_id")
+    assert res.loc["x1", "winner"] == "home" and not res.loc["x1", "void"]      # Struff (home, dog) won
+    assert res.loc["x2", "void"]                                                # fair price: not started
+    assert "x3" not in res.index                                                # 8 days apart: no match
+    assert "odds_home_draftkings" not in ds.match_list(u).columns              # no odds leave the container
+    f = ds.frame_unresolved(u, res.reset_index())
+    r = f.set_index(f["odds_dog_dk"])
+    assert r.loc[3.2, "upset"] == 1 and r.loc[3.2, "odds_fav_dk"] == 1.35 and r.loc[3.2, "tour"] == "atp"
+    assert r.loc[2.6, "void"]
+    assert ds.pnl(f).sum() == pytest.approx(3.2 - 1)
