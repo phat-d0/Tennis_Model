@@ -175,3 +175,38 @@ def test_run_end_to_end_smoke():
     assert parts["km"]["id_a"].notna().all()
     assert len(parts["bets"]) == 60
     assert parts["bets"]["p_dog"].between(0, 1).all()
+
+
+def test_unjoined_later_round_never_leaks_into_joined_earlier_round():
+    """X's R1 is joined (Kalshi start day 3); X's R2 is not (estimated ~day 1). X's R1 pre-match
+    Elo must be the same whether X won or lost R2."""
+    out = {}
+    for x_wins_r2 in (True, False):
+        r2 = (srow("ev", 20260601, "q", "r", num=20, rnd="R16") if x_wins_r2
+              else srow("ev", 20260601, "r", "q", num=20, rnd="R16"))
+        extra = [srow("ev", 20260601, "q", "s", num=1, rnd="R32"), r2]
+        sack = sack_frame(extra)
+        pl = ke.player_table(sack)
+        km = ke.kalshi_matches(kmatches([
+            ("K1", "2026-06-04 18:00", "Quinn Quill", "Sam Sole", 1.0)]), pl)
+        rows, km = ke.timeline(sack, km)
+        k = km.set_index("match_id")
+        assert k.loc["K1", "sack_row"] >= 0
+        r1_t = rows.loc[rows["kalshi"].notna(), "time"].iloc[0]
+        r2_t = rows.loc[(rows["wkey"].isin(["q", "r"])) & (rows["lkey"].isin(["q", "r"])), "time"].iloc[0]
+        assert r2_t > r1_t
+        out[x_wins_r2] = (k.loc["K1", "elo_a"], k.loc["K1", "elo_b"], k.loc["K1", "n_a"])
+    assert out[True] == out[False]
+
+
+def test_round_monotone():
+    s = pd.DataFrame({
+        "tourney_id": ["e"] * 4 + ["f"],
+        "round_idx": [1.0, 1.0, 2.0, np.nan, 1.0],
+        "round": ["R32", "R32", "R16", "Q1", "R32"],
+        "time": pd.to_datetime(["2026-06-01", "2026-06-04", "2026-06-02", "2026-05-30", "2026-06-01"]),
+    })
+    t = ke.round_monotone(s)
+    assert t[0] == s["time"][0] and t[1] == s["time"][1] and t[4] == s["time"][4]
+    assert t[2] > s["time"][1]            # R2 moved after the latest R1
+    assert t[3] == s["time"][3]           # qualifying stays at the start

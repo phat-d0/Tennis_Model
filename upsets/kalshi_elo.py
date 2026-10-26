@@ -157,6 +157,23 @@ def estimated_time(sack: pd.DataFrame) -> pd.Series:
     return sack["date"] + pd.to_timedelta(frac * span, unit="D")
 
 
+def round_monotone(s: pd.DataFrame, eps: pd.Timedelta = pd.Timedelta(microseconds=1)) -> pd.Series:
+    """Times made non-decreasing in round order within each tournament: a row in round r is
+    moved to just after the latest row of any earlier round (plus r x eps, so rounds never tie).
+    Qualifying/round-robin rows (no round_idx) count as the first round; 'BR' goes last.
+    Needed because joined rows carry Kalshi's real start while the rest are estimates: an
+    unjoined R2 row must never sort before a joined R1 row of the same event."""
+    order = sackmann._order_key(s)
+    rank = order.groupby(s["tourney_id"]).rank(method="dense").astype(int)
+    g = (pd.DataFrame({"t": s["tourney_id"], "r": rank, "time": s["time"]})
+         .groupby(["t", "r"], sort=True)["time"].max().reset_index())
+    g["prev"] = g.groupby("t")["time"].transform(lambda x: x.cummax().shift())
+    prev = pd.MultiIndex.from_frame(pd.DataFrame({"t": s["tourney_id"], "r": rank}))
+    floor = g.set_index(["t", "r"])["prev"].reindex(prev).to_numpy()
+    floor = pd.Series(floor, index=s.index) + rank * eps
+    return s["time"].where(floor.isna() | (s["time"] >= floor), floor)
+
+
 def kalshi_matches(matches: pd.DataFrame, players: pd.DataFrame) -> pd.DataFrame:
     """ATP/WTA Kalshi matches with player ids and the result (a_won: 1/0, NaN if fair-price)."""
     m = matches[matches["series"].isin(TOURS)].dropna(subset=["scheduled_start"]).copy()
@@ -203,6 +220,10 @@ def timeline(sack: pd.DataFrame, km: pd.DataFrame) -> tuple[pd.DataFrame, pd.Dat
     joined = km[km["sack_row"] >= 0]
     s.loc[joined["sack_row"].to_numpy(), "time"] = joined["start"].to_numpy()
     s.loc[joined["sack_row"].to_numpy(), "kalshi"] = joined.index.to_numpy()
+    fixed = round_monotone(s)
+    is_joined = s["kalshi"].notna()
+    km.attrs["moved_joined"] = int((is_joined & (fixed != s["time"])).sum())
+    s["time"] = fixed
     sack_end = coverage_end(sack)
 
     rest = km[km["sack_row"] < 0]
@@ -370,7 +391,8 @@ def report(km: pd.DataFrame, b: pd.DataFrame, oos: pd.DataFrame, months: pd.Data
         f"({both.mean():.1%}). Name matches by method: "
         + ", ".join(f"{k} {v:,}" for k, v in how.items()) + ".",
         f"- Joined to a Sackmann row (real seeds/ranks): {joined.sum():,}; winner agrees with "
-        f"Kalshi's settlement in {agree:.1%} of settled joined matches.",
+        f"Kalshi's settlement in {agree:.1%} of settled joined matches. Joined rows moved later "
+        f"to keep round order within their event: {km.attrs.get('moved_joined', 0):,}.",
         f"- Early-round bets with both players matched and ≥ {min_n} prior matches each: {len(early):,} "
         f"(of {int((b['group'] == 'early').sum()):,} early-round matches with closing asks).",
         f"- Model: P(win) = logistic(Elo logit, Elo logit × best-of-5), coefficients fitted on "
