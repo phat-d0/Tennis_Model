@@ -106,14 +106,14 @@ systemctl stop swinglock                                      # stop everything
 ## What runs, and its limits
 | Service | What it does | Kalshi requests |
 |---|---|---|
-| `scanner` | Live arb and lock alerts → `data/live/state.json`, `data/alerts.log` | capped at `scanner.max_rps` (0.5 req/s): one orderbooks call per 50 matches each poll, so with 250 open matches polls are 12 s apart instead of 5 s |
-| `recorder` | Order books, top-5 depth, matches and scores → daily parquet in `data/recorded/kalshi/` | ≤ 1 req/s cap; grows with the number of open matches (~0.45 req/s at 252 matches) |
+| `scanner` | Live arb and lock alerts → `data/live/state.json`, `data/alerts.log` | capped at `scanner.max_rps` (0.5 req/s): one orderbooks call per 50 matches each poll, so polls are about 6 s apart at ~100 open matches |
+| `recorder` | Order books, top-5 depth, matches and scores → daily parquet in `data/recorded/kalshi/` | capped at `recorder.max_rps` (0.5 req/s); grows with the number of open matches (~0.33 req/s at 104 matches) |
 | `dashboard` | Web page on 127.0.0.1:8000, reachable only through `tailscale serve` (tailnet-only HTTPS) | none |
 
 - **One IP, one rate limit.** The scanner and the recorder share the server's IP, and with it Kalshi's
-  unauthenticated limit, which is undocumented. **Never run a backfill on this server.** In the
-  test below, the two together ran at about 0.95 req/s and got an occasional 429 (about 1 a minute),
-  which both clients retry after a short wait.
+  unauthenticated limit, which is undocumented. **Never run a backfill on this server.** Both
+  are capped at 0.5 req/s. With ITF dropped they ran at about 0.84 req/s together, with no 429s.
+  The earlier ITF run at about 0.95 req/s got about one 429 a minute, which both clients retried.
 - **Firewall:** ufw denies all inbound except the `tailscale0` interface and Tailscale's UDP port 41641.
   The dashboard port is only bound to 127.0.0.1. Docker-published ports would bypass ufw, so none are
   published on a public interface.
@@ -148,6 +148,17 @@ systemctl stop swinglock                                      # stop everything
   Odd result: the first 3 minutes, before the scanner's rate cap existed (scanner at about 1 req/s,
   about 1.5 req/s combined), had no 429s at all. So the limit isn't a simple rate, and the test
   machine's IP may be shared.
+- **Re-run after dropping ITF** (config `scanner.series` = ATP, WTA, ATP Challenger, WTA 125; both
+  `max_rps` 0.5), all three services for 5.5 min. Both services watched **104 matches**, including 32 ATP
+  Challenger and 24 WTA 125.
+
+  | Service | Requests | Rate | 429s |
+  |---|---|---|---|
+  | scanner | 170 | 0.51 req/s | 0 |
+  | recorder | 108 | 0.33 req/s | 0 |
+  | **combined** | 278 | 0.84 req/s | **0** |
+
+  The recorder wrote parquet for all 104 matches, and the dashboard returned HTTP 200.
 - **Not tested here:** the Tailscale install, `tailscale up`/`serve` (pkgs.tailscale.com is blocked in
   the test sandbox, and joining needs a real key), a real systemd boot, and enabling ufw on a real host.
   These steps are guarded: public SSH stays open unless Tailscale came up.
