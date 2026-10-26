@@ -225,12 +225,22 @@ def needed(j: pd.DataFrame, t: pd.DataFrame | None = None, early_rounds: int = 2
     """Events that need a price: Sackmann rounds 1-2, or, for a projected event (no Sackmann rows;
     results come from Kalshi), every listed match in its first r12_days days of play."""
     sel = (j["sack_row"] >= 0) & (j["round_idx"] <= early_rounds)
+    inside = pd.Series(True, index=j.index)
+    if t is not None and len(t) and {"win_start", "win_end"} <= set(t.columns):
+        # a listing returns the closest snapshot at or before the requested date, which can be
+        # an old one (e.g. last year's final): keep only events that start inside the window
+        w = t.set_index(["key", "tourney_id"])[["win_start", "win_end"]]
+        idx = pd.MultiIndex.from_frame(j[["key", "tourney_id"]])
+        ws = pd.Series(w["win_start"].reindex(idx).to_numpy(), index=j.index)
+        we = pd.Series(w["win_end"].reindex(idx).to_numpy(), index=j.index)
+        inside = ((j["commence"] >= ws - pd.Timedelta(days=1)) & (j["commence"] <= we + pd.Timedelta(days=3))) | ws.isna()
+        sel &= inside
     if t is not None and len(t) and "projected" in t and t["projected"].any():
         pr = t[t["projected"]].set_index(["key", "tourney_id"])["r12_days"]
         idx = pd.MultiIndex.from_frame(j[["key", "tourney_id"]])
         days = pd.Series(pr.reindex(idx).to_numpy(), index=j.index)
-        first = j.groupby(["key", "tourney_id"])["commence"].transform("min")
-        sel |= days.notna() & (j["commence"] < first.dt.floor("D") + pd.to_timedelta(days.fillna(0), unit="D"))
+        first = j["commence"].where(inside).groupby([j["key"], j["tourney_id"]]).transform("min")
+        sel |= inside & days.notna() & (j["commence"] < first.dt.floor("D") + pd.to_timedelta(days.fillna(0), unit="D"))
     return sel
 
 

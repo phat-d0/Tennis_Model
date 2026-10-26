@@ -296,3 +296,12 @@ def test_pull_stops_if_an_empty_listing_costs_credits(tmp_path):
     todo = pd.DataFrame([{"key": A_KEY, "when": f"2024-01-1{i}T00:00:00Z"} for i in range(3)])
     res = dh.pull(api, "events", todo, cap=1000, root=tmp_path, pause_s=0)
     assert res["done"] == 1 and "empty listing cost credits" in res["stopped"]
+
+
+def test_needed_ignores_stale_events_outside_the_window():
+    j = pd.DataFrame({"key": ["k"] * 3, "tourney_id": ["p+52w"] * 3,
+                      "commence": pd.to_datetime(["2025-10-01 06:00", "2026-09-30 03:00", "2026-10-01 03:00"]),
+                      "sack_row": [-1] * 3, "round_idx": [np.nan] * 3})
+    t = pd.DataFrame({"key": ["k"], "tourney_id": ["p+52w"], "projected": [True], "r12_days": [3],
+                      "win_start": [pd.Timestamp("2026-09-16")], "win_end": [pd.Timestamp("2026-10-04")]})
+    assert list(dh.needed(j, t)) == [False, True, True]   # last year's final in an old snapshot: out
