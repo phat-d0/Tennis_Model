@@ -37,3 +37,11 @@ Checked on the real files (2026-10-25):
   Nadal, Djokovic, Murray; 2016 Djokovic, Murray; 2023 Djokovic, Sinner, Alcaraz; 2025 Sinner,
   Alcaraz, Djokovic. WTA 2016 S. Williams, Azarenka, Kerber; 2023 Swiatek, Gauff, Pegula,
   Sabalenka; 2025 Sabalenka, Swiatek, Rybakina, Gauff.
+
+## DraftKings / Pinnacle historical odds (The Odds API, paid plan)
+Planner + puller: `upsets/dk_history.py`; analysis: `upsets/dk_study.py`. Scope: Slams 2020+ and 1000s
+2024+ (95 key-events through Roland Garros 2026), rounds 1–2, `bookmakers=draftkings,pinnacle`.
+Raw responses are cached gzipped under `data/raw/odds_api/` (gitignored; **never committed**: the Odds
+API terms forbid redistribution) with their own spend log `data/raw/odds_api/spend.log`. Every spend
+also goes in `docs/data_inventory.md`. Order: `plan` (dry run, free) → `events --yes` (listings, ≤ 683
+credits) → `plan` (exact odds count) → `odds --yes` (10 credits per snapshot). Pull cap 15,000, floor 1,000.
