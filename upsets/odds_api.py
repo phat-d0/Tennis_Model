@@ -21,6 +21,27 @@ import requests
 BASE = "https://api.the-odds-api.com/v4"
 DEFAULT_BOOKS = ("draftkings", "pinnacle")
 
+# Odds API key suffix -> Sackmann tournament names (both tours); dk_history and the odds page (site) use it
+KEY_NAMES = {
+    "aus_open_singles": ["Australian Open"], "french_open": ["Roland Garros"],
+    "wimbledon": ["Wimbledon"], "us_open": ["Us Open", "US Open"],
+    "indian_wells": ["Indian Wells Masters", "Indian Wells"], "miami_open": ["Miami Masters", "Miami"],
+    "madrid_open": ["Madrid Masters", "Madrid"], "italian_open": ["Rome Masters", "Rome"],
+    "canadian_open": ["Canada Masters", "Montreal", "Toronto"],
+    "cincinnati_open": ["Cincinnati Masters", "Cincinnati"],
+    "shanghai_masters": ["Shanghai Masters"], "paris_masters": ["Paris Masters"],
+    "monte_carlo_masters": ["Monte Carlo Masters"], "china_open": ["Beijing"],
+    "wuhan_open": ["Wuhan"], "dubai": ["Dubai"], "qatar_open": ["Doha"],
+    # 250/500 keys (in scope only with levels including "other")
+    "barcelona_open": ["Barcelona"], "halle_open": ["Halle"], "hamburg_open": ["Hamburg"],
+    "japan_open": ["Tokyo"], "munich": ["Munich"], "queens_club_champ": ["Queen's Club"],
+    "pan_pacific_open": ["Tokyo"],
+    "washington_open": ["Washington"], "bad_homburg_open": ["Bad Homburg"],
+    "charleston_open": ["Charleston"], "german_open": ["Berlin"], "guadalajara_open": ["Guadalajara"],
+    "monterrey_open": ["Monterrey"], "ningbo_open": ["Ningbo"], "singapore_open": ["Singapore"],
+    "strasbourg": ["Strasbourg"], "stuttgart_open": ["Stuttgart"],
+}
+
 
 class BudgetError(RuntimeError):
     pass
@@ -71,6 +92,11 @@ class OddsApi:
         cost = -(-len(bookmakers) // 10)
         return self._get(f"/sports/{sport}/odds", {"markets": "h2h", "oddsFormat": "decimal",
                                                     "bookmakers": ",".join(bookmakers)}, cost)
+
+    def scores(self, sport: str, days_from: int = 3) -> list[dict]:
+        """Live and recently completed events with scores; 2 credits with daysFrom (1 without)."""
+        return self._get(f"/sports/{sport}/scores", {"daysFrom": days_from, "dateFormat": "iso"},
+                         2 if days_from else 1)
 
     def historical_events(self, sport: str, when: str) -> dict:
         """Events listed at ISO time `when`: {"timestamp", "data": [...]}; 1 credit, 0 if none."""

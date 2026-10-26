@@ -22,12 +22,8 @@ def expected(r_a: float, r_b: float) -> float:
     return 1.0 / (1.0 + 10 ** ((r_b - r_a) / 400.0))
 
 
-def add_elo(df: pd.DataFrame, keys: tuple[str, str] = ("winner", "loser")) -> pd.DataFrame:
-    """Add pre-match columns w_elo, l_elo, w_selo, l_selo, w_n, l_n (matches played before).
-
-    Players are keyed by (tour, <keys> column) so ATP and WTA pools never mix; pass
-    keys=("winner_id", "loser_id") when the source has player ids (Sackmann).
-    """
+def _replay(df: pd.DataFrame, keys: tuple[str, str]):
+    """Run every match in order. -> (pre-match columns, final state dicts)."""
     rating: dict = defaultdict(lambda: START)
     s_rating: dict = defaultdict(lambda: START)
     played: dict = defaultdict(int)
@@ -55,7 +51,26 @@ def add_elo(df: pd.DataFrame, keys: tuple[str, str] = ("winner", "loser")) -> pd
         played[l] += 1
         s_played[ws] += 1
         s_played[ls] += 1
+    return cols, (rating, s_rating, played, s_played)
+
+
+def add_elo(df: pd.DataFrame, keys: tuple[str, str] = ("winner", "loser")) -> pd.DataFrame:
+    """Add pre-match columns w_elo, l_elo, w_selo, l_selo, w_n, l_n (matches played before).
+
+    Players are keyed by (tour, <keys> column) so ATP and WTA pools never mix; pass
+    keys=("winner_id", "loser_id") when the source has player ids (Sackmann).
+    """
+    cols, _ = _replay(df, keys)
     out = df.copy()
     for c, v in cols.items():
         out[c] = v
     return out
+
+
+def final_ratings(df: pd.DataFrame, keys: tuple[str, str] = ("winner", "loser")) -> pd.DataFrame:
+    """Ratings after the last match: one row per (tour, player, surface) with elo/n (overall)
+    and selo/sn (that surface). Players with no match on a surface have no row for it."""
+    _, (rating, s_rating, played, s_played) = _replay(df, keys)
+    rows = [(t, p, s, rating[(t, p)], played[(t, p)], r, s_played[((t, p), s)])
+            for ((t, p), s), r in s_rating.items()]
+    return pd.DataFrame(rows, columns=["tour", "id", "surface", "elo", "n", "selo", "sn"])

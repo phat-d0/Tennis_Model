@@ -46,7 +46,7 @@ def kmatches(rows):
 # --- names -----------------------------------------------------------------------------------
 
 def players(rows):
-    return pd.DataFrame([{"tour": t, "id": i, "name": n, "key": ke.name_key(n),
+    return pd.DataFrame([{"tour": t, "id": i, "name": n, "key": ke.norm_name(n),
                           "last": pd.Timestamp(last)} for t, i, n, last in rows])
 
 
@@ -65,6 +65,23 @@ def test_name_matching():
     assert list(r["id"].astype(object).where(r["id"].notna(), None)) == [
         "1", "2", "3", "4", None, "8", None]
     assert list(r["how"]) == ["exact", "order", "initial", "fuzzy", "ambiguous", "exact", "none"]
+
+
+def test_name_key_order_and_aliases():
+    # the pairs Data had to alias by hand (Odds API / Kalshi / Sackmann spellings)
+    same = [("Bu Yunchaokete", "Yunchaokete Bu"), ("Shi Han", "Han Shi"), ("Guo Hanyu", "Hanyu Guo"),
+            ("Liang En-shuo", "En-Shuo Liang"), ("Liang En-shuo", "En Shuo Liang"),
+            ("Maria Camila Osorio Serrano", "Camila Osorio"),
+            ("Mayar Sherif Ahmed Abdelaziz", "Mayar Sherif"), ("Martin Damm Jr.", "Martin Damm Jr")]
+    for a, b in same:
+        assert ke.name_key(a) == ke.name_key(b), (a, b)
+    assert ke.name_key("Andres Martin") != ke.name_key("Andrej Martin")
+    assert ke.norm_name("Osorio Serrano Maria Camila") == "camila osorio"   # alias hits in any order
+    assert ke.norm_name("Yunchaokete Bu") == "yunchaokete bu"                # order kept for initials
+    p = players([("wta", "1", "Camila Osorio", "2026-05-01"), ("wta", "2", "Mayar Sherif", "2026-05-01")])
+    r = ke.match_names(pd.Series(["Maria Camila Osorio Serrano", "Mayar Sherif Ahmed Abdelaziz"]),
+                       pd.Series(["wta", "wta"]), p)
+    assert list(r["id"]) == ["1", "2"] and list(r["how"]) == ["exact", "exact"]
 
 
 # --- timeline --------------------------------------------------------------------------------

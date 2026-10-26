@@ -15,3 +15,7 @@ reports/*.csv
 *.egg-info/
 data/recorded/
 data/reports/
+# odds page build (upsets/site.py): Sackmann clone, odds snapshot cache, built site
+data/sackmann/
+data/site_cache/
+_site/
