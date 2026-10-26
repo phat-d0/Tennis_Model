@@ -197,12 +197,17 @@ The owner asked for a public phone page like the soccer app, refreshed every 3 h
 - **DK all tiers at the close (#99): no edge.** Dog ROI −11.2% against −10.9% expected at Pinnacle-fair, on 6,655 matches. DK's margin is
   5.16%, mostly on the dog. Elo walk-forward FAIL (−15.3%, 2,426 OOS bets). Drift report (#100): DK sits static in the last 3 h
   while Pinnacle moves. Name aliases are in (#95).
-- **Line shopping (A, #101, pending a pandas 3.1 fix):** the pre-registered gate PASSES (379 OOS bets, +6.4%, CLV +3.7%), but it is
+- **Line shopping (A, #101, merged):** the pre-registered gate PASSES (379 OOS bets, +6.4%, CLV +3.7%), but it is
   **fragile**:
   - The CI runs −4.5% to +18.1%.
   - With the books within 5 points it is +0.9%, CLV −0.2%. The profit rests on about 40 big-disagreement bets that look like stale DK lines.
   - The forward test is the Portfolio tab's "DK vs Pinnacle" strategy.
   - Not an edge until it holds up live.
+- **Elo upgrades (B, #103): no edge.** Best variant (+fatigue+serve) log loss 0.5755, against 0.5859 for the current Elo and 0.5552
+  for Pinnacle. Every variant is worse than Pinnacle in every season, and all lose 11.5–14.6% at DK walk-forward (CLV −9 to −10.5%).
+  A QF-as-qualifying lookahead in the fatigue feature was caught and fixed. The page model is unchanged.
+- **Status:** jobs A, B and C and the DK report are done. Remaining leads: a live forward test of line shopping via the Portfolio tab
+  (from Jan 2027). Next ideas need the owner.
 - **Queued (owner 2026-10-26), Upsets:**
   - **(C) Closing-price snapshots.** All tiers, cap 50k credits.
   - **(A) Line-shopping test.** Bet DK only when its odds beat Pinnacle's de-vigged price by t. 0 credits, pre-registered, walk-forward,
