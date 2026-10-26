@@ -125,7 +125,17 @@ were the pre-match underdog?
   inflated by straight sets.
 - **Price test:** Kalshi per-set markets (`KXATPSETWINNER-…-N`) have `close_time` = set end, which gives the
   match ask at the start of the decider. Data builds a `sets` table; Upsets writes `upsets/decider.py` +
-  `upsets/penultimate.py`. This runs before the DK history code (which waits on the plan upgrade).
+  `upsets/penultimate.py`.
+- **Widened by the owner (2026-10-26): "match path" time series.** For each match: the original (pre-match)
+  favourite's price at the start, after each set end, and in-match min/max; the number and timing of favourite
+  flips (50¢ crossings with hysteresis); and whether the original favourite wins. Aggregates by set path and by
+  flips, an average-path table for a chart, set-end price calibration and ROI, and 3 example timelines (to the
+  Lead only, never in git). Code: `upsets/match_path.py` (Upsets); data: Data's `sets` collector.
+- Results only (Sackmann 2010–26, ranking favourite): the favourite wins 63.8% (ATP bo3) / 64.7% (WTA) / 72.2%
+  (ATP bo5). After losing set 1 they win 28.3% / 26.8% / 41.4%; after winning it, 87–88%.
+- **DK history code merged (phat-d0/Tennis_Model#67):** dry run ≤ 13,073 credits (95 key-events; 6 h snapshot
+  cells; price ≤ 6 h before start). It waits on the owner's 20K upgrade, then a Lead OK for listings (≤ 683)
+  and then for odds.
 
 ## How to continue in a new session
 Read `CLAUDE.md`, this file, and your brief in `docs/team/`. Check open PRs into `main` and the
