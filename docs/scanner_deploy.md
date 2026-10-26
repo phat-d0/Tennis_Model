@@ -33,8 +33,8 @@ That file clones this repo and runs [`deploy/bootstrap.sh`](../deploy/bootstrap.
 1. Open **console.hetzner.com** → your project → **Add server**:
    - **Location:** Ashburn, VA (US East).
    - **Image:** Ubuntu 24.04.
-   - **Type:** shared vCPU, x86. **CPX11**, or the smallest type offered there. The stack uses
-     about 100 MB of RAM, so the smallest type is enough.
+   - **Type:** shared vCPU, x86. **CPX11**, or the smallest type offered there. The three services
+     use about 180 MB of RAM, so the smallest type is enough.
    - **Networking:** keep **public IPv4** on. GitHub has no IPv6, and the server clones the repo from it.
    - **SSH key:** optional. If you add none, Hetzner emails a root password. Keep it, because the
      web console needs it. You can also reset it later under the server's **Rescue** tab.
@@ -106,12 +106,14 @@ systemctl stop swinglock                                      # stop everything
 ## What runs, and its limits
 | Service | What it does | Kalshi requests |
 |---|---|---|
-| `scanner` | Live arb and lock alerts → `data/live/state.json`, `data/alerts.log` | ~0.2–0.5 req/s (1 orderbooks call per 50 matches every 5 s, plus discovery every 5 min) |
-| `recorder` | Order books, top-5 depth, matches and scores → daily parquet in `data/recorded/kalshi/` | ≤ 1 req/s cap; measured ~0.17 req/s |
+| `scanner` | Live arb and lock alerts → `data/live/state.json`, `data/alerts.log` | capped at `scanner.max_rps` (0.5 req/s): one orderbooks call per 50 matches each poll, so with 250 open matches polls are 12 s apart instead of 5 s |
+| `recorder` | Order books, top-5 depth, matches and scores → daily parquet in `data/recorded/kalshi/` | ≤ 1 req/s cap; grows with the number of open matches (~0.45 req/s at 252 matches) |
 | `dashboard` | Web page on 127.0.0.1:8000, reachable only through `tailscale serve` (tailnet-only HTTPS) | none |
 
 - **One IP, one rate limit.** The scanner and the recorder share the server's IP, and with it Kalshi's
-  unauthenticated limit (a 429 after about 8 rapid calls). **Never run a backfill on this server.**
+  unauthenticated limit, which is undocumented. **Never run a backfill on this server.** In the
+  test below, the two together ran at about 0.95 req/s and got an occasional 429 (about 1 a minute),
+  which both clients retry after a short wait.
 - **Firewall:** ufw denies all inbound except the `tailscale0` interface and Tailscale's UDP port 41641.
   The dashboard port is only bound to 127.0.0.1. Docker-published ports would bypass ufw, so none are
   published on a public interface.
@@ -120,6 +122,35 @@ systemctl stop swinglock                                      # stop everything
 - **Logs:** Docker caps each service's log at 5 × 10 MB. logrotate rotates `data/*.log` weekly and keeps 12.
 - The optional `public` compose profile (a Caddy proxy with basic auth on ports 80/443) is **not used**
   with Tailscale. It's kept for a setup without Tailscale.
+
+## Tested (2026-10-26)
+- `cloud-init schema --config-file deploy/cloud-init.yaml` is valid (cloud-init on Ubuntu 24.04).
+- `deploy/bootstrap.sh` ran twice in a fresh `ubuntu:24.04` container with systemd, Tailscale and ufw
+  skipped, since a container has none of them. The second run was a clean no-op.
+  - Docker Engine and the compose plugin installed from download.docker.com.
+  - `data/` was set up with owner 1000 and the positions file copied in.
+  - The unit and logrotate files were installed. Swap is refused inside a container, so the script
+    warned and went on.
+  - The ufw rules were checked with `--dry-run`, and `logrotate -d` parses.
+- `COMPOSE_PROFILES=recorder docker compose up` ran all three services against live Kalshi for about
+  9 minutes. During the last 6 minutes:
+  - **scanner:** 181 requests (0.50 req/s, polls 12 s apart), 6 × 429.
+  - **recorder:** 161 requests (0.45 req/s), 3 × 429.
+  - All 429s were retried after a 2 s backoff, with no lost polls.
+
+  | Check | Result |
+  |---|---|
+  | Matches in `state.json` | 251, including **32 KXATPCHALLENGERMATCH**, 24 WTA 125, 27 ATP, 21 WTA, 148 ITF |
+  | Recorder parquet | quotes 14,598 rows, depth 140,945 rows, score 84 rows; 252 matches in `matches.parquet` |
+  | Dashboard | HTTP 200 |
+  | Memory | scanner 31 MB, dashboard 28 MB, recorder 119 MB |
+
+  Odd result: the first 3 minutes, before the scanner's rate cap existed (scanner at about 1 req/s,
+  about 1.5 req/s combined), had no 429s at all. So the limit isn't a simple rate, and the test
+  machine's IP may be shared.
+- **Not tested here:** the Tailscale install, `tailscale up`/`serve` (pkgs.tailscale.com is blocked in
+  the test sandbox, and joining needs a real key), a real systemd boot, and enabling ufw on a real host.
+  These steps are guarded: public SSH stays open unless Tailscale came up.
 
 ## Files
 | File | Purpose |
