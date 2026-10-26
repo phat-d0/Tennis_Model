@@ -126,6 +126,11 @@ were the pre-match underdog?
 - **Price test:** Kalshi per-set markets (`KXATPSETWINNER-…-N`) have `close_time` = set end, which gives the
   match ask at the start of the decider. Data builds a `sets` table; Upsets writes `upsets/decider.py` +
   `upsets/penultimate.py`.
+- **Kalshi price test (Data run 2026-10-26, kalshi_g0, 0 requests): the effect is real but priced in, so no edge.**
+  1,423 deciders: the penultimate-set winner won 54.8% vs an average ask of 53.8% (55.2% break-even with the fee).
+  ROI −0.7% at 0¢ (CI −5.0% to +3.7%), −2.4% at 1¢; other side −7.3%. Pre-match favourite who levelled: 65.8%
+  vs 64.1% ask (+0.5%); underdog who levelled: 44.4% vs 44.0% (−2.4%). Excluding bad set times (14 impossible
+  + 24 > 180 min): 1,385 bets, −0.9% / −2.7%. A guard is going into decider.py / match_path.py.
 - **Widened by the owner (2026-10-26): "match path" time series.** For each match: the original (pre-match)
   favourite's price at the start, after each set end, and in-match min/max; the number and timing of favourite
   flips (50¢ crossings with hysteresis); and whether the original favourite wins. Aggregates by set path and by
