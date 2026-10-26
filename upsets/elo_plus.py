@@ -288,14 +288,15 @@ def main(argv=None) -> None:
     ap.add_argument("--cache", type=Path, default=dh.CACHE)
     ap.add_argument("--other-from", default="2024-01-01")
     ap.add_argument("--out", type=Path, default=None)
+    ap.add_argument("--dump", type=Path, default=None, help="pickle the frame and predictions (local only)")
     a = ap.parse_args(argv)
-    text = study(a.sackmann, a.cache, a.other_from)
+    text = study(a.sackmann, a.cache, a.other_from, a.dump)
     print(text)
     if a.out:
         a.out.write_text(text)
 
 
-def study(root: Path, cache: Path, other_from: str) -> str:
+def study(root: Path, cache: Path, other_from: str, dump: Path | None = None) -> str:
     sack = sackmann.load(root, start=1990, lower=True)
     gs = np.array([games_sets(s) for s in sack["score"]])
     tot = np.maximum(gs[:, 0] + gs[:, 1], 1)
@@ -379,6 +380,8 @@ def study(root: Path, cache: Path, other_from: str) -> str:
             chosen[v][S] = best
             Xd = best_X[fi[test]] * sign[test][:, None]
             res[v][test] = best_cal.predict(Xd)
+    if dump is not None:
+        pd.to_pickle({"f": f, "res": res, "chosen": chosen}, dump)
     return report(f, res, chosen, y_dog)
 
 
