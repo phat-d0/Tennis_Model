@@ -312,6 +312,8 @@ def structural(f: pd.DataFrame) -> list[str]:
     slices += [(f"… {names.get(lv, lv)}", g) for lv, g in done.groupby("level_group")]
     slices += [("… results from Sackmann (through May 2026)", done[done["sack_row"] >= 0]),
                ("… results from Kalshi (Jun–Oct 2026)", done[done["sack_row"] < 0])]
+    if "season" in done:
+        slices += [(f"… season {int(y)}", g) for y, g in done.groupby("season")]
     for name, b in slices:
         if not len(b):
             continue
@@ -358,6 +360,7 @@ def report(f: pd.DataFrame, priced: pd.DataFrame, oos: pd.DataFrame, seasons: pd
         "", "## (a) Every early-round underdog", "", *ROW_HEAD,
         _row("All", f), _row("… ATP", f[f["tour"] == "atp"]), _row("… WTA", f[f["tour"] == "wta"]),
         _row("… Slams", f[f["level_group"] == "slam"]), _row("… 1000s", f[f["level_group"] == "1000"]),
+        _row("… 250/500s", f[f["level_group"] == "other"]),
         _row("Seeded favourite vs unseeded dog", seeded),
         _row("… ATP", seeded[seeded["tour"] == "atp"]), _row("… WTA", seeded[seeded["tour"] == "wta"]),
         "", "By DraftKings underdog odds:", "", *ROW_HEAD]
