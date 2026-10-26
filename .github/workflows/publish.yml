@@ -1,0 +1,74 @@
+# Builds the Tennis Odds page and publishes it to GitHub Pages (docs/site_plan.md).
+# One-time setup: repo Settings -> Pages -> Source: "GitHub Actions"; Actions secret ODDS_API_KEY.
+# Paid calls: at most 600 credits a month and never below the 5,000 reserve (enforced in upsets/site.py).
+# No Kalshi data is read or published here: the repo and the site are public.
+name: Publish page
+
+on:
+  schedule:
+    - cron: "17 */3 * * *" # every 3 h; GitHub often starts scheduled runs late
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths: ["site/**", "upsets/site.py", ".github/workflows/publish.yml"]
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+# Wait for a running build instead of cancelling it: a cancelled run could lose the record of
+# credits it already spent.
+concurrency:
+  group: pages
+  cancel-in-progress: false
+
+jobs:
+  build:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+          cache: pip
+
+      - run: pip install -e .
+
+      # Spend record, last odds snapshot and the snapshot history. Never committed or uploaded.
+      - uses: actions/cache@v4
+        with:
+          path: data/site_cache
+          key: site-cache-${{ github.run_id }}
+          restore-keys: site-cache-
+
+      # Sackmann results (CC BY-NC-SA) for the Elo column: match files only, never committed.
+      - name: Fetch the results archive
+        run: |
+          git clone -q --depth 1 --filter=blob:none --sparse \
+            https://github.com/phat-d0/tennis-sackmann-archive data/sackmann
+          git -C data/sackmann sparse-checkout set --no-cone '/atp/atp_matches_[12][0-9][0-9][0-9].csv' '/wta/wta_matches_[12][0-9][0-9][0-9].csv'
+
+      - name: Build
+        env:
+          ODDS_API_KEY: ${{ secrets.ODDS_API_KEY }}
+        run: |
+          mkdir -p _site/data
+          python -m upsets.site build --out _site/data --cache data/site_cache \
+            --archive data/sackmann --floor 5000 --month-cap 600
+          cp -r site/* _site/
+
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: _site
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-24.04
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - id: deployment
+        uses: actions/deploy-pages@v4
