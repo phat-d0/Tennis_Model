@@ -96,7 +96,7 @@ def penultimate_frame(df: pd.DataFrame) -> pd.DataFrame:
     n = sets.map(len)
     won = sets.map(sum)
     need = (d["best_of"] + 1) // 2
-    valid = (n >= 2) & (won == need) & (n - won < need) & sets.map(lambda s: s[-1] == 1 if s else False)
+    valid = (n >= 2) & (won == need) & (n - won < need) & sets.map(lambda s: len(s) > 0 and s[-1] == 1)
     d, sets, n = d[valid], sets[valid], n[valid]
     pen_by_w = sets.map(lambda s: s[-2] == 1).astype(bool)  # match winner won the penultimate set
     p_w = 1.0 / (1.0 + 10 ** ((d["l_elo"] - d["w_elo"]) / 400.0))
