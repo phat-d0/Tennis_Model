@@ -99,6 +99,12 @@ Plan, method, gate and data blockers: `docs/upsets_plan.md`. Code: `upsets/` (Le
 - **Phase B code merged (phat-d0/Tennis_Model#60), 149 tests.** The Lead found a lookahead issue: an unjoined later
   round could sort before a joined earlier round. It's fixed by `round_monotone()`, with a test. Waiting on a
   Data run over kalshi_g0 (Apr 24 → Oct 24).
+- **Phase B result (phat-d0/Tennis_Model#63, `reports/upsets_findings.md`): no edge, gate FAIL.** Elo vs Kalshi
+  closing asks on early-round underdogs, out of sample: 108 bets, −15.2% (CI −38% to +7%); ATP +2.7% (61), WTA −41.0% (47).
+  The market is better calibrated (log loss 0.5845 vs model 0.6157). The model over-rates underdogs (35.5% vs
+  31.7% realized), and the bigger its "edge", the worse the ROI. **Upset study status: answered (no) on Kalshi.**
+  The only open test is DraftKings' own prices, which needs the paid Odds API month (~$30, owner's call);
+  the Lead expects no edge there either (DraftKings' margin is higher).
 - **Results data (2026-10-25):** Jeff Sackmann's repos now return 404. The owner forked the archival
   mirror `phat-d0/tennis-sackmann-archive` (CC BY-NC-SA 4.0, non-commercial, attribute Sackmann; never
   commit the CSVs). It covers ATP/WTA 1968 → tournaments starting by 2026-05-25, with seeds, ranks, rounds
