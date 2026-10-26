@@ -116,6 +116,17 @@ Plan, method, gate and data blockers: `docs/upsets_plan.md`. Code: `upsets/` (Le
   history still needs the paid Odds API month (~$30), so the owner decides.
 - Next: download 2013–2026, calibration table + walk-forward, `reports/upsets_findings.md`.
 
+## Third question: penultimate-set winner (owner 2026-10-26)
+Question: does the winner of the penultimate set win the match, beat the odds, and does it differ when they
+were the pre-match underdog?
+- **Results only (Lead, Sackmann 1991–2026, tour level):** in matches that reach a deciding set, the player who
+  levelled wins the decider 53.1% (ATP bo3, n=28,828), 54.6% (ATP bo5, 3,462), 53.1% (WTA, 27,120). That's
+  +~3 pp on top of ranking for both favourites (≈62%) and underdogs (≈44–47%). "All matches" (83–85%) is
+  inflated by straight sets.
+- **Price test:** Kalshi per-set markets (`KXATPSETWINNER-…-N`) have `close_time` = set end, which gives the
+  match ask at the start of the decider. Data builds a `sets` table; Upsets writes `upsets/decider.py` +
+  `upsets/penultimate.py`. This runs before the DK history code (which waits on the plan upgrade).
+
 ## How to continue in a new session
 Read `CLAUDE.md`, this file, and your brief in `docs/team/`. Check open PRs into `main` and the
 `team/*` branches. The Lead's session ID and the role session IDs are in `docs/team/lead.md`.
