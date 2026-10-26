@@ -206,6 +206,14 @@ The owner asked for a public phone page like the soccer app, refreshed every 3 h
 - **Elo upgrades (B, #103): no edge.** Best variant (+fatigue+serve) log loss 0.5755, against 0.5859 for the current Elo and 0.5552
   for Pinnacle. Every variant is worse than Pinnacle in every season, and all lose 11.5–14.6% at DK walk-forward (CLV −9 to −10.5%).
   A QF-as-qualifying lookahead in the fatigue feature was caught and fixed. The page model is unchanged.
+- **Later on 2026-10-26 (owner asks, all done):**
+  - Page model switched to tuned Elo + serve/return (#106).
+  - Line-shopping drawdown = luck on a thin edge (#108).
+  - Private **Tennis Backtest Explorer**, every bet for 20+ strategies, owner-only: https://claude.ai/artifact/3bDnTdzVARrgthoU8GHNVC.
+  - Polymarket intl Challenger/WTA 125 section on the page (#105, #107, #111; ~108 matches, 12 requests/build, no key).
+  - Portfolio and the page's fair chance on the **power de-vig** (#112). Line backtest is now 205 bets, +9.2% realized / +8.0% expected (in-sample).
+  - Hetzner + Tailscale deploy ready (#109); **owner set-up pending**.
+  - OddsPapi test of DK Challenger lines waits on the owner: `ODDSPAPI_KEY` + allow oddspapi.io / api.oddspapi.io.
 - **Status:** jobs A, B and C and the DK report are done. Remaining leads: a live forward test of line shopping via the Portfolio tab
   (from Jan 2027). Next ideas need the owner.
 - **Queued (owner 2026-10-26), Upsets:**
