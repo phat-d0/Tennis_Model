@@ -1,0 +1,151 @@
+{
+ "source": "polymarket_intl",
+ "fetched_at": "2026-10-26T05:50:00Z",
+ "status": "ok",
+ "matches": [
+  {
+   "event_id": "pm01",
+   "tournament": "Halden Challenger",
+   "tour": "ATP",
+   "tier": "Challenger",
+   "commence_time": "2026-10-26T09:00:00Z",
+   "player_1": "Pablo Quintero",
+   "player_2": "Ruben Sato",
+   "p1": {
+    "bid": 0.61,
+    "bid_size": 150,
+    "ask": 0.63,
+    "ask_size": 80
+   },
+   "p2": {
+    "bid": 0.37,
+    "bid_size": 80,
+    "ask": 0.39,
+    "ask_size": 150
+   },
+   "model_p1": 0.58,
+   "model_n1": 96,
+   "model_n2": 44
+  },
+  {
+   "event_id": "pm02",
+   "tournament": "Halden Challenger",
+   "tour": "ATP",
+   "tier": "Challenger",
+   "commence_time": "2026-10-26T11:00:00Z",
+   "player_1": "Stefan Udeh",
+   "player_2": "Tomas Varga-Lindqvist",
+   "p1": {
+    "bid": 0.4,
+    "bid_size": 8,
+    "ask": 0.52,
+    "ask_size": 5
+   },
+   "p2": {
+    "bid": 0.48,
+    "bid_size": 5,
+    "ask": 0.6,
+    "ask_size": 8
+   },
+   "model_p1": null,
+   "model_n1": 15,
+   "model_n2": 61
+  },
+  {
+   "event_id": "pm03",
+   "tournament": "Halden Challenger",
+   "tour": "ATP",
+   "tier": "Challenger",
+   "commence_time": "2026-10-26T13:30:00Z",
+   "player_1": "Viktor Wendt",
+   "player_2": "Xavier Yoon",
+   "p1": {
+    "bid": 0.83,
+    "bid_size": 240,
+    "ask": 0.84,
+    "ask_size": 12
+   },
+   "p2": {
+    "bid": 0.16,
+    "bid_size": 12,
+    "ask": 0.17,
+    "ask_size": 240
+   },
+   "model_p1": 0.77,
+   "model_n1": 120,
+   "model_n2": 88
+  },
+  {
+   "event_id": "pm04",
+   "tournament": "Marisol Challenger",
+   "tour": "ATP",
+   "tier": "Challenger",
+   "commence_time": "2026-10-26T16:00:00Z",
+   "player_1": "Yusuf Zane",
+   "player_2": "Adrian Bellweather",
+   "p1": {
+    "bid": 0.3,
+    "bid_size": 60,
+    "ask": 0.33,
+    "ask_size": 45
+   },
+   "p2": {
+    "bid": 0.67,
+    "bid_size": 45,
+    "ask": 0.7,
+    "ask_size": 60
+   },
+   "model_p1": 0.36,
+   "model_n1": 70,
+   "model_n2": 52
+  },
+  {
+   "event_id": "pm05",
+   "tournament": "Lakeview 125",
+   "tour": "WTA",
+   "tier": "WTA 125",
+   "commence_time": "2026-10-26T10:00:00Z",
+   "player_1": "Beatriz Calder",
+   "player_2": "Dana Eskelinen",
+   "p1": {
+    "bid": 0.55,
+    "bid_size": 300,
+    "ask": 0.56,
+    "ask_size": 410
+   },
+   "p2": {
+    "bid": 0.44,
+    "bid_size": 410,
+    "ask": 0.45,
+    "ask_size": 300
+   },
+   "model_p1": 0.49,
+   "model_n1": 130,
+   "model_n2": 140
+  },
+  {
+   "event_id": "pm06",
+   "tournament": "Lakeview 125",
+   "tour": "WTA",
+   "tier": "WTA 125",
+   "commence_time": "2026-10-26T12:00:00Z",
+   "player_1": "Freya Gallo",
+   "player_2": "Hana Ishikawa-Moreno",
+   "p1": {
+    "bid": 0.7,
+    "bid_size": 25,
+    "ask": null,
+    "ask_size": null
+   },
+   "p2": {
+    "bid": null,
+    "bid_size": null,
+    "ask": 0.3,
+    "ask_size": 25
+   },
+   "model_p1": null,
+   "model_n1": 0,
+   "model_n2": 33
+  }
+ ]
+}

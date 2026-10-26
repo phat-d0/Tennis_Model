@@ -34,8 +34,15 @@ def _fmt(dt: datetime) -> str:
     return dt.astimezone(UTC).strftime("%Y-%m-%dT%H:%M:%SZ")
 
 
-def sample() -> dict:
-    return json.loads(SAMPLE.read_text())
+CHALLENGERS = SAMPLE.parent / "challengers.json"   # the proposed `challengers` block, kept apart so the
+                                                    # builder's shape test (tests/test_upsets_site.py) is unaffected
+
+
+def sample(challengers: bool = True) -> dict:
+    d = json.loads(SAMPLE.read_text())
+    if challengers:
+        d["challengers"] = json.loads(CHALLENGERS.read_text())
+    return d
 
 
 def shifted(data: dict, built_ago: timedelta = timedelta(minutes=5)) -> dict:
@@ -45,6 +52,10 @@ def shifted(data: dict, built_ago: timedelta = timedelta(minutes=5)) -> dict:
     move = lambda ts: _fmt(_iso(ts) + delta) if ts else ts  # noqa: E731
     out["generated_at"] = move(out["generated_at"])
     out["odds_fetched_at"] = move(out["odds_fetched_at"])
+    if out.get("challengers"):
+        out["challengers"]["fetched_at"] = move(out["challengers"]["fetched_at"])
+        for m in out["challengers"]["matches"]:
+            m["commence_time"] = move(m["commence_time"])
     for m in out["matches"]:
         m["commence_time"] = move(m["commence_time"])
         for b in ("draftkings", "pinnacle"):
@@ -57,8 +68,8 @@ def shifted(data: dict, built_ago: timedelta = timedelta(minutes=5)) -> dict:
 
 def test_sample_matches_contract():
     d = sample()
-    assert set(d) == {"generated_at", "odds_fetched_at", "status", "credits", "ratings_through",
-                      "tournaments", "matches"}
+    assert set(d) - {"challengers"} == {"generated_at", "odds_fetched_at", "status", "credits", "ratings_through",
+                                        "tournaments", "matches"}
     _iso(d["generated_at"]), _iso(d["odds_fetched_at"])
     assert d["status"] in STATUSES or d["status"].startswith("error")
     assert set(d["credits"]) == {"left", "used_this_month", "month_cap"}
@@ -84,6 +95,38 @@ def test_sample_matches_contract():
             assert m["dk_implied_1"] is None
         if m["model_p1"] is not None:
             assert min(m["model_n1"], m["model_n2"]) >= 20
+
+
+CH_MATCH_KEYS = {"event_id", "tournament", "tour", "tier", "commence_time", "player_1", "player_2",
+                 "p1", "p2", "model_p1", "model_n1", "model_n2"}
+
+
+def test_sample_challengers_contract():
+    ch = sample()["challengers"]
+    assert set(ch) == {"source", "fetched_at", "status", "matches"} and ch["source"] == "polymarket_intl"
+    _iso(ch["fetched_at"])
+    for m in ch["matches"]:
+        assert set(m) == CH_MATCH_KEYS, m["event_id"]
+        assert m["tour"] in ("ATP", "WTA") and m["tier"] in ("Challenger", "WTA 125")
+        for q in (m["p1"], m["p2"]):
+            assert set(q) == {"bid", "bid_size", "ask", "ask_size"}
+            for k in ("bid", "ask"):
+                assert q[k] is None or 0 <= q[k] <= 1
+                assert (q[k] is None) == (q[k + "_size"] is None)
+            if q["bid"] is not None and q["ask"] is not None:
+                assert q["bid"] <= q["ask"]
+        # a binary book: player 1's bid mirrors player 2's ask
+        if m["p1"]["bid"] is not None and m["p2"]["ask"] is not None:
+            assert m["p1"]["bid"] + m["p2"]["ask"] == pytest.approx(1.0)
+
+
+def _thin(m) -> bool:
+    for q in (m["p1"], m["p2"]):
+        if q["bid"] is None or q["ask"] is None:
+            return True
+        if q["ask"] - q["bid"] > 0.05 + 1e-9 or min(q["bid_size"], q["ask_size"]) < 20:
+            return True
+    return False
 
 
 def test_sample_covers_display_cases():
@@ -196,6 +239,31 @@ const VIEWPORTS = { phone: { width: 390, height: 844 }, laptop: { width: 1280, h
       await page.click("#view .segmented button:nth-child(3)");   // WTA
       info.wtaCards = await page.evaluate(() => document.querySelectorAll("#view article.match").length);
     }
+    info.levels = !!(await page.$("#view .levels"));
+    if (info.levels) {
+      await page.click("#view .segmented:not(.levels) button:nth-child(1)");   // tour filter back to All
+      await page.click("#view .levels button:nth-child(2)");             // Challengers
+      const chGrab = () => page.evaluate(() => ({
+        cards: document.querySelectorAll("#view article.ch").length,
+        thin: document.querySelectorAll("#view article.ch.thin").length,
+        groups: [...document.querySelectorAll("#view h2.section-title > span:first-child")].map((s) => s.textContent),
+        banners: [...document.querySelectorAll("#view .banner b")].map((b) => b.textContent),
+        notProven: [...document.querySelectorAll("#view article.ch .tag")].filter((t) => t.textContent === "model: not proven").length,
+        chip: document.querySelector("#view .chip")?.textContent || "",
+        empty: document.querySelector("#view .empty")?.textContent || "",
+        overflow: document.documentElement.scrollWidth - window.innerWidth,
+      }));
+      info.ch = await chGrab();
+      if (outDir) await page.screenshot({ path: path.join(outDir, `${prefix}-challengers-${tag}.png`), fullPage: true });
+      if (info.ch.chip) {
+        await page.click("#view .chip");
+        info.chHidden = await chGrab();
+        await page.click("#view .chip");
+      }
+      await page.click("#view .segmented:not(.levels) button:nth-child(3)");   // WTA within Challengers
+      info.chWta = await page.evaluate(() => document.querySelectorAll("#view article.ch").length);
+      if (info.ch.overflow > 0) problems.push(`${tag} challengers overflow ${info.ch.overflow}px`);
+    }
     for (const o of [info.overflow, info.findings.overflow]) if (o > 0) problems.push(`${tag} horizontal overflow ${o}px`);
     results.push({ tag, ...info });
     await ctx.close();
@@ -285,6 +353,15 @@ def test_page_ok(site, tmp_path):
         assert res["wtaCards"] == 2
         assert res["updated"].startswith("Odds ") and "143 of 600" in res["footer"]
         assert "2026-10-19" in res["footer"]
+        chs = d["challengers"]["matches"]
+        ch = res["ch"]
+        assert res["levels"] and ch["cards"] == len(chs) == ch["notProven"]
+        assert ch["thin"] == sum(map(_thin, chs)) == 3
+        assert ch["groups"] == ["Halden Challenger", "Lakeview 125", "Marisol Challenger"]
+        assert ch["banners"] == ["Polymarket (international), indicative: not tradable from the US"]
+        assert res["chHidden"]["cards"] == len(chs) - 3 and res["chHidden"]["thin"] == 0
+        assert res["chWta"] == sum(m["tour"] == "WTA" for m in chs)
+        assert "Polymarket (international) public order books" in res["footer"]
 
 
 @needs_browser
@@ -299,6 +376,22 @@ def test_page_portfolio(site, tmp_path):
         assert res["portfolioLine"]["trades"] == 0 and "No paper trades yet" in res["portfolioLine"]["empty"]
         bt = json.loads((SITE / "portfolio_backtest.json").read_text())
         assert res["backtest"]["tiles"] == 4 and res["backtest"]["chart"] == bool(bt["strategies"]["line"]["bets"])
+
+
+@needs_browser
+def test_page_challengers_failed_or_absent(site, tmp_path):
+    """A failed, stale Challenger fetch keeps its last prices with banners; no `challengers` key hides the switch."""
+    d = shifted(sample())
+    d["challengers"]["status"] = "error: Polymarket timed out"
+    d["challengers"]["fetched_at"] = _fmt(datetime.now(UTC) - timedelta(hours=9))
+    for res in _check(tmp_path, site(d), "cherr"):
+        assert res["banners"] == []   # the tour-level odds are fine
+        assert res["ch"]["banners"] == ["Polymarket (international), indicative: not tradable from the US",
+                                        "Challenger prices not updated", "Old prices"]
+        assert res["ch"]["cards"] == len(d["challengers"]["matches"])
+    d.pop("challengers")
+    for res in _check(tmp_path, site(d), "nochal"):
+        assert not res["levels"] and res["cards"] == len(d["matches"])
 
 
 @needs_browser

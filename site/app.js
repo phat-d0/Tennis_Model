@@ -28,6 +28,8 @@ let pfStrategy = store.get("tennis-pf-strategy", "model");
 let pfView = store.get("tennis-pf-view", "live");
 let pfShown = 20;
 let tour = store.get("tennis-tour", "all");
+let level = store.get("tennis-level", "tour");      // "tour" (DraftKings/Pinnacle) or "challengers" (Polymarket)
+let hideThin = store.get("tennis-hide-thin", false);
 
 const $ = (id) => document.getElementById(id);
 
@@ -171,42 +173,149 @@ function matchCard(m) {
     foot.length && el("div", { class: "card-foot" }, foot.map((f) => el("span", {}, f))));
 }
 
-function matchesView() {
-  const all = odds && Array.isArray(odds.matches) ? odds.matches.filter((m) => m && typeof m === "object") : [];
+const objects = (xs) => (Array.isArray(xs) ? xs.filter((x) => x && typeof x === "object") : []);
+
+function segmented(label, items, cur, onPick) {
+  return el("div", { class: "segmented", role: "tablist", "aria-label": label },
+    items.map(([k, name]) => el("button", {
+      class: k === cur ? "on" : "", role: "tab", "aria-selected": String(k === cur), onclick: () => onPick(k),
+    }, name)));
+}
+
+// ATP / WTA filter with counts; shared by the tour-level and Challenger lists.
+function tourFilter(all) {
   const counts = { all: all.length, ATP: 0, WTA: 0 };
   for (const m of all) if (m.tour in counts) counts[m.tour] += 1;
   if (!(tour in counts)) tour = "all";
-  const shown = tour === "all" ? all : all.filter((m) => m.tour === tour);
+  const seg = segmented("Tour", ["all", "ATP", "WTA"].map((t) => [t, `${t === "all" ? "All" : t} (${counts[t]})`]), tour,
+    (t) => { tour = t; store.set("tennis-tour", t); render(); });
+  return [seg, tour === "all" ? all : all.filter((m) => m.tour === tour)];
+}
 
-  const seg = el("div", { class: "segmented", role: "tablist", "aria-label": "Tour" },
-    ["all", "ATP", "WTA"].map((t) => el("button", {
-      class: t === tour ? "on" : "", role: "tab", "aria-selected": String(t === tour),
-      onclick: () => { tour = t; store.set("tennis-tour", t); render(); },
-    }, `${t === "all" ? "All" : t} (${counts[t]})`)));
+function matchesView() {
+  const ch = odds && odds.challengers && typeof odds.challengers === "object" ? odds.challengers : null;
+  if (!ch) return tourLevelView([]);
+  const nTour = objects(odds.matches).length, nCh = objects(ch.matches).length;
+  if (level !== "challengers") level = "tour";
+  const levels = segmented("Level", [["tour", `Tour-level (${nTour})`], ["challengers", `Challengers (${nCh})`]], level,
+    (k) => { level = k; store.set("tennis-level", k); render(); window.scrollTo(0, 0); });
+  levels.classList.add("levels");
+  return level === "challengers" ? challengersView(ch, [levels]) : tourLevelView([levels]);
+}
 
+function tourLevelView(head) {
+  const all = odds ? objects(odds.matches) : [];
+  const [seg, shown] = tourFilter(all);
+  head = [...head, seg];
   if (!shown.length) {
     const msg = !odds ? "No odds to show yet."
       : all.length ? `No ${tour} matches in the next 36 hours.`
       : "No matches with odds in the next 36 hours.";
-    return [seg, el("div", { class: "card empty" }, msg)];
+    return [...head, el("div", { class: "card empty" }, msg)];
   }
+  const out = [...head, ...grouped(shown, matchCard)];
+  out.push(el("p", { class: "note" },
+    "Decimal odds. Fair chance = the book's implied chance with its margin removed. The model is a surface-weighted Elo rating that has not beaten the market in any test, so treat it as context, not a tip."));
+  return out;
+}
 
-  // Group by tournament; tournaments ordered by their first start time, matches by start time.
+// Group by tournament; tournaments ordered by their first start time, matches by start time.
+function grouped(ms, card) {
   const byStart = (a, b) => (parseTs(a.commence_time) ?? Infinity) - (parseTs(b.commence_time) ?? Infinity);
   const groups = new Map();
-  for (const m of [...shown].sort(byStart)) {
+  for (const m of [...ms].sort(byStart)) {
     const key = m.tournament || m.sport_key || "Other";
     if (!groups.has(key)) groups.set(key, []);
     groups.get(key).push(m);
   }
-  const out = [seg];
-  for (const [name, ms] of groups) {
+  const out = [];
+  for (const [name, list] of groups) {
     out.push(el("h2", { class: "section-title" }, el("span", {}, name),
-      el("span", { class: "count" }, `${ms.length} match${ms.length === 1 ? "" : "es"}`)));
-    for (const m of ms) out.push(matchCard(m));
+      el("span", { class: "count" }, `${list.length} match${list.length === 1 ? "" : "es"}`)));
+    for (const m of list) out.push(card(m));
   }
+  return out;
+}
+
+// ---------------------------------------------------------------- challengers (Polymarket)
+// Indicative peer order-book prices (dollars per share) from Polymarket international.
+// A book is "thin" when a player's spread is over 5c, a best level holds under 20 shares,
+// or a side is empty: those prices may not be there for any real size.
+
+const THIN_SPREAD = 0.05;
+const THIN_SIZE = 20;
+const prob = (x) => (isNum(x) && x >= 0 && x <= 1 ? x : null);
+const cents = (x) => (prob(x) === null ? na() : `${Math.round(x * 1000) / 10}¢`);
+const shares = (x) => (isNum(x) && x >= 0 ? (x >= 1000 ? `${(x / 1000).toFixed(1)}k` : x.toFixed(0)) : "—");
+
+function side(q) {
+  q = q && typeof q === "object" ? q : {};
+  const bid = prob(q.bid), ask = prob(q.ask);
+  const spread = bid !== null && ask !== null ? ask - bid : null;
+  return { bid, ask, spread, bidSize: q.bid_size, askSize: q.ask_size };
+}
+
+function thinReasons(a, b) {
+  const why = new Set();
+  for (const q of [a, b]) {
+    if (q.bid === null || q.ask === null) why.add("one side empty");
+    else if (q.spread > THIN_SPREAD + 1e-9) why.add(`spread over ${THIN_SPREAD * 100}¢`);
+    for (const n of [q.bidSize, q.askSize]) if (q.bid !== null && q.ask !== null && !(isNum(n) && n >= THIN_SIZE)) why.add(`under ${THIN_SIZE} shares at best`);
+  }
+  return [...why];
+}
+
+function challengerCard(m) {
+  const a = side(m.p1), b = side(m.p2);
+  const thin = thinReasons(a, b);
+  const model = prob(m.model_p1);
+  const started = (parseTs(m.commence_time) ?? Infinity) <= Date.now();
+  const priceCell = (p, n) => el("td", {}, cents(p), el("span", { class: "sub" }, p === null ? "" : `${shares(n)} sh`));
+  const row = (name, q) => el("tr", {},
+    el("td", {}, name || "?"), priceCell(q.bid, q.bidSize), priceCell(q.ask, q.askSize),
+    el("td", { class: q.spread !== null && q.spread > THIN_SPREAD + 1e-9 ? "wide" : "" }, q.spread === null ? na() : cents(q.spread)));
+  return el("article", { class: "card match ch" + (thin.length ? " thin" : "") },
+    el("div", { class: "match-head" },
+      el("span", {}, startText(m.commence_time)),
+      el("span", {}, started ? el("span", { class: "tag warn" }, "Started") : null, " ",
+        thin.length ? el("span", { class: "tag thin-tag", title: thin.join(", ") }, "Thin book") : null, " ",
+        m.tier || m.tour || "")),
+    el("table", { class: "odds book" },
+      el("thead", {}, el("tr", {}, el("th", {}, "Player"), el("th", {}, "Bid"), el("th", {}, "Ask"), el("th", {}, "Spread"))),
+      el("tbody", {}, row(m.player_1, a), row(m.player_2, b))),
+    el("div", { class: "card-foot" },
+      el("span", {}, "Model ", el("span", { class: "tag" }, "model: not proven"), " ",
+        model === null ? "—" : `${pct(model)} / ${pct(1 - model)}`),
+      thin.length ? el("span", {}, `Thin: ${thin.join(", ")}`) : null));
+}
+
+function challengersView(ch, head) {
+  const out = [...head];
+  const status = typeof ch.status === "string" ? ch.status : "missing";
+  const add = (title, text, bad) => out.push(el("div", { class: "banner" + (bad ? " bad" : ""), role: "status" }, el("b", {}, title), text));
+  out.push(el("div", { class: "banner info" }, el("b", {}, "Polymarket (international), indicative: not tradable from the US"),
+    `Peer order-book prices per share, ${ageText(ch.fetched_at) ? `fetched ${ageText(ch.fetched_at)}` : "fetch time unknown"}. Size = shares at the best price; books are often only a few shares deep.`));
+  if (status !== "ok") add("Challenger prices not updated", status.startsWith("error") ? "The last fetch failed. These are the last saved prices." : `Status "${status}".`, status.startsWith("error"));
+  const fh = ageHours(ch.fetched_at);
+  if (fh !== null && fh > STALE_ODDS_H) add("Old prices", `These prices were fetched ${ageText(ch.fetched_at)}.`, false);
+
+  const all = objects(ch.matches);
+  const [seg, byTour] = tourFilter(all);
+  const thinCount = byTour.filter((m) => thinReasons(side(m.p1), side(m.p2)).length).length;
+  out.push(seg);
+  if (thinCount) {
+    out.push(el("button", { class: "chip" + (hideThin ? " on" : ""), "aria-pressed": String(hideThin),
+      onclick: () => { hideThin = !hideThin; store.set("tennis-hide-thin", hideThin); render(); } },
+    hideThin ? `Showing ${byTour.length - thinCount} with usable books · show all ${byTour.length}` : `Hide ${thinCount} thin book${thinCount === 1 ? "" : "s"}`));
+  }
+  const shown = hideThin ? byTour.filter((m) => !thinReasons(side(m.p1), side(m.p2)).length) : byTour;
+  if (!shown.length) {
+    out.push(el("div", { class: "card empty" }, all.length ? "No matches with these filters." : "No Challenger or WTA 125 matches listed right now."));
+    return out;
+  }
+  out.push(...grouped(shown, challengerCard));
   out.push(el("p", { class: "note" },
-    "Decimal odds. Fair chance = the book's implied chance with its margin removed. The model is a surface-weighted Elo rating that has not beaten the market in any test, so treat it as context, not a tip."));
+    "Bid = the best price someone will pay for a share that pays $1 if the player wins; ask = the best price to buy one. The spread is the cost of crossing the book. Polymarket international can't be traded from the US; these are shown only as an indicative line."));
   return out;
 }
 
@@ -434,6 +543,9 @@ function footer() {
     ", licensed ", el("a", { href: "https://creativecommons.org/licenses/by-nc-sa/4.0/", rel: "noopener" }, "CC BY-NC-SA 4.0"),
     ". This page is non-commercial."));
   lines.push(p("Odds from DraftKings Sportsbook and Pinnacle via The Odds API. Not betting advice."));
+  if (odds && odds.challengers && typeof odds.challengers === "object") {
+    lines.push(p("Challenger and WTA 125 prices: Polymarket (international) public order books, indicative only, not tradable from the US."));
+  }
   return lines;
 }
 

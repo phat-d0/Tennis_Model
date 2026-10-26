@@ -169,6 +169,20 @@ table.odds td .sub { display: block; font-size: 11px; color: var(--text-muted); 
 table.odds .na { color: var(--text-muted); }
 .card-foot { margin-top: 6px; font-size: 12px; color: var(--text-muted); display: flex; flex-wrap: wrap; gap: 2px 12px; }
 
+/* ---------- challengers ---------- */
+.levels { margin-top: 4px; }
+.banner.info { border-left-color: var(--p1); }
+table.book th:first-child, table.book td:first-child { width: 40%; color: var(--text-primary); font-weight: 600; overflow-wrap: anywhere; }
+table.book td.wide { color: var(--warn); }
+.card.thin { opacity: 0.62; }
+.card.thin:hover, .card.thin:focus-within { opacity: 1; }
+.tag.thin-tag { color: var(--warn); }
+.chip {
+  display: inline-block; margin: 8px 0 2px; border: 0.5px solid var(--border); border-radius: 999px;
+  background: var(--surface-2); color: var(--text-secondary); font-size: 13px; padding: 5px 12px; cursor: pointer;
+}
+.chip.on { color: var(--accent); border-color: var(--accent); }
+
 /* ---------- findings ---------- */
 .finding h3 { margin: 0 0 4px; font-size: 16px; display: flex; justify-content: space-between; gap: 8px; align-items: baseline; }
 .finding p { margin: 0; font-size: 14px; color: var(--text-secondary); }
