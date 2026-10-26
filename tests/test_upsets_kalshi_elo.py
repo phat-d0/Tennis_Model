@@ -72,7 +72,11 @@ def test_name_key_order_and_aliases():
     same = [("Bu Yunchaokete", "Yunchaokete Bu"), ("Shi Han", "Han Shi"), ("Guo Hanyu", "Hanyu Guo"),
             ("Liang En-shuo", "En-Shuo Liang"), ("Liang En-shuo", "En Shuo Liang"),
             ("Maria Camila Osorio Serrano", "Camila Osorio"),
-            ("Mayar Sherif Ahmed Abdelaziz", "Mayar Sherif"), ("Martin Damm Jr.", "Martin Damm Jr")]
+            ("Mayar Sherif Ahmed Abdelaziz", "Mayar Sherif"), ("Martin Damm Jr.", "Martin Damm Jr"),
+            # the second batch (Data, 2026-10-26): Odds API vs Kalshi vs Sackmann spellings
+            ("Daniel Merida Aguilar", "Daniel Merida"), ("JJ Wolf", "Jeffrey John Wolf"),
+            ("JJ Wolf", "J J Wolf"), ("Chak Lam Coleman Wong", "Coleman Wong"),
+            ("Alexander Shevchenko", "Aleksandr Shevchenko")]
     for a, b in same:
         assert ke.name_key(a) == ke.name_key(b), (a, b)
     assert ke.name_key("Andres Martin") != ke.name_key("Andrej Martin")

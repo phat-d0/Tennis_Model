@@ -20,6 +20,11 @@ import pandas as pd
 ALIASES = {
     "camila maria osorio serrano": "camila osorio",
     "abdelaziz ahmed mayar sherif": "mayar sherif",
+    "aguilar daniel merida": "daniel merida",              # Odds API
+    "jj wolf": "j j wolf",                                  # Odds API
+    "jeffrey john wolf": "j j wolf",                        # Kalshi
+    "chak coleman lam wong": "coleman wong",                # Odds API
+    "aleksandr shevchenko": "alexander shevchenko",         # Kalshi
 }
 
 
