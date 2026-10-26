@@ -380,3 +380,14 @@ def test_results_from_data_table():
     assert r.loc["e2", "winner"] == "away"                                    # subset: Camila Osorio
     assert r.loc["e3", "void"]                                                # retired in set 1
     assert "e4" not in r.index                                                # Andrej != Andres
+
+
+def test_structural_cost_table():
+    f = pd.DataFrame({"tour": ["atp", "wta", "atp"], "level_group": ["slam", "1000", "other"],
+                      "sack_row": [3, -1, 5], "void": [False, False, True],
+                      "p_pin": [0.4, 0.25, 0.3], "odds_dog_dk": [2.4, 3.6, 3.0], "upset": [1, 0, 0]})
+    lines = ds.structural(f)
+    all_row = next(x for x in lines if x.startswith("| All"))
+    # expected = mean(0.4*2.4-1, 0.25*3.6-1) = mean(-0.04, -0.10) = -0.07; realized = mean(+1.4, -1) = +0.2
+    assert "| 2 |" in all_row and "-7.0%" in all_row and "+20.0%" in all_row
+    assert any("results from Kalshi" in x for x in lines) and not any("250/500" in x for x in lines)

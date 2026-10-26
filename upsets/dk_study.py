@@ -300,6 +300,28 @@ def _row(name: str, b: pd.DataFrame) -> str:
             f"{_pct(sp['roi'])} ({sp['bets']:,}) |")
 
 
+def structural(f: pd.DataFrame) -> list[str]:
+    """DraftKings' price vs Pinnacle's fair price, per slice: what a dog bet at DK should return if
+    Pinnacle's de-vigged chance is right (the structural cost of DK's margin), next to what it did
+    return on the same settled matches."""
+    done = f[~f["void"].astype(bool)].dropna(subset=["p_pin", "odds_dog_dk"])
+    lines = ["| Slice | Matches | Pinnacle p(dog) | Upset rate | Expected ROI at DK (Pinnacle fair) | "
+             "Realized ROI at DK | 95% CI |", "|---|---|---|---|---|---|---|"]
+    names = {"slam": "Slams", "1000": "1000s", "other": "250/500s"}
+    slices = [("All", done), ("… ATP", done[done["tour"] == "atp"]), ("… WTA", done[done["tour"] == "wta"])]
+    slices += [(f"… {names.get(lv, lv)}", g) for lv, g in done.groupby("level_group")]
+    slices += [("… results from Sackmann (through May 2026)", done[done["sack_row"] >= 0]),
+               ("… results from Kalshi (Jun–Oct 2026)", done[done["sack_row"] < 0])]
+    for name, b in slices:
+        if not len(b):
+            continue
+        s = summary(b)
+        exp = float((b["p_pin"] * b["odds_dog_dk"] - 1).mean())
+        lines.append(f"| {name} | {len(b):,} | {b['p_pin'].mean():.1%} | {b['upset'].mean():.1%} | "
+                     f"{_pct(exp)} | {_pct(s['roi'])} | {_pct(s['lo'])} to {_pct(s['hi'])} |")
+    return lines
+
+
 def _logloss(y, p) -> float:
     p = np.clip(np.asarray(p, float), 1e-6, 1 - 1e-6)
     return float(-np.mean(y * np.log(p) + (1 - y) * np.log(1 - p)))
@@ -329,6 +351,10 @@ def report(f: pd.DataFrame, priced: pd.DataFrame, oos: pd.DataFrame, seasons: pd
         f"{int(f['odds_dog_pin'].notna().sum()):,}).",
         f"- DraftKings price age before the listed start: median {age.median():.0f} min, p90 "
         f"{age.quantile(0.9):.0f} min.",
+        "", "## DraftKings' price vs Pinnacle's fair price", "",
+        "Expected ROI = mean(Pinnacle de-vigged p(dog) × DK odds − 1): the cost of DraftKings' margin if "
+        "Pinnacle is right. Realized ROI is on the same settled matches; the gap between them is luck "
+        "(or Pinnacle being wrong).", "", *structural(f),
         "", "## (a) Every early-round underdog", "", *ROW_HEAD,
         _row("All", f), _row("… ATP", f[f["tour"] == "atp"]), _row("… WTA", f[f["tour"] == "wta"]),
         _row("… Slams", f[f["level_group"] == "slam"]), _row("… 1000s", f[f["level_group"] == "1000"]),
