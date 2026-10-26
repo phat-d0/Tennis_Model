@@ -20,6 +20,8 @@ import math
 import numpy as np
 import pandas as pd
 
+from .odds import devig_power
+
 STAKE = 10.0
 SETTLE_AFTER_H = 3.0
 VOID_AFTER_D = 4.0
@@ -53,14 +55,15 @@ def _num(x) -> float | None:
 
 
 def _fair(book: dict | None) -> float | None:
-    """Proportional de-vig of a book's two prices -> fair p(player 1)."""
+    """Power de-vig of a book's two prices -> fair p(player 1). The page and every study use the power
+    method since 2026-10-26 (it puts more of the margin on the long shot; the proportional method made
+    the line rule's expected value about +9% a bet instead of about +0.5%)."""
     if not isinstance(book, dict):
         return None
     o1, o2 = _num(book.get("odds_1")), _num(book.get("odds_2"))
     if not o1 or not o2 or o1 <= 1 or o2 <= 1:
         return None
-    i1, i2 = 1 / o1, 1 / o2
-    return i1 / (i1 + i2)
+    return float(devig_power(np.array([o1]), np.array([o2]))[0])
 
 
 def pick(strategy: dict, m: dict) -> tuple[int, float] | None:

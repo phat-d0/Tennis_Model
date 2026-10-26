@@ -139,13 +139,14 @@ def test_ok_json_shape_model_and_names(dirs):
     assert set(e1) == {"event_id", "sport_key", "tournament", "tour", "commence_time", "player_1", "player_2",
                        "draftkings", "pinnacle", "fair_1", "dk_implied_1", "model_p1", "model_n1", "model_n2"}
     assert e1["draftkings"]["margin"] == pytest.approx(1 / 1.5 + 1 / 2.6 - 1, abs=1e-4)
-    assert e1["fair_1"] == pytest.approx((1 / 1.55) / (1 / 1.55 + 1 / 2.7), abs=1e-4)   # Pinnacle de-vig
+    assert e1["fair_1"] == pytest.approx(site.portfolio._fair({"odds_1": 1.55, "odds_2": 2.7}), abs=1e-4)  # Pinnacle
+    assert e1["fair_1"] > (1 / 1.55) / (1 / 1.55 + 1 / 2.7)          # power de-vig: the favourite gets more
     assert e1["dk_implied_1"] == pytest.approx(1 / 1.5, abs=1e-4)
     # "Yunchaokete Bu" (Odds API order) = Sackmann "Bu Yunchaokete"; he won every match
     assert e1["model_p1"] > 0.6 and e1["model_n1"] >= 20 and e1["model_n2"] >= 20
     # e2: "Marco Rossi" is two Sackmann players -> null; no Pinnacle -> fair from DraftKings
     assert m["e2"]["pinnacle"] is None and m["e2"]["model_p1"] is None
-    assert m["e2"]["fair_1"] == pytest.approx((1 / 1.8) / (1 / 1.8 + 1 / 1.95), abs=1e-4)
+    assert m["e2"]["fair_1"] == pytest.approx(site.portfolio._fair({"odds_1": 1.8, "odds_2": 1.95}), abs=1e-4)
     # w1: WTA names not in the archive -> null; no DraftKings quote
     assert m["w1"]["draftkings"] is None and m["w1"]["dk_implied_1"] is None and m["w1"]["model_p1"] is None
 

@@ -4,7 +4,7 @@
         [--out reports/upsets_line_shop_drawdown.md]
 
 Two versions of the line-shopping rule:
-  Portfolio backtest  upsets.portfolio_backtest's "line" bets (one price per match: DK and Pinnacle at
+  Portfolio backtest  the Portfolio backtest's "line" bets as they were until 2026-10-26 (one price per match: DK and Pinnacle at
                       their last snapshot >= 5 min before the start, proportional de-vig, edge >= 1%,
                       books within 10 pts). Pinnacle's price there is its closing price, so "expected"
                       is already the CLV against Pinnacle's close.
@@ -25,7 +25,7 @@ import pandas as pd
 
 from . import dk_history as dh
 from . import dk_study as ds
-from . import elo, line_shop, portfolio_backtest, sackmann
+from . import elo, line_shop, sackmann
 from .odds import devig_power
 
 GAP_BINS = [0, 0.05, 0.10, 1.0]
@@ -39,10 +39,29 @@ SACKMANN_END = pd.Timestamp("2026-06-01")
 
 # --- bets ----------------------------------------------------------------------------------------
 
+def proportional_line_bets(f: pd.DataFrame, min_edge: float = 0.01, max_gap: float = 0.10) -> pd.DataFrame:
+    """The Portfolio backtest's "line" bets as they were until 2026-10-26 (this report's subject):
+    proportional de-vig for the rule, the expected value and the 10-pt gap filter."""
+    f = f[~f["void"].astype(bool)].dropna(subset=["odds_dog_pin", "odds_fav_pin"]).copy()
+    i_d, i_f = 1 / f["odds_dog_pin"], 1 / f["odds_fav_pin"]
+    f["pf_dog"] = i_d / (i_d + i_f)
+    k_d, k_f = 1 / f["odds_dog_dk"], 1 / f["odds_fav_dk"]
+    f = f[(k_d / (k_d + k_f) - f["pf_dog"]).abs() <= max_gap]
+    long = pd.concat([pd.DataFrame({
+        "m": f.index, "date": f["date"], "side": side, "odds": f[f"odds_{side}_dk"],
+        "p_fair": f["pf_dog"] if side == "dog" else 1 - f["pf_dog"],
+        "win": f["upset"] if side == "dog" else 1 - f["upset"]}) for side in ("dog", "fav")], ignore_index=True)
+    long["ev"] = long["odds"] * long["p_fair"] - 1
+    b = long.sort_values("ev", ascending=False).drop_duplicates("m")
+    b = b[b["ev"] >= min_edge]
+    b = b.assign(pnl=np.where(b["win"] == 1, b["odds"] - 1, -1.0))
+    return b.sort_values("date")
+
+
 def portfolio_bets(f: pd.DataFrame) -> pd.DataFrame:
-    """The Portfolio backtest's "line" bets with gap, tour, tier, odds band and the power-de-vig
+    """The Portfolio backtest's old "line" bets with gap, tour, tier, odds band and the power-de-vig
     expected value next to the proportional one. f: dk_study.frame + date."""
-    b = portfolio_backtest.bets(f)["line"].copy()
+    b = proportional_line_bets(f).copy()
     for c in ("tour", "level_group", "odds_dog_dk", "odds_fav_dk", "odds_dog_pin", "odds_fav_pin"):
         b[c] = f.loc[b["m"], c].to_numpy()
     k_d, k_f = 1 / b["odds_dog_dk"], 1 / b["odds_fav_dk"]

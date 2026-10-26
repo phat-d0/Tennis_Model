@@ -258,9 +258,8 @@ def page_matches(snaps: pd.DataFrame, titles: dict, rt: dict | None, now: pd.Tim
         dk, pin = ((q if q is not None and q["player_1"] == e["player_1"] else None) for q in (dk, pin))
         fair_src = pin if pin is not None else dk
         fair = None
-        if fair_src is not None:
-            i1, i2 = 1 / fair_src["odds_1"], 1 / fair_src["odds_2"]
-            fair = round(i1 / (i1 + i2), 4)
+        if fair_src is not None:   # power de-vig, as the Portfolio and the studies use
+            fair = round(portfolio._fair({"odds_1": fair_src["odds_1"], "odds_2": fair_src["odds_2"]}), 4)
         out.append({
             "event_id": e["event_id"], "sport_key": e["sport_key"],
             "tournament": titles.get(e["sport_key"], e["sport_key"]), "tour": _tour(e["sport_key"]),
