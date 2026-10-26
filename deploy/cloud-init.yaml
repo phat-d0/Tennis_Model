@@ -1,0 +1,27 @@
+#cloud-config
+# Swing-lock scanner + dashboard + recorder on a fresh Ubuntu 24.04 server (Hetzner "Cloud config").
+# Replace TS_AUTHKEY below with a ONE-OFF, non-reusable, short-expiry Tailscale auth key.
+# The key is stored in Hetzner's server metadata, so let it expire quickly (1 hour is plenty);
+# it is used once at first boot and the copy on disk is deleted afterwards.
+# Everything else is in deploy/bootstrap.sh (log: /var/log/swinglock-bootstrap.log).
+# See docs/scanner_deploy.md. Read-only: nothing on this server places orders.
+
+package_update: true
+package_upgrade: true
+packages:
+  - git
+  - ca-certificates
+  - curl
+
+write_files:
+  - path: /root/tailscale-authkey
+    permissions: "0600"
+    owner: root:root
+    content: |
+      TS_AUTHKEY
+
+runcmd:
+  - [git, clone, --depth, "1", "https://github.com/phat-d0/Tennis_Model.git", /opt/swinglock]
+  - [bash, /opt/swinglock/deploy/bootstrap.sh]
+
+final_message: "swinglock cloud-init finished after $UPTIME s; see /var/log/swinglock-bootstrap.log"

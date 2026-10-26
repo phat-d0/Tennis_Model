@@ -5,8 +5,10 @@
 
 Per poll: one `GET /markets/orderbooks` per 50 matches (both legs in one call). Discovery
 (`GET /events` per series, with milestones) refreshes every `scanner.discovery_seconds`
-(default 300). Series fee types are fetched once at startup. With the client's 1 s minimum
-spacing that stays well under a quarter of the observed unauthenticated limit.
+(default 300). Series fee types are fetched once at startup. Requests are spaced at least
+`scanner.min_request_interval` apart, and the poll interval stretches so the average rate stays at
+or under `scanner.max_rps` (default 0.5 req/s, under a quarter of the observed unauthenticated
+limit): with 250 open matches a tick is 6 calls, so polls are 12 s apart instead of 5 s.
 """
 
 from __future__ import annotations
@@ -55,6 +57,7 @@ class Scanner:
         self._discovered_at: datetime | None = None
         self._positions_mtime: float | None = None
         self._positions = []
+        self._stretched = False
 
     def load_fees(self) -> None:
         for s in self.sc.get("series", []):
@@ -105,9 +108,11 @@ class Scanner:
         if not self.fees:
             self.load_fees()
         poll = float(self.sc.get("poll_seconds", 5))
+        max_rps = float(self.sc.get("max_rps", 0.5))
         ticks, failures = 0, 0
         while True:
             start = time.monotonic()
+            before = getattr(self.client, "requests_made", 0)
             try:
                 self.tick()
                 failures = 0
@@ -117,8 +122,19 @@ class Scanner:
             ticks += 1
             if once or (max_ticks is not None and ticks >= max_ticks):
                 return
-            backoff = min(poll * 2 ** min(failures, 6), 300) if failures else poll
+            interval = self.interval(poll, getattr(self.client, "requests_made", 0) - before, max_rps)
+            if interval > poll and not self._stretched:
+                log.info("poll stretched to %.0fs to stay under %.2f req/s", interval, max_rps)
+            self._stretched = interval > poll
+            self.state.poll_seconds = round(interval, 1)   # so the dashboard's staleness check is honest
+            backoff = min(interval * 2 ** min(failures, 6), 300) if failures else interval
             sleep(max(0.0, backoff - (time.monotonic() - start)))
+
+    @staticmethod
+    def interval(poll: float, requests: int, max_rps: float) -> float:
+        """Seconds per tick: the configured poll, stretched so the average request rate stays at or
+        under `scanner.max_rps` (many open matches mean several orderbooks calls per tick)."""
+        return max(poll, requests / max_rps) if max_rps > 0 else poll
 
 
 def main(argv: list[str] | None = None) -> None:
