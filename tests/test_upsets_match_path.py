@@ -132,3 +132,14 @@ def test_batch_close_times_are_unreliable():
     last = pd.Series({f"M{i}": at(700) for i in range(6)})
     flags = mp.unreliable_sets(sets, last)
     assert list(flags) == [True] * 5 + [False]
+
+
+def test_decider_guard_applies_to_match_path():
+    m, q, s, d = frames()
+    t, _ = mp.path_table(m, q, s, d)
+    assert t.set_index("match_id").loc["M1", "decider_ok"]
+    m["close_time"] = at(85)                     # decider (starts +80) would last 5 min
+    t, _ = mp.path_table(m, q, s, d)
+    r = t.set_index("match_id").loc["M1"]
+    assert r["decider"] and not r["decider_ok"]
+    assert "| ATP bo3 | all |" not in mp.report(t, load_config())   # no levelling-player bet
