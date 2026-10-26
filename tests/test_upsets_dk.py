@@ -281,7 +281,37 @@ def test_needed_covers_first_days_of_projected_events():
         "sack_row": [-1, -1, -1, -1, 7], "round_idx": [np.nan] * 4 + [1.0]})
     t = pd.DataFrame({"key": ["k", "s"], "tourney_id": ["p+52w", "2024-580"], "projected": [True, False],
                       "r12_days": [3, 5]})
-    assert list(dh.needed(j, t)) == [True, True, False, False, True]   # days 1-3 of the projected event
+    assert list(dh.needed(j, t, margin_days=0)) == [True, True, False, False, True]   # days 1-3
+    assert list(dh.needed(j, t)) == [True, True, True, False, True]                   # + 2 margin days
+
+
+def test_needed_skips_qualifying_week_of_projected_events():
+    # Wimbledon-like: qualifying listed under the same key a week before the main draw
+    j = pd.DataFrame({
+        "key": ["k"] * 4, "tourney_id": ["p+52w"] * 4,
+        "commence": pd.to_datetime(["2026-06-22 10:00", "2026-06-25 10:00", "2026-06-29 11:00",
+                                    "2026-07-06 12:00"]),
+        "sack_row": [-1] * 4, "round_idx": [np.nan] * 4})
+    t = pd.DataFrame({"key": ["k"], "tourney_id": ["p+52w"], "projected": [True], "r12_days": [5],
+                      "date": [pd.Timestamp("2026-06-29")]})
+    assert list(dh.needed(j, t)) == [False, False, True, False]
+
+
+def test_frame_unresolved_keeps_first_two_kalshi_rounds():
+    u = pd.DataFrame({"key": ["tennis_atp_us_open"] * 4, "tourney_id": ["u+52w"] * 4,
+                      "level_group": ["slam"] * 4, "event_id": list("abcd"),
+                      "commence": pd.to_datetime(["2026-08-30"] * 4),
+                      "home": list("ABCD"), "away": list("EFGH"),
+                      "odds_home_draftkings": [3.0] * 4, "odds_away_draftkings": [1.4] * 4,
+                      "odds_home_pinnacle": [np.nan] * 4, "odds_away_pinnacle": [np.nan] * 4,
+                      "age_min_draftkings": [9.0] * 4, "age_min_pinnacle": [np.nan] * 4})
+    res = pd.DataFrame({"event_id": list("abcd"), "winner": ["home", "away", "away", None],
+                        "void": [False, False, False, True],
+                        "round": ["Round Of 128", "Round Of 64", "Round Of 32", "Round Of 128"]})
+    f = ds.frame_unresolved(u, res)
+    assert len(f) == 3 and list(f["upset"]) == [1, 0, 0]       # round of 32 dropped
+    assert set(f["level_group"]) == {"slam"} and set(f["best_of"]) == {5.0}
+    assert ds.round_size("Quarterfinal") == 8 and np.isnan(ds.round_size(None))
 
 
 def test_pull_stops_if_an_empty_listing_costs_credits(tmp_path):
@@ -350,3 +380,14 @@ def test_results_from_data_table():
     assert r.loc["e2", "winner"] == "away"                                    # subset: Camila Osorio
     assert r.loc["e3", "void"]                                                # retired in set 1
     assert "e4" not in r.index                                                # Andrej != Andres
+
+
+def test_structural_cost_table():
+    f = pd.DataFrame({"tour": ["atp", "wta", "atp"], "level_group": ["slam", "1000", "other"],
+                      "sack_row": [3, -1, 5], "void": [False, False, True],
+                      "p_pin": [0.4, 0.25, 0.3], "odds_dog_dk": [2.4, 3.6, 3.0], "upset": [1, 0, 0]})
+    lines = ds.structural(f)
+    all_row = next(x for x in lines if x.startswith("| All"))
+    # expected = mean(0.4*2.4-1, 0.25*3.6-1) = mean(-0.04, -0.10) = -0.07; realized = mean(+1.4, -1) = +0.2
+    assert "| 2 |" in all_row and "-7.0%" in all_row and "+20.0%" in all_row
+    assert any("results from Kalshi" in x for x in lines) and not any("250/500" in x for x in lines)

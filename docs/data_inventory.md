@@ -112,3 +112,16 @@ Shared paid-plan key since 2026-10-26 (owner). Global floor 5,000; dk_live reser
 | 2026-10-26 04:16–04:20 | Upsets, phase (a) listings, 62 key-events, 478 listing calls | `/historical/sports/{key}/events` | 136 non-empty (342 empty, 0 credits) | 136 | 10,768 |
 | 2026-10-26 04:22–04:24 | Upsets, phase (c) odds, 6 h cells, `bookmakers=draftkings,pinnacle` | `/historical/sports/{key}/odds` | 151 | 1,510 | 9,258 |
 | | **Total for the 250/500 pull** | | 287 | **1,646** | 9,258 |
+
+**Slams + 1000s pull** (Lead-approved 2026-10-26 after the owner's 5M-credit upgrade; job cap 40,000 = spend-log total ≤ 41,646; floor 5,000; 3 h cells; `python -m upsets.dk_history ... --tiers slam,1000 --project-until 2026-10-25 --snap-h 3`). Plan before the pull: ≤ 23,916 credits. Plan verified first with a free `/sports` call: 5,000,000 remaining, 0 used.
+
+| Date (UTC) | Who / job | Endpoint | Calls | Credits | Balance after |
+|---|---|---|---|---|---|
+| 2026-10-26 05:03 | Upsets, DK history Slams + 1000s | start balance | — | — | 5,000,000 |
+| 2026-10-26 05:03–05:13 | Upsets, listings, 106 key-events (916 listing calls; 96 empty, 0 credits) | `/historical/sports/{key}/events` | 820 non-empty | 820 | 4,999,168 |
+| 2026-10-26 05:13–05:33 | Upsets, odds, 3 h cells, `bookmakers=draftkings,pinnacle` | `/historical/sports/{key}/odds` | 1,555 | 15,550 | 4,983,618 |
+| 2026-10-26 05:39–05:41 | Upsets, top-up after the projected-event fix (qualifying week skipped, +2 days, listing window +10 d): listings + odds | events / odds | 33 + 116 | 33 + 1,160 | 4,982,425 |
+| | **Total for the Slams + 1000s pull** | | 2,524 | **17,563** | 4,982,425 |
+| 2026-10-26 05:41–05:42 | Upsets, 250/500 top-up with the same fix (6 h cells, as the original pull) | events / odds | 36 + 47 | 36 + 470 | 4,981,919 |
+| | **DK history total so far (spend log)** | | 2,894 | **19,715** | 4,981,919 |
+
