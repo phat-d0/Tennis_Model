@@ -38,9 +38,14 @@ Output: alerts go to the console and to `data/alerts.log` (`<ts> [arb|lock] <mes
 
 ## API budget
 Requests are spaced ≥ 1 s apart (`scanner.min_request_interval`) and retried with exponential backoff
-(2, 4, … 60 s) on 429/5xx, since 429s carry no Retry-After. Steady state is 1 request per 5 s poll
-(0.2 req/s) plus 6 discovery requests every 5 minutes, against an observed unauthenticated limit
-of roughly 4 req/s, so about 5 % of it. A failing tick doubles the wait (up to 5 min).
+(2, 4, … 60 s) on 429/5xx, since 429s carry no Retry-After. Each poll makes one orderbooks call per 50
+matches, and the poll interval stretches so the average stays at or under `scanner.max_rps` (default
+0.5 req/s). On 2026-10-24, with 96 matches, that was 2 calls per 5 s poll. On 2026-10-26, with 252
+matches, it was 6 calls per 12 s poll. A failing tick doubles the wait (up to 5 min).
+
+Measured 2026-10-26 (scanner and recorder on one IP, 6 min): scanner 0.50 req/s and recorder
+0.45 req/s, with 9 × 429 out of 342 requests, all retried. The unauthenticated limit is
+undocumented. It looks closer to about 1 req/s sustained than to the ~4 req/s burst seen at first.
 
 First live check, 2026-10-24 09:14 UTC: 96 open matches discovered across the six series;
 best combined ask was exactly $1.00 (no arb before fees, none after).

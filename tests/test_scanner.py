@@ -212,6 +212,38 @@ def test_replay_arb_episodes(make_scanner, tmp_path):
     assert kinds.count("events") == kinds.count("series") == len(sc.cfg["scanner"]["series"])
 
 
+def test_poll_interval_stretches_to_stay_under_max_rps():
+    assert Scanner.interval(5, 1, 0.5) == 5          # 1 call per 5 s = 0.2 req/s: no stretch
+    assert Scanner.interval(5, 6, 0.5) == 12         # 250 matches = 6 calls -> 12 s per tick
+    assert Scanner.interval(5, 6, 0) == 5            # cap off
+
+
+def test_run_loop_respects_max_rps_and_reports_real_interval(make_scanner):
+    class Counting(FakeClient):           # every endpoint call counts as one request, like the client
+        requests_made = 0
+
+        def series(self, s):
+            self.requests_made += 1
+            return super().series(s)
+
+        def open_events(self, s):
+            self.requests_made += 1
+            return super().open_events(s)
+
+        def orderbooks(self, tickers):
+            self.requests_made += 1
+            return super().orderbooks(tickers)
+
+    sc, _ = make_scanner([fb(0.48, 0.53)] * 3, max_rps=0.5, poll_seconds=5)
+    sc.client = Counting([fb(0.48, 0.53)] * 3)
+    sc.cfg["scanner"]["series"] = ["KXATPMATCH", "KXWTAMATCH"]
+    sleeps = []
+    sc.run(sleep=sleeps.append, max_ticks=3)
+    # tick 1: 2 events calls (discovery) + 1 orderbooks = 3 calls -> 6 s; then 1 call -> 5 s
+    assert [round(x) for x in sleeps] == [6, 5]
+    assert sc.state.poll_seconds == 5
+
+
 def test_replay_small_edge_below_threshold(make_scanner):
     # .49 + .50 = .99 but fees (~1.75c per pair) eat it: no arb
     sc, advance = make_scanner([fb(0.49, 0.50)])

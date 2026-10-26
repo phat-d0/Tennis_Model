@@ -1,7 +1,8 @@
 # Swing-lock services on one small VPS. Read-only: nothing here places orders.
 #   docker compose -f deploy/docker-compose.yml up -d --build                 # scanner + dashboard
-#   docker compose -f deploy/docker-compose.yml --profile recorder up -d      # + Data's recorder
+#   docker compose -f deploy/docker-compose.yml --profile recorder up -d      # + order-book recorder
 #   docker compose -f deploy/docker-compose.yml --profile public up -d        # + Caddy basic-auth proxy
+# The systemd unit sets COMPOSE_PROFILES=recorder, so the server runs all three.
 # See docs/scanner_deploy.md.
 
 x-common: &common
@@ -38,15 +39,18 @@ services:
       - ../config.yaml:/app/config.yaml:ro
 
   recorder:
-    # Placeholder for Data's order-book recorder (swinglock/collectors/recorder.py, not written yet).
-    # Off by default; enable with --profile recorder once the module exists.
+    # Data's order-book recorder (swinglock/collectors/recorder.py): daily parquet under
+    # data/recorded/kalshi/. Profile "recorder" (on in the systemd unit). It shares the server's IP,
+    # and Kalshi's rate limit, with the scanner: never run a backfill on this server.
     <<: *common
     profiles: ["recorder"]
     command: ["python", "-m", "swinglock.collectors.recorder"]
+    stop_grace_period: 30s         # lets it flush the current part file on SIGTERM
 
   caddy:
-    # Optional HTTPS + basic-auth front for the dashboard. Needs DASHBOARD_DOMAIN, DASHBOARD_USER
-    # and DASHBOARD_PASSWORD_HASH in deploy/.env, and ports 80/443 open. Off by default.
+    # Optional HTTPS + basic-auth front for the dashboard on the public internet. Not used with
+    # Tailscale (the default: `tailscale serve` gives tailnet-only HTTPS). Needs DASHBOARD_DOMAIN,
+    # DASHBOARD_USER and DASHBOARD_PASSWORD_HASH in deploy/.env, and ports 80/443 open. Off by default.
     image: caddy:2.8
     profiles: ["public"]
     restart: unless-stopped

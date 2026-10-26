@@ -49,11 +49,12 @@ scanner:
     - KXWTAMATCH
     - KXATPCHALLENGERMATCH
     - KXWTACHALLENGERMATCH
-    - KXITFMATCH
-    - KXITFWMATCH
+                                # ITF (KXITFMATCH, KXITFWMATCH) dropped 2026-10-26 (Lead): ~60% of open
+                                # matches, outside the owner's scope, and it pushed the shared IP into 429s
   alert_log: data/alerts.log
   discovery_seconds: 300        # how often to re-list open matches
   min_request_interval: 1.0     # seconds between Kalshi requests
+  max_rps: 0.5                  # average Kalshi request cap; the poll interval stretches above it
   realert_min_improvement: 0.05 # dollars of extra edge before re-alerting an open episode
   realert_min_improvement_pct: 0.25
   episode_gap_seconds: 30       # an opportunity gone this long starts a new episode
@@ -62,7 +63,7 @@ recorder:                       # python -m swinglock.collectors.recorder (deplo
   poll_s: 10                    # order-book snapshot interval
   discovery_s: 600              # re-list open matches
   flush_s: 60                   # write a parquet part file
-  max_rps: 1.0                  # cap on all recorder requests (shares the VPS IP with the scanner)
+  max_rps: 0.5                  # cap on all recorder requests (shares the VPS IP with the scanner)
   depth: 5                      # bid levels kept per book side
   score_poll_s: 60              # live score via /live_data/batch (1 req per ≤100 matches); 0 = off
   out_dir: data/recorded/kalshi
