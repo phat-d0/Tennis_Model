@@ -41,16 +41,31 @@ LN10_400 = np.log(10) / 400.0
 
 # --- names -----------------------------------------------------------------------------------
 
-def name_key(name) -> str:
-    """'Félix Auger-Aliassime' -> 'felix auger aliassime'."""
-    if not isinstance(name, str):
-        return ""
-    s = unicodedata.normalize("NFKD", name).encode("ascii", "ignore").decode().lower()
-    return re.sub(r"\s+", " ", re.sub(r"[^a-z ]", " ", s)).strip()
+# Same player, different spellings across Sackmann / Kalshi / The Odds API. Keys and values are
+# norm_name() forms; keys are token-sorted so either name order hits; values are the Sackmann spelling.
+ALIASES = {
+    "camila maria osorio serrano": "camila osorio",
+    "abdelaziz ahmed mayar sherif": "mayar sherif",
+}
 
 
 def _sorted_key(key: str) -> str:
     return " ".join(sorted(key.split()))
+
+
+def norm_name(name) -> str:
+    """'Félix Auger-Aliassime' -> 'felix auger aliassime' (word order kept; aliases applied)."""
+    if not isinstance(name, str):
+        return ""
+    s = unicodedata.normalize("NFKD", name).encode("ascii", "ignore").decode().lower()
+    s = re.sub(r"\s+", " ", re.sub(r"[^a-z ]", " ", s)).strip()
+    return ALIASES.get(_sorted_key(s), s)
+
+
+def name_key(name) -> str:
+    """Order-insensitive key for equality joins: 'Bu Yunchaokete' and 'Yunchaokete Bu' ->
+    'bu yunchaokete'; 'Liang En-shuo' and 'En-Shuo Liang' -> 'en liang shuo'."""
+    return _sorted_key(norm_name(name))
 
 
 def _initial_keys(key: str) -> set[str]:
@@ -67,7 +82,7 @@ def player_table(sack: pd.DataFrame) -> pd.DataFrame:
         sack[["tour", "loser_id", "loser", "date"]].set_axis(["tour", "id", "name", "date"], axis=1)])
     t = long.sort_values("date").groupby(["tour", "id"], as_index=False).agg(
         name=("name", "last"), last=("date", "max"))
-    t["key"] = t["name"].map(name_key)
+    t["key"] = t["name"].map(norm_name)
     return t
 
 
@@ -121,7 +136,7 @@ def match_names(names: pd.Series, tours: pd.Series, players: pd.DataFrame,
     cache: dict = {}
     out = []
     for name, tour in zip(names, tours):
-        k = (name_key(name), tour)
+        k = (norm_name(name), tour)
         if k not in cache:
             res = (pd.NA, "none")
             if k[0]:
