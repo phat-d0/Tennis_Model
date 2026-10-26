@@ -42,9 +42,15 @@
   "report": "reports/upsets_match_path.md"
  },
  {
-  "title": "Early-round underdogs at DraftKings",
+  "title": "DraftKings underdogs, all tournaments",
   "verdict": "No edge",
-  "summary": "417 early-round underdogs at ATP/WTA 250/500s (mostly 2026): −18.7% at DraftKings' price, −15.6% at Pinnacle's. No odds band is positive. DraftKings' margin is 4.8% vs Pinnacle's 2.8%, and Pinnacle forecasts slightly better.",
-  "report": "reports/upsets_dk_small.md"
+  "summary": "Betting every early-round underdog at DraftKings' closing price returned −11.2% over 6,655 matches (Slams 2020–26, 1000s and 250/500s 2024–26). That is what DraftKings' margin predicts if Pinnacle's price is fair (−10.9%): its 5.2% margin falls mostly on the underdog. The Elo model failed the walk-forward test (−15%).",
+  "report": "reports/upsets_dk_all.md"
+ },
+ {
+  "title": "Line shopping: DraftKings vs Pinnacle",
+  "verdict": "In progress",
+  "summary": "Bet at DraftKings only when its odds beat Pinnacle's margin-free price. Results are being checked; the Portfolio tab paper-trades the rule live.",
+  "report": ""
  }
 ]
