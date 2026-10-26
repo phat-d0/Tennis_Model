@@ -47,3 +47,12 @@ def test_fatigue_counts_recent_sets():
     fw, fl = ep.fatigue(df, np.array([1, 2]))
     assert list(fw) == [2, 2]   # row 1: a's R32 (2 sets); row 2: b played 2 sets on 2024-01-01 (7 days earlier)
     assert list(fl) == [0, 2]   # row 1: c had no earlier match; row 2: c played 2 sets in E1
+
+
+def test_fatigue_ignores_later_rounds():
+    # a QF (or any later round) of the same event must never count as qualifying for its R16
+    df = frame()
+    qf = df.iloc[[1]].assign(winner_id="c", loser_id="a", round="QF", round_idx=3.0, _sets=3)
+    df = pd.concat([df, qf], ignore_index=True)
+    fw, fl = ep.fatigue(df, np.array([1]))
+    assert list(fw) == [2] and list(fl) == [0]

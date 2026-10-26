@@ -122,7 +122,7 @@ def run(df: pd.DataFrame, keep: np.ndarray, k_scale: float = 250.0, mov: float =
 def fatigue(df: pd.DataFrame, rows: np.ndarray) -> tuple[np.ndarray, np.ndarray]:
     """Sets played by winner / loser of each row in `rows` in the 10 days before it: matches of
     other events that started in [date - 10 d, date), the same event's earlier main-draw rounds,
-    and its qualifying (rows of the same tournament name and start date, round 'Q*')."""
+    and its qualifying (rows of the same tournament name and start date, round Q1-Q4; not QF)."""
     long = pd.concat([
         df[["winner_id", "tour", "date", "tourney_id", "tournament", "round", "round_idx", "_sets"]]
         .set_axis(["p", "tour", "date", "tid", "name", "round", "ri", "sets"], axis=1),
@@ -130,7 +130,7 @@ def fatigue(df: pd.DataFrame, rows: np.ndarray) -> tuple[np.ndarray, np.ndarray]
         .set_axis(["p", "tour", "date", "tid", "name", "round", "ri", "sets"], axis=1)], ignore_index=True)
     by_event = long.groupby(["p", "tour", "date", "tid"])["sets"].sum().reset_index()
     by_day = by_event.groupby(["p", "tour", "date"])["sets"].sum()
-    quali = long[long["round"].astype(str).str.startswith("Q")].groupby(["p", "tour", "name", "date"])["sets"].sum()
+    quali = long[long["round"].astype(str).str.fullmatch(r"Q\d")].groupby(["p", "tour", "name", "date"])["sets"].sum()
     main = long[long["ri"].notna()]
     out = []
     for side in ("winner_id", "loser_id"):
