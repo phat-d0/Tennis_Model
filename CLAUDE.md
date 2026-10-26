@@ -341,3 +341,6 @@ the newest 200. Format changes go through the Lead (Scanner proposes, Dashboard 
   `reports/upsets_seed_base_rates.md`); 140 tests. 2010–2025, rounds 1–2, seed vs unseeded: seeds lose 29.7%
   (ATP) / 30.1% (WTA), ~2 pp more than Elo expects, mostly vs qualifiers. 42% / 46% of seeds are out by round 2.
   No odds in this data, so no edge claim. Lead re-check matched ATP within 0.2 pp.
+- 2026-10-25: Upsets phase B code merged (phat-d0/Tennis_Model#60): Elo (Sackmann + Kalshi results) vs Kalshi
+  closing asks, early-round underdogs, monthly walk-forward. Review caught a round-order lookahead; fixed
+  (`round_monotone`). 149 tests. Data run pending.
