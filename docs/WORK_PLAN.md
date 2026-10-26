@@ -178,7 +178,11 @@ The owner asked for a public phone page like the soccer app, refreshed every 3 h
 - **Owner 2026-10-26: plan upgraded to 5M credits/month** (still shared with soccer ≈ 5k/month and baseball), "we don't have to
   skimp". **Approved: DK history for Slams + 1000s** (Upsets), with 3 h cells instead of 6 h for prices closer to the start
   (~25–30k credits; per-job cap 40k; the 5,000 floor stays). The page's monthly cap goes from 600 to 3,000 (still every 3 h).
-- **Page status:** UI merged (#85). Next is `upsets/site.py` (Upsets), then `publish.yml`, which is drafted on team/lead.
+- **Page is live: https://phat-d0.github.io/Tennis_Model/** (2026-10-26 05:07 UTC).
+  - Merged: UI #85/#92, builder #89/#90, publish #91.
+  - First run: ok, 29 matches, 3 credits.
+  - Refresh is every 3 h, capped at 3,000 credits a month; the balance is never published.
+- **Slams + 1000s DK pull:** running (Upsets). The plan is ≤ 23,916 credits against a 40k cap; the account shows 5M credits.
 
 ## How to continue in a new session
 Read `CLAUDE.md`, this file, and your brief in `docs/team/`. Check open PRs into `main` and the

@@ -1,5 +1,8 @@
 # Tennis Odds page (GitHub Pages): plan and contract
 
+**Live since 2026-10-26 05:07 UTC** (first run: status ok, 29 matches, 3 credits). `credits.left` is always
+`null` (the shared plan's balance is never published); `paced` = under the monthly cap but today's share is used.
+
 The owner approved this on 2026-10-26: a public phone page like the soccer app (phat-d0.github.io/Soccer_Stats). It shows
 ATP/WTA match odds from DraftKings and Pinnacle, refreshed every 3 hours. URL once live:
 `https://phat-d0.github.io/Tennis_Model/`.
@@ -41,8 +44,8 @@ cp -r site/* _site/
 ## `_site/data/odds.json`
 ```json
 {"generated_at": "ISO-8601 UTC", "odds_fetched_at": "ISO-8601 UTC | null",
- "status": "ok | no_key | cap_reached | below_floor | no_tournaments | error: ...",
- "credits": {"left": 0, "used_this_month": 0, "month_cap": 3000},
+ "status": "ok | no_key | cap_reached | paced | below_floor | no_tournaments | error: <ExceptionClass> [HTTP code]",
+ "credits": {"left": null, "used_this_month": 0, "month_cap": 3000},
  "ratings_through": "YYYY-MM-DD",
  "tournaments": [{"sport_key": "tennis_atp_paris", "title": "ATP Paris Masters", "tour": "ATP"}],
  "matches": [{"event_id": "", "sport_key": "", "tournament": "", "tour": "ATP|WTA",
