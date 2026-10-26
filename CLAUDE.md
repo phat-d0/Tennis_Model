@@ -214,9 +214,10 @@ the newest 200. Format changes go through the Lead (Scanner proposes, Dashboard 
   default (dashboard published on 127.0.0.1:8000 only, so it's reached over an SSH tunnel), `recorder`
   behind `--profile recorder`, optional Caddy HTTPS + basic auth behind `--profile public`. Secrets in
   `deploy/.env` (gitignored); holdings in `data/positions.json` (gitignored). **Scanner and recorder
-  share the VPS IP and therefore Kalshi's unauthenticated rate limit**: the scanner uses ~0.22 req/s,
-  so size the recorder within Data's ½ share. The recorder measured ~0.17 req/s (30 requests in
-  3 min, 90 matches). **Never run a backfill on the same IP as scanner + recorder**: in a trial,
+  share the VPS IP and therefore Kalshi's unauthenticated rate limit**. Measured 2026-10-26 (phat-d0/Tennis_Model#109):
+  at 252 matches the scanner ran ~1 req/s before its new `scanner.max_rps` cap, and the recorder ~0.45 req/s.
+  Together that was 0.95 req/s, with ~1 × 429/min. ITF was dropped and both are capped at 0.5 req/s; at 104 matches the
+  pair runs 0.84 req/s with 0 × 429. **Never run a backfill on the same IP as scanner + recorder**: in a trial,
   recorder + backfill together set off a run of 429s.
 - Recorded order books (~100 MB/day before compaction) stay on the VPS disk under
   `data/recorded/kalshi/`. They don't go to `data-store`, which is too big for git; Backtest gets
@@ -374,6 +375,11 @@ the newest 200. Format changes go through the Lead (Scanner proposes, Dashboard 
   The page and its build never touch Kalshi data; the builder's `status` must never contain the API key or a URL.
 - 2026-10-26 (owner): Odds API plan upgraded to **5M credits/month** (shared with soccer ≈ 5k/month and baseball). 5,000 floor
   kept as a safety net; budgets are now per-job caps in WORK_PLAN. Slams + 1000s DK history approved.
+- 2026-10-26 (owner): VPS = Hetzner (Ashburn) with **Tailscale-only** access: one-paste `deploy/cloud-init.yaml` +
+  `deploy/bootstrap.sh`, recorder on, no public ports (phat-d0/Tennis_Model#109). ITF series dropped from scanner, recorder
+  and backfill defaults. The page model is now tuned Elo + serve/return (#106). Line-shopping drawdown = luck on a thin
+  edge (#108); the Portfolio switches to the power de-vig. Challengers come from Polymarket intl, owner OK'd its terms
+  (#105, #107). Owner set-up of the server is pending.
 - 2026-10-26: **Tennis Odds page live** at https://phat-d0.github.io/Tennis_Model/ (GitHub Pages, `.github/workflows/publish.yml`,
   every 3 h, ≤ 3,000 credits/month; phat-d0/Tennis_Model#85, #89–#92). Name matching moved to `upsets/names.py` (token-sorted
   keys + aliases). The cloud container can't reach github.io (network policy), so check runs via the Actions log.
