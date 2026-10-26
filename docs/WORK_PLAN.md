@@ -90,7 +90,11 @@ Plan, method, gate and data blockers: `docs/upsets_plan.md`. Code: `upsets/` (Le
   first, and the Lead approves the estimate before any paid call. Odds data is never committed. Spent by Upsets/Data only, each spend logged in docs/data_inventory.md. **Owner 2026-10-26: use up the free key's ~491 credits first
   (floor lowered to 10 for this key) on live DK + Pinnacle pre-match odds (`upsets/dk_live.py`, starts when a tennis
   key goes active), then ask again.** The owner then plans to switch `ODDS_API_KEY` to their shared paid plan (also
-  used by soccer/baseball). The DK history pull (~13k) needs a fresh owner OK on a budget and a floor for that shared key. Run by the Upsets role (session in docs/team/lead.md).
+  used by soccer/baseball). The DK history pull (~13k) needs a fresh owner OK on a budget and a floor for that shared key. **Update (owner 2026-10-26):** the key is now the shared plan
+  (balance ≈ 10,906). **Reserve 5,000: no tennis call may take the balance below it.** Approved: DK history for the
+  **250/500 tier only** (budget ≈ balance − 5,000 − 481 for dk_live ≈ 5,400; listings first, then 6 h cells, else 8 h,
+  else most recent events first). dk_live is capped at 481. Slams/1000s (~14–15k more) wait for an owner decision
+  (a 100K upgrade was suggested). Run by the Upsets role (session in docs/team/lead.md).
 - **Blocked (2026-10-25 17:37):** tennis-data.co.uk's Cloudflare blocks the cloud container's IP (403
   "you have been blocked"; not worked around). The owner downloads the ATP + WTA xlsx files for 2015–2026
   by hand. The Limited network policy also denies api.the-odds-api.com, so it needs adding.
