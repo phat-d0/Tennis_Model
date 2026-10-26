@@ -3,28 +3,45 @@
 **PRELIMINARY: about one season of odds history (ATP Beijing 2024–25, ATP Doha/Dubai 2025, everything
 else 2026 only), ~430 matches.**
 
-**Answer: no edge at DraftKings' price.** Betting every early-round underdog lost **−18.7%** at DraftKings
-(417 settled bets, 95% CI −31.9% to −5.6%) and −15.6% at Pinnacle's price on the same matches. No dog price
-band is positive; long shots (DK odds > 5) lost the most. Against seeded favourites (Sackmann seeds,
-events through May 2026) the dog lost −27.5% (126 bets). DraftKings' margin is **4.84%** vs Pinnacle's
-**2.82%**, and its de-vigged prices are slightly less accurate than Pinnacle's (log loss 0.5691 vs 0.5666).
-The Elo walk-forward (77 out-of-sample bets, 2026) **fails the gate** (−20.5%), and Elo prices worse than
-both books on the same matches (log loss 0.5562 vs DK 0.5351, Pinnacle 0.5237).
+**Answer: no edge at DraftKings' price, and most of the measured loss is a cold run, not DraftKings.**
+
+- **Cold run first.** On the Sackmann-resolved half (events through May 2026), dogs lost **−29.9%** at
+  DraftKings and **−29.7%** at Pinnacle: the sharp book's price lost just as much. Dogs won 24.5% of
+  those matches while both books priced them at ~30%. That is bad luck for underdogs, not mispricing.
+- **What to expect structurally:** if Pinnacle's de-vigged price is fair, a dog bet at DraftKings'
+  price returns **−7.4%** on average (385 matches; −7.6% / −7.0% on the two halves). That is the cost of
+  DraftKings' margin, **4.84%** vs Pinnacle's **2.82%**. The Jun–Oct 2026 half (Kalshi-resolved, 184
+  bets) came in at **−4.5%**, close to that expectation (dogs won 35.4% vs 32.8% priced).
+- **All dogs:** **−18.7%** at DraftKings (417 settled bets, 95% CI −31.9% to −5.6%), −15.6% at
+  Pinnacle's price on the same matches. No dog price band is positive. Against seeded favourites (Sackmann
+  seeds) the dog lost −27.5% (126 bets), but those are all in the cold half.
+- **Model:** the Elo walk-forward (77 out-of-sample bets, 2026) **fails the gate** (−20.5%), and Elo
+  prices worse than both books on the same 204 matches (log loss Elo 0.5562 vs DraftKings 0.5351,
+  Pinnacle 0.5237). DraftKings' de-vigged prices are slightly less accurate than Pinnacle's
+  (0.5691 vs 0.5666 on 397 matches).
 
 How it was built:
 - **Odds:** The Odds API historical snapshots, DraftKings + Pinnacle h2h, 6 h cells; price = the last
   snapshot ≥ 5 min before the listed start (median 79 min before, p90 269 min). 1,646 credits
   (docs/data_inventory.md). Odds data is never committed.
-- **Results:** events through May 2026 from Jeff Sackmann's match files (CC BY-NC-SA 4.0); Jun–Oct 2026
-  events from Kalshi settlements supplied by the Data role (195 of 199 listed events joined, 98%; the 4
-  misses are a duplicate listing and 3 Monterrey qualifying matches). Aggregates only.
+- **Results:** events through May 2026 from Jeff Sackmann's match files (CC BY-NC-SA 4.0). Jun–Oct 2026
+  events from Kalshi settlements, via the Data role's `results_from_kalshi` run on our match list
+  (source of truth: 198 of 199 listed events, sha256 checked; aggregates only).
+  - The one miss is a duplicate DraftKings listing (Humbert vs "Andrej" Martin); it is dropped.
+  - 3 of the 198 joined events (Monterrey, 2026-08-23) have no DraftKings price, so they add no bets.
+  - Cross-check: an independent join of Data's hand-copied Kalshi table matched 195 events. All 195
+    agree with Data's output on winner and void (0 disagreements); the other 3 are those Monterrey events.
+- **WTA Tokyo is dropped.** Kalshi's data ends 2026-10-24/25, so it has only Tokyo qualifying, no main
+  draw. It also has no Odds API key in our list, so it adds no rows either way. ATP Tokyo (Japan Open) is
+  included.
 - **Void rule = DraftKings':** walkovers / not-started matches and retirements during set 1 are void
-  (stake back). Kalshi shows set 1's status, so retirements in set 1 are caught (2 matches); 1 match had no
-  set-1 market and is kept. A retirement after set 1 settles normally, as at DraftKings.
+  (stake back). The 11 Kalshi-side voids are all not-started matches settled at a fair price. No set-1
+  retirement is in the list (the 2 Data flagged are other matches). A retirement after set 1 settles
+  normally, as at DraftKings.
 - **Rounds 1–2:** Sackmann rounds where joined; for Jun–Oct 2026 events, the first 3–4 days of play
   (Kalshi rounds: 142 R32, 53 R16).
-- **Caveats:** a single season; mostly 2026 small events; the 5–10 and >10 odds bands have few bets; prices
-  can be hours old for later matches in a 6 h cell.
+- **Caveats:** a single season, mostly 2026 small events; the 5–10 and >10 odds bands have few bets;
+  prices can be hours old for later matches in a 6 h cell.
 
 ## Full sample
 Odds: The Odds API historical snapshots (DraftKings Sportsbook + Pinnacle; not redistributed). Results: Jeff Sackmann's match files (CC BY-NC-SA 4.0). 1 unit on the underdog (longer DK odds) at the last snapshot ≥ 5 min before the listed start; DK voids walkovers and retirements before set 1 is complete. Aggregates only.
@@ -119,7 +136,6 @@ Calibration by Pinnacle's de-vigged p(dog):
 | (0.25, 0.35] | 103 | 34.0% | 29.3% | 29.8% | 33.2% |
 | (0.35, 0.45] | 113 | 39.8% | 40.2% | 40.4% | 43.1% |
 | (0.45, 0.5] | 45 | 33.3% | 47.3% | 47.4% | 49.4% |
-
 
 ## Check: Sackmann-resolved subset only (events through May 2026)
 
