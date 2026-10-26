@@ -271,3 +271,61 @@ def test_projection_beyond_sackmann_and_other_tier():
     assert dh.tournaments(s2, KEYS).empty
     hs = {**dh.HIST_START, "other": pd.Timestamp("2024-01-01")}
     assert len(dh.tournaments(s2, KEYS, hist_start=hs)) == 2
+
+
+def test_needed_covers_first_days_of_projected_events():
+    j = pd.DataFrame({
+        "key": ["k"] * 4 + ["s"], "tourney_id": ["p+52w"] * 4 + ["2024-580"],
+        "commence": pd.to_datetime(["2026-06-15 10:00", "2026-06-17 12:00", "2026-06-18 09:00",
+                                    "2026-06-20 12:00", "2024-01-15 01:00"]),
+        "sack_row": [-1, -1, -1, -1, 7], "round_idx": [np.nan] * 4 + [1.0]})
+    t = pd.DataFrame({"key": ["k", "s"], "tourney_id": ["p+52w", "2024-580"], "projected": [True, False],
+                      "r12_days": [3, 5]})
+    assert list(dh.needed(j, t)) == [True, True, False, False, True]   # days 1-3 of the projected event
+
+
+def test_pull_stops_if_an_empty_listing_costs_credits(tmp_path):
+    class Costly(Session):
+        def get(self, url, params=None, timeout=None):
+            if "/historical/" in url and url.endswith("/events"):
+                self.remaining -= 1
+                return Resp({"timestamp": params["date"], "data": []}, 1, self.remaining)
+            return super().get(url, params, timeout)
+
+    api = OddsApi(floor=100, key="K", session=Costly({}, {}), spend_log=tmp_path / "spend.log")
+    todo = pd.DataFrame([{"key": A_KEY, "when": f"2024-01-1{i}T00:00:00Z"} for i in range(3)])
+    res = dh.pull(api, "events", todo, cap=1000, root=tmp_path, pause_s=0)
+    assert res["done"] == 1 and "empty listing cost credits" in res["stopped"]
+
+
+def test_needed_ignores_stale_events_outside_the_window():
+    j = pd.DataFrame({"key": ["k"] * 3, "tourney_id": ["p+52w"] * 3,
+                      "commence": pd.to_datetime(["2025-10-01 06:00", "2026-09-30 03:00", "2026-10-01 03:00"]),
+                      "sack_row": [-1] * 3, "round_idx": [np.nan] * 3})
+    t = pd.DataFrame({"key": ["k"], "tourney_id": ["p+52w"], "projected": [True], "r12_days": [3],
+                      "win_start": [pd.Timestamp("2026-09-16")], "win_end": [pd.Timestamp("2026-10-04")]})
+    assert list(dh.needed(j, t)) == [False, True, True]   # last year's final in an old snapshot: out
+
+
+def test_results_from_kalshi_and_unresolved_frame():
+    u = pd.DataFrame({"key": ["tennis_atp_halle_open"] * 3, "tourney_id": ["h+52w"] * 3,
+                      "event_id": ["x1", "x2", "x3"],
+                      "commence": pd.to_datetime(["2026-06-16 10:00", "2026-06-16 12:00", "2026-06-17 12:00"]),
+                      "home": ["Jan-Lennard Struff", "Ugo Humbert", "A B"], "away": ["Félix Auger-Aliassime", "C D", "E F"],
+                      "odds_home_draftkings": [3.2, 1.5, 2.0], "odds_away_draftkings": [1.35, 2.6, 1.8],
+                      "odds_home_pinnacle": [3.4, 1.52, np.nan], "odds_away_pinnacle": [1.36, 2.7, np.nan],
+                      "age_min_draftkings": [9.0, 9.0, 9.0], "age_min_pinnacle": [9.0, 9.0, np.nan]})
+    km = pd.DataFrame({"match_id": ["K1", "K2", "K3"], "series": ["KXATPMATCH"] * 3,
+                       "scheduled_start": pd.to_datetime(["2026-06-16 10:30", "2026-06-16 12:10", "2026-06-25 12:00"], utc=True),
+                       "player_a": ["Felix Auger Aliassime", "C D", "A B"], "player_b": ["Jan Lennard Struff", "Ugo Humbert", "E F"],
+                       "settle_a": [0.0, 0.43, 1.0], "settle_b": [1.0, 0.57, 0.0]})
+    res = ds.results_from_kalshi(ds.match_list(u), km).set_index("event_id")
+    assert res.loc["x1", "winner"] == "home" and not res.loc["x1", "void"]      # Struff (home, dog) won
+    assert res.loc["x2", "void"]                                                # fair price: not started
+    assert "x3" not in res.index                                                # 8 days apart: no match
+    assert "odds_home_draftkings" not in ds.match_list(u).columns              # no odds leave the container
+    f = ds.frame_unresolved(u, res.reset_index())
+    r = f.set_index(f["odds_dog_dk"])
+    assert r.loc[3.2, "upset"] == 1 and r.loc[3.2, "odds_fav_dk"] == 1.35 and r.loc[3.2, "tour"] == "atp"
+    assert r.loc[2.6, "void"]
+    assert ds.pnl(f).sum() == pytest.approx(3.2 - 1)
