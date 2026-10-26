@@ -4,7 +4,7 @@ Costs (docs/research/odds_api.md): /sports and /events are free; /odds = 1 credi
 block (<= 10 bookmakers) per call; /historical/.../odds = 10 credits per snapshot. Every call
 checks the quota headers, refuses to go below `floor`, and appends the spend to `spend_log`
 (copy totals into docs/data_inventory.md). The key comes from ODDS_API_KEY and never
-appears in logs. Only the Data role runs paid calls, within the WORK_PLAN budget.
+appears in logs. Only the Data and Upsets roles run paid calls, within the WORK_PLAN budget.
 """
 
 from __future__ import annotations
@@ -71,6 +71,10 @@ class OddsApi:
         cost = -(-len(bookmakers) // 10)
         return self._get(f"/sports/{sport}/odds", {"markets": "h2h", "oddsFormat": "decimal",
                                                     "bookmakers": ",".join(bookmakers)}, cost)
+
+    def historical_events(self, sport: str, when: str) -> dict:
+        """Events listed at ISO time `when`: {"timestamp", "data": [...]}; 1 credit, 0 if none."""
+        return self._get(f"/historical/sports/{sport}/events", {"date": when}, 1)
 
     def historical_odds(self, sport: str, when: str, bookmakers=DEFAULT_BOOKS) -> dict:
         """Snapshot closest to (at or before) ISO time `when`: {"timestamp", "data": [...]}."""

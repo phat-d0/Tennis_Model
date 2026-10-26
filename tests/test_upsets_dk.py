@@ -1,0 +1,255 @@
+"""DraftKings history planner/puller + DK study, on synthetic Sackmann rows and synthetic Odds API
+JSON only (no real odds in git)."""
+
+import numpy as np
+import pandas as pd
+import pytest
+
+from upsets import dk_history as dh
+from upsets import dk_study as ds
+from upsets import elo, sackmann
+from upsets.odds_api import OddsApi
+
+COLS = ["tourney_id", "tourney_name", "surface", "draw_size", "tourney_level", "tourney_date",
+        "match_num", "winner_id", "winner_seed", "winner_entry", "winner_name", "loser_id",
+        "loser_seed", "loser_entry", "loser_name", "score", "best_of", "round",
+        "winner_rank", "winner_rank_points", "loser_rank", "loser_rank_points"]
+
+
+def srow(tid, name, level, date, rnd, w, l, num, ws=None, ls=None, score="6-3 6-3", draw=128, bo=3):
+    return dict(zip(COLS, [tid, name, "Hard", draw, level, date, num, w, ws, None, f"Player {w.upper()}",
+                           l, ls, None, f"Player {l.upper()}", score, bo, rnd, 10, 1000, 50, 500]))
+
+
+def sack_frame():
+    """ATP + WTA 'Australian Open' 2024 sharing one tourney_id (as in Sackmann), a 2019 Slam
+    (before the API's history) and a 2023 1000 (before 1000s history), plus history for Elo."""
+    atp, wta = [], []
+    rng = np.random.default_rng(0)
+    for i in range(300):   # history 2015-2023 for the calibration fit
+        a, b = f"h{i % 20}", f"h{(i * 7 + 3) % 20}"
+        if a != b:
+            atp.append(srow(f"h{i}", "Hist", "A", 20150105 + 10000 * (i // 40) + (i % 40) * 2,
+                            "R32", a, b, i, draw=32))
+    atp += [srow("2019-580", "Australian Open", "G", 20190114, "R128", "a", "b", 1),
+            srow("2023-0404", "Indian Wells Masters", "M", 20230308, "R128", "a", "b", 1),
+            srow("2024-580", "Australian Open", "G", 20240115, "R128", "a", "b", 1, ws=1, bo=5),
+            srow("2024-580", "Australian Open", "G", 20240115, "R128", "c", "d", 2, ls=3,
+                 score="2-1 RET", bo=5),
+            srow("2024-580", "Australian Open", "G", 20240115, "R64", "a", "e", 3, ws=1, bo=5),
+            srow("2024-580", "Australian Open", "G", 20240115, "R32", "a", "f", 4, ws=1, bo=5)]
+    wta += [srow("2024-580", "Australian Open", "G", 20240115, "R128", "x", "y", 1, ls=2)]
+    df = pd.concat([sackmann.normalize(pd.DataFrame(atp, columns=COLS), "atp"),
+                    sackmann.normalize(pd.DataFrame(wta, columns=COLS), "wta")], ignore_index=True)
+    df = df.sort_values(["date", "round_idx"], kind="stable").reset_index(drop=True)
+    return elo.add_elo(df, keys=("winner_id", "loser_id"))
+
+
+KEYS = ["tennis_atp_aus_open_singles", "tennis_wta_aus_open_singles", "tennis_atp_indian_wells",
+        "tennis_atp_china_open"]
+
+
+def test_tournaments_scope_and_tours():
+    t = dh.tournaments(sack_frame(), KEYS)
+    assert sorted(zip(t["key"], t["tourney_id"], t["season"])) == [
+        ("tennis_atp_aus_open_singles", "2024-580", 2024), ("tennis_wta_aus_open_singles", "2024-580", 2024)]
+    r = t.iloc[0]
+    assert r["win_start"] == pd.Timestamp("2024-01-13") and r["win_end"] == pd.Timestamp("2024-01-20")
+    sched = dh.events_schedule(t, 24)
+    assert len(sched) == 2 * 8 and sched["when"].iloc[0] == "2024-01-13T00:00:00Z"
+
+
+# --- fake Odds API -----------------------------------------------------------------------------
+
+def ev(eid, commence, home, away, dk=None, pin=None):
+    e = {"id": eid, "sport_key": "k", "commence_time": commence, "home_team": home, "away_team": away}
+    books = []
+    for key, pr in (("draftkings", dk), ("pinnacle", pin)):
+        if pr:
+            books.append({"key": key, "last_update": commence, "markets": [{"key": "h2h", "outcomes": [
+                {"name": home, "price": pr[0]}, {"name": away, "price": pr[1]}]}]})
+    if dk or pin:
+        e["bookmakers"] = books
+    return e
+
+
+class Resp:
+    def __init__(self, body, cost, remaining):
+        self._b, self.status_code = body, 200
+        self.headers = {"x-requests-last": str(cost), "x-requests-remaining": str(remaining)}
+
+    def json(self):
+        return self._b
+
+    def raise_for_status(self):
+        pass
+
+
+class Session:
+    """Routes /historical/sports/{key}/{events|odds}?date= to canned bodies; counts calls."""
+
+    def __init__(self, listings, snapshots, remaining=5000):
+        self.listings, self.snapshots, self.remaining, self.calls = listings, snapshots, remaining, []
+
+    def get(self, url, params=None, timeout=None):
+        self.calls.append(url)
+        if url.endswith("/sports"):
+            return Resp([], 0, self.remaining)
+        key, kind = url.split("/sports/")[1].split("/")[:2]
+        when = params["date"]
+        if kind == "events":
+            data = self.listings.get((key, when), [])
+            cost = 1 if data else 0
+            body = {"timestamp": when, "data": data}
+        else:
+            ts, data = self.snapshots.get((key, when), (when, []))
+            cost = 10
+            body = {"timestamp": ts, "data": data}
+        self.remaining -= cost
+        return Resp(body, cost, self.remaining)
+
+
+A_KEY = "tennis_atp_aus_open_singles"
+
+
+def fixtures():
+    listings = {(A_KEY, "2024-01-14T00:00:00Z"): [
+        ev("e1", "2024-01-15T01:00:00Z", "Player A", "Player B"),     # R1, seed 1 vs unseeded
+        ev("e2", "2024-01-15T03:30:00Z", "Player D", "Player C"),     # R1, D retires in set 1: void
+        ev("e9", "2024-01-15T04:00:00Z", "Nobody Known", "Player Z")]}  # unknown players
+    listings[(A_KEY, "2024-01-16T00:00:00Z")] = [ev("e3", "2024-01-17T08:00:00Z", "Player E", "Player A"),  # R2
+                                                ev("e4", "2024-01-19T08:00:00Z", "Player A", "Player F")]  # R3
+    snaps = {
+        (A_KEY, "2024-01-15T00:55:00Z"): ("2024-01-15T00:50:00Z", [
+            ev("e1", "2024-01-15T01:00:00Z", "Player A", "Player B", dk=(1.25, 3.9), pin=(1.22, 4.6)),
+            ev("e2", "2024-01-15T03:30:00Z", "Player D", "Player C", dk=(2.6, 1.5), pin=(2.7, 1.5))]),
+        (A_KEY, "2024-01-17T07:55:00Z"): ("2024-01-17T07:50:00Z", [
+            ev("e3", "2024-01-17T08:00:00Z", "Player E", "Player A", dk=(5.0, 1.17), pin=(5.5, 1.16))]),
+    }
+    return listings, snaps
+
+
+def test_pull_cache_cap_and_spend_log(tmp_path):
+    sack = sack_frame()
+    t = dh.tournaments(sack, KEYS)
+    t = t[t["key"] == A_KEY]
+    listings, snaps = fixtures()
+    s = Session(listings, snaps)
+    api = OddsApi(floor=100, key="SECRET", session=s, spend_log=tmp_path / "spend.log")
+    sched = dh.events_schedule(t, 24)
+    res = dh.pull(api, "events", sched, cap=1000, root=tmp_path, pause_s=0)
+    assert res == {"done": 8, "cached": 0, "stopped": None}
+    assert dh.logged_total(tmp_path / "spend.log") == 2        # empty listings cost 0
+    n = len(s.calls)
+    again = dh.pull(api, "events", sched, cap=1000, root=tmp_path, pause_s=0)
+    assert again["done"] == 0 and again["cached"] == 8 and len(s.calls) == n   # never repeated
+    assert "SECRET" not in (tmp_path / "spend.log").read_text()
+
+    text, parts = dh.dry_run(t, sack, 24, 6, 5, tmp_path)
+    assert "exact" in text and "estimate" not in text
+    req, need = parts["req"], parts["need"]
+    assert sorted(need["event_id"]) == ["e1", "e2", "e3"]      # R3 and unknown players: no price needed
+    # e1 (01:00) and e2 (03:30) share the 00-06 cell: one snapshot at e1's deadline
+    assert list(req["when"]) == ["2024-01-15T00:55:00Z", "2024-01-17T07:55:00Z"]
+    assert parts["credits_new"] == 20
+    stopped = dh.pull(api, "odds", req, cap=12, root=tmp_path, pause_s=0)
+    assert stopped["done"] == 1 and stopped["stopped"]          # 2 + 10 = 12; the next would pass 12
+    rest = dh.pull(api, "odds", req, cap=1000, root=tmp_path, pause_s=0)
+    assert rest["done"] == 1 and rest["cached"] == 1
+    assert dh.logged_total(tmp_path / "spend.log") == 22
+
+
+def test_dry_run_without_listings_is_an_estimate_and_makes_no_calls(tmp_path):
+    sack = sack_frame()
+    t = dh.tournaments(sack, KEYS)
+    text, parts = dh.dry_run(t, sack, 24, 6, 5, tmp_path)
+    assert "estimate" in text and parts["totals"]["listing_new"] == 16
+    assert parts["credits_new"] == 16 + 10 * 2 * 5 * 3      # 5 play days x 3 cells, 2 keys
+
+
+def _pulled(tmp_path):
+    sack = sack_frame()
+    t = dh.tournaments(sack, KEYS)
+    listings, snaps = fixtures()
+    snaps[(A_KEY, "2024-01-17T09:00:00Z")] = ("2024-01-17T09:00:00Z", [   # after e3's start: ignored
+        ev("e3", "2024-01-17T08:00:00Z", "Player E", "Player A", dk=(1.01, 30.0), pin=(1.01, 30.0))])
+    s = Session(listings, snaps)
+    api = OddsApi(floor=100, key="K", session=s, spend_log=tmp_path / "spend.log")
+    dh.pull(api, "events", dh.events_schedule(t, 24), cap=1000, root=tmp_path, pause_s=0)
+    _, parts = dh.dry_run(t, sack, 24, 6, 5, tmp_path)
+    dh.pull(api, "odds", parts["req"], cap=1000, root=tmp_path, pause_s=0)
+    dh.pull(api, "odds", pd.DataFrame([{"key": A_KEY, "when": "2024-01-17T09:00:00Z"}]), 1000, tmp_path, 0)
+    return sack, t
+
+
+def test_prices_orientation_and_no_post_start_snapshot(tmp_path):
+    sack, t = _pulled(tmp_path)
+    priced = dh.collect(t, sack, 24, root=tmp_path).set_index("sack_row")
+    row = lambda w, l: sack.index[(sack["winner_id"] == w) & (sack["loser_id"] == l)  # noqa: E731
+                                  & (sack["tourney_id"] == "2024-580")][0]
+    r1, r2, rv = row("a", "b"), row("a", "e"), row("c", "d")
+    assert priced.loc[r1, "odds_w_draftkings"] == 1.25 and priced.loc[r1, "odds_l_draftkings"] == 3.9
+    # e3 lists E as home; a (= A) won: odds re-oriented, and the 09:00 in-play snapshot is not used
+    assert priced.loc[r2, "odds_w_draftkings"] == 1.17 and priced.loc[r2, "odds_l_draftkings"] == 5.0
+    assert priced.loc[r2, "age_min_draftkings"] == 10
+    # e2 lists D (who retired in set 1) as home; C won
+    assert priced.loc[rv, "odds_w_draftkings"] == 1.5 and priced.loc[rv, "odds_l_draftkings"] == 2.6
+    assert len(priced) == 3
+
+
+def test_study_settlement_void_and_report(tmp_path):
+    sack, t = _pulled(tmp_path)
+    priced = dh.collect(t, sack, 24, root=tmp_path)
+    f = ds.frame(priced, sack, fit_min_n=0).set_index("sack_row")
+    row = lambda w, l: sack.index[(sack["winner_id"] == w) & (sack["loser_id"] == l)  # noqa: E731
+                                  & (sack["tourney_id"] == "2024-580")][0]
+    r1, rv = row("a", "b"), row("c", "d")
+    assert f.loc[r1, "upset"] == 0 and f.loc[r1, "odds_dog_dk"] == 3.9 and f.loc[r1, "seed_fav"] == 1
+    assert f.loc[rv, "void"] and f.loc[rv, "upset"] == 0     # dog D retired in set 1: void
+    p = ds.pnl(f.reset_index())
+    assert p[f.reset_index()["sack_row"] == rv].iloc[0] == 0.0
+    assert p[f.reset_index()["sack_row"] == r1].iloc[0] == -1.0
+    assert 0 < f.loc[r1, "p_model"] < 1 and f.loc[r1, "margin_dk"] == pytest.approx(1 / 1.25 + 1 / 3.9 - 1)
+    text, parts = ds.run(priced, sack, min_n=0, min_select_bets=1, fit_min_n=0)
+    assert "Gate:" in text and "DraftKings vs Pinnacle" in text
+
+
+def test_walk_forward_uses_earlier_seasons_only():
+    rng = np.random.default_rng(1)
+    rows = []
+    for y in range(2020, 2026):
+        for _ in range(200):
+            e = rng.uniform(-0.2, 0.3)
+            win = rng.random() < (0.5 if e >= 0.10 else 0.2)
+            rows.append({"season": y, "edge": e, "odds_dog_dk": 3.0, "upset": int(win), "void": False,
+                         "min_n": 50, "tour": "atp"})
+    f = pd.DataFrame(rows)
+    oos, seasons = ds.walk_forward(f, min_select_bets=30)
+    assert list(seasons["season"]) == [2021, 2022, 2023, 2024, 2025]
+    assert (seasons["threshold"] == 0.10).all()
+    g = ds.gate(oos, seasons)
+    assert g["pass"]
+    f2 = f.copy()
+    f2.loc[f2["season"] == 2025, "upset"] = 0                  # the test season's own results...
+    _, s2 = ds.walk_forward(f2, min_select_bets=30)
+    assert list(s2["threshold"]) == list(seasons["threshold"])   # ...never choose its threshold
+
+
+def test_api_error_stops_pull_and_caches_nothing(tmp_path):
+    import requests
+
+    class ErrResp(Resp):
+        def raise_for_status(self):
+            raise requests.HTTPError("401 HISTORICAL_UNAVAILABLE_ON_FREE_USAGE_PLAN")
+
+    class ErrSession(Session):
+        def get(self, url, params=None, timeout=None):
+            if "/historical/" in url:
+                return ErrResp({"error_code": "HISTORICAL_UNAVAILABLE_ON_FREE_USAGE_PLAN"}, 0, self.remaining)
+            return super().get(url, params, timeout)
+
+    api = OddsApi(floor=100, key="K", session=ErrSession({}, {}), spend_log=tmp_path / "spend.log")
+    todo = pd.DataFrame([{"key": A_KEY, "when": "2024-01-14T00:00:00Z"}])
+    with pytest.raises(requests.HTTPError):
+        dh.pull(api, "events", todo, cap=1000, root=tmp_path, pause_s=0)
+    assert not list(tmp_path.glob("events/**/*.json.gz"))
