@@ -108,7 +108,8 @@ def test_site_is_static_and_self_contained():
     for url in re.findall(r"https?://[^\s\"'`)]+", js):
         assert url.startswith(("https://github.com/", "https://creativecommons.org/")), url
     assert set(re.findall(r"""fetch\(\s*([A-Za-z_]+|["'][^"']+["'])""", js)) == {"url"}
-    assert re.findall(r'_URL = "([^"]+)"', js) == ["data/odds.json", "findings.json"]
+    assert re.findall(r'_URL = "([^"]+)"', js) == ["data/odds.json", "findings.json", "data/portfolio.json",
+                                                   "portfolio_backtest.json"]
     manifest = json.loads((SITE / "manifest.webmanifest").read_text())
     for icon in manifest["icons"]:
         assert (SITE / icon["src"]).is_file()
@@ -167,6 +168,25 @@ const VIEWPORTS = { phone: { width: 390, height: 844 }, laptop: { width: 1280, h
       overflow: document.documentElement.scrollWidth - window.innerWidth,
     }));
     if (outDir && vp === "phone") await page.screenshot({ path: path.join(outDir, `${prefix}-findings-${tag}.png`), fullPage: true });
+    await page.click('.tabbar button[data-tab="portfolio"]');
+    const pfGrab = () => page.evaluate(() => ({
+      tiles: document.querySelectorAll("#view .tile").length,
+      chart: !!document.querySelector("#view .chart svg"),
+      trades: document.querySelectorAll("#view .trade").length,
+      empty: document.querySelector("#view .empty")?.textContent || "",
+      rule: document.querySelector("#view .rule")?.textContent || "",
+      overflow: document.documentElement.scrollWidth - window.innerWidth,
+    }));
+    info.portfolio = await pfGrab();
+    if (outDir) await page.screenshot({ path: path.join(outDir, `${prefix}-portfolio-${tag}.png`), fullPage: true });
+    await page.click('#view .segmented:nth-of-type(1) button:nth-child(2)');     // the line-shopping strategy
+    info.portfolioLine = await pfGrab();
+    await page.click('#view .segmented:nth-of-type(2) button:nth-child(2)');     // backtest view
+    info.backtest = await pfGrab();
+    if (outDir) await page.screenshot({ path: path.join(outDir, `${prefix}-backtest-${tag}.png`), fullPage: true });
+    await page.click('#view .segmented:nth-of-type(2) button:nth-child(1)');     // back to live
+    await page.click('#view .segmented:nth-of-type(1) button:nth-child(1)');
+    for (const o of [info.portfolio.overflow, info.backtest.overflow]) if (o > 0) problems.push(`${tag} portfolio overflow ${o}px`);
     await page.click('.tabbar button[data-tab="matches"]');
     if (await page.$("#view .segmented button:nth-child(3)")) {
       await page.click("#view .segmented button:nth-child(3)");   // WTA
@@ -180,6 +200,9 @@ const VIEWPORTS = { phone: { width: 390, height: 844 }, laptop: { width: 1280, h
   console.log(JSON.stringify({ results, problems }));
 })();
 """
+
+
+PORTFOLIO = Path(__file__).parent / "test_site_data" / "portfolio.json"
 
 
 def _node_playwright() -> bool:
@@ -208,6 +231,7 @@ def site(tmp_path):
         if odds is not None:
             (root / "data").mkdir()
             (root / "data" / "odds.json").write_text(odds if isinstance(odds, str) else json.dumps(odds))
+            (root / "data" / "portfolio.json").write_text(PORTFOLIO.read_text())
         handler = functools.partial(SimpleHTTPRequestHandler, directory=str(root))
         handler.log_message = lambda *a: None
         httpd = ThreadingHTTPServer(("127.0.0.1", 0), handler)
@@ -257,6 +281,20 @@ def test_page_ok(site, tmp_path):
         assert res["wtaCards"] == 2
         assert res["updated"].startswith("Odds ") and "143 of 600" in res["footer"]
         assert "2026-10-19" in res["footer"]
+
+
+@needs_browser
+def test_page_portfolio(site, tmp_path):
+    """Portfolio tab: tiles, realized-vs-expected chart and trade rows; an empty strategy; backtest."""
+    sample_pf = json.loads(PORTFOLIO.read_text())
+    model = next(s for s in sample_pf["strategies"] if s["id"] == "model")
+    for res in _check(tmp_path, site(shifted(sample())), "pf"):
+        p = res["portfolio"]
+        assert p["tiles"] == 8 and p["chart"] and p["trades"] == min(20, model["summary"]["settled"]) + model["summary"]["open"]
+        assert "not proven" in p["rule"] and "Elo model" in p["rule"]
+        assert res["portfolioLine"]["trades"] == 0 and "No paper trades yet" in res["portfolioLine"]["empty"]
+        bt = json.loads((SITE / "portfolio_backtest.json").read_text())
+        assert res["backtest"]["tiles"] == 4 and res["backtest"]["chart"] == bool(bt["strategies"]["line"]["bets"])
 
 
 @needs_browser
