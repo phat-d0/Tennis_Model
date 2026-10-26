@@ -356,3 +356,5 @@ the newest 200. Format changes go through the Lead (Scanner proposes, Dashboard 
   set series); set close_time = set end; Kalshi lists only the sets before the decider. Penultimate-set study
   merged (phat-d0/Tennis_Model#70): the player who levels wins the decider 53.0% (ATP bo3) / 54.5% (bo5) / 53.2%
   (WTA), i.e. momentum ≈ +3 pp per set (symmetric test). Kalshi decider price test running. 171 tests.
+- 2026-10-26: Kalshi decider price test: the penultimate-set winner wins 54.8% but costs 53.8% + fee, so
+  ROI −0.7% at 0¢ / −2.4% at 1¢ (1,423 bets). Priced in; no edge.
