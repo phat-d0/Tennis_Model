@@ -17,7 +17,8 @@ Per match (ATP/WTA have per-set markets; Challenger / WTA 125 don't, so they get
   Snapshots as of each set's close_time + 90 s (both legs <= 5 min old). The decider starts at
   the last listed set's close when the score is level. A match is excluded when a set settled
   at a fair price (retirement) and set-based metrics are dropped when a close_time is unreliable
-  (> 15 min after the match's last quote, or a batch timestamp shared by many sets).
+  (> 15 min after the match's last quote, or a batch timestamp shared by many sets). Decider-start
+  metrics also need decider.guard: 15-180 min before the match close, not shared by 2+ matches.
 - Outcome: settle of the favourite's side (fair-price match settlements reported apart).
 Aggregates only; the example timelines go to a separate file (never into git).
 """
@@ -34,6 +35,7 @@ import pandas as pd
 from swinglock.config import kalshi_fees
 from swinglock.locks import buy_cost
 
+from . import decider as dz
 from . import kalshi_preview as kp
 
 TOURS = {"KXATPMATCH": "ATP", "KXWTAMATCH": "WTA", "KXATPCHALLENGERMATCH": "ATP-Ch",
@@ -195,6 +197,10 @@ def path_table(matches: pd.DataFrame, quotes: pd.DataFrame, sets: pd.DataFrame |
     last_k = t["n_sets_listed"].clip(lower=1)
     t["decider_p"] = [r.get(f"set{int(k)}_p", np.nan) if d else np.nan
                       for (_, r), k, d in zip(t.iterrows(), last_k, t["decider"])]
+    # decider-start plausibility (decider.guard): 15-180 min before the match close, not a batch close
+    d = t.loc[t["decider"], ["match_id", "decider_start"]]
+    g = dz.guard(d, dz.match_end(matches, quotes)) if len(d) else d.assign(ok=pd.Series(dtype=bool))
+    t["decider_ok"] = t["match_id"].map(g.set_index("match_id")["ok"]).fillna(False).astype(bool)
     return t.drop(columns=["_first_flip"]), series
 
 
@@ -253,11 +259,12 @@ def report(full: pd.DataFrame, cfg: dict) -> str:
          "stays ≥ 2 min). Set snapshots at set close + 90 s. 1-min candles; aggregates only.", "",
          "## Coverage", "",
          "| Tour | Matches | Fair-price settlement | With set rows | Retirement (fair-price set) | "
-         "Unreliable set close | Set path usable |", "|---|---|---|---|---|---|---|"]
+         "Unreliable set close | Set path usable | Deciders (guard failed) |", "|---|---|---|---|---|---|---|---|"]
     for tour, g in full.groupby("tour"):
         L.append(f"| {tour} | {len(g):,} | {int(g['fair'].sum())} | {int(g['has_sets'].sum()):,} | "
                  f"{int(g['set_fair'].sum())} (excluded) | "
-                 f"{int(g['set_unreliable'].sum())} | {int(g['set_ok'].sum()):,} |")
+                 f"{int(g['set_unreliable'].sum())} | {int(g['set_ok'].sum()):,} | "
+                 f"{int(g['decider'].sum()):,} ({int((g['decider'] & ~g['decider_ok']).sum())}) |")
     L += ["", "Win rates leave out fair-price match settlements (not started); ROI keeps them at their "
           "settle price.", "", "## Original favourite: win rate", "", "| Slice | Matches | Fav won | SE |", "|---|---|---|---|"]
 
@@ -275,7 +282,7 @@ def report(full: pd.DataFrame, cfg: dict) -> str:
     for fmt, g in sp.groupby("fmt"):
         for path, h in g.groupby("path"):
             L.append(f"| {fmt} | {path} | {len(h):,} | {len(h) / len(g):.1%} | {_p(h['fav_won'].mean())} |")
-    dd = sp[sp["decider"]]
+    dd = sp[sp["decider"] & sp["decider_ok"]]
     L += ["", "Deciders, by who won the penultimate set:", "", "| Format | Penultimate set | Matches | Fav won |",
           "|---|---|---|---|"]
     for fmt, g in dd.groupby("fmt"):
@@ -292,7 +299,7 @@ def report(full: pd.DataFrame, cfg: dict) -> str:
         n = len(g)
         c = g["n_flips"].clip(upper=3).value_counts().reindex([0, 1, 2, 3], fill_value=0)
         f1, f2 = g[g["n_flips"] >= 1], g[g["n_flips"] >= 2]
-        oth = g[g["decider"] & (g["decider_p"] < 0.5)]
+        oth = g[g["decider"] & g["decider_ok"] & (g["decider_p"] < 0.5)]
         ff = g["first_flip_min"].dropna()
         L.append(f"| {fmt} | {n:,} | {(g['n_flips'] >= 1).mean():.1%} | {c[0] / n:.1%} | {c[1] / n:.1%} | "
                  f"{c[2] / n:.1%} | {c[3] / n:.1%} | {_p(f1['fav_won'].mean())} ({len(f1):,}) | "
