@@ -10,7 +10,7 @@ on:
   workflow_dispatch:
   push:
     branches: [main]
-    paths: ["site/**", "upsets/site.py", "upsets/portfolio.py", "upsets/names.py", "upsets/elo.py", "upsets/elo_plus.py", "upsets/model.py", ".github/workflows/publish.yml"]
+    paths: ["site/**", "upsets/site.py", "upsets/portfolio.py", "upsets/names.py", "upsets/elo.py", "upsets/elo_plus.py", "upsets/model.py", "upsets/polymarket.py", ".github/workflows/publish.yml"]
 
 permissions:
   contents: read
@@ -52,7 +52,7 @@ jobs:
             https://github.com/phat-d0/tennis-sackmann-archive data/sackmann
           sha=$(git -C data/sackmann rev-parse HEAD)
           # file prefix = upsets.site.MODEL_TAG (a new tag rebuilds the model once)
-          if [ -f "data/site_cache/eloserve1_${sha}.parquet" ]; then
+          if [ -f "data/site_cache/eloserve2_${sha}.parquet" ]; then
             echo "Ratings for $sha are cached: match files not needed"
           else
             git -C data/sackmann sparse-checkout set --no-cone \

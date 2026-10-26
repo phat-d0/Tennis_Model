@@ -35,11 +35,11 @@ import re
 import subprocess
 from pathlib import Path
 
-import pandas as pd
-
 import numpy as np
+import pandas as pd
+import requests
 
-from . import elo, elo_plus, model, portfolio, sackmann
+from . import elo, elo_plus, model, polymarket, portfolio, sackmann
 from .names import match_names, player_table
 from .odds_api import KEY_NAMES, BudgetError, OddsApi, parse_h2h
 
@@ -48,7 +48,7 @@ HORIZON_H = 36.0
 SHOW_PAST_H = 3.0       # keep a match on the page this long after its listed start
 MIN_RATED = 20          # model_p1 is null below this many rated matches for either player
 ACTIVE_YEARS = 2        # name matching tries players active in the last 2 years first
-MODEL_TAG = "eloserve1"  # cache-file prefix: bump when the page model changes (old caches are ignored)
+MODEL_TAG = "eloserve2"  # cache-file prefix: bump when the page model changes (old caches are ignored)
 SLAM_KEYS = {"aus_open_singles", "french_open", "wimbledon", "us_open"}  # ATP: best of 5
 
 
@@ -197,7 +197,7 @@ def load_ratings(archive: Path, cache: Path) -> dict | None:
     players["id"] = players["id"].astype(str)
     cal = pm["cal"]
     meta = {"through": sack["date"].max().strftime("%Y-%m-%d"), "surfaces": key_surfaces(sack),
-            "mean_spw": pm["mean_spw"]}
+            "mean_spw": pm["mean_spw"], "tiers": polymarket.tier_table(sack)}
     cache.mkdir(parents=True, exist_ok=True)
     for pat in ("ratings_*", "players_*", "eloserve*"):
         for old in cache.glob(pat):
@@ -212,10 +212,19 @@ def load_ratings(archive: Path, cache: Path) -> dict | None:
 def model_probs(m: pd.DataFrame, rt: dict | None, now: pd.Timestamp) -> pd.DataFrame:
     """model_p1, model_n1, model_n2 for each match row (sport_key, player_1, player_2); None where
     a name isn't matched uniquely or a player has < MIN_RATED rated matches."""
+    if rt is None or not len(m):
+        return _probs(m, None, None, None, rt, now)
+    tours = m["sport_key"].map(lambda k: _tour(k).lower())
+    surfaces = m["sport_key"].map(lambda k: rt["surfaces"].get(k))
+    return _probs(m, tours, surfaces, m["sport_key"].map(best_of), rt, now)
+
+
+def _probs(m: pd.DataFrame, tours, surfaces, best_ofs, rt: dict | None, now: pd.Timestamp) -> pd.DataFrame:
+    """The page model for rows of player_1, player_2 with per-row tour ("atp"/"wta"), surface (None =
+    unknown) and best_of."""
     out = pd.DataFrame({"model_p1": None, "model_n1": None, "model_n2": None}, index=m.index, dtype=object)
     if rt is None or not len(m):
         return out
-    tours = m["sport_key"].map(lambda k: _tour(k).lower())
     since = (now - pd.DateOffset(years=ACTIVE_YEARS)).tz_localize(None)
     players = rt["players"].assign(last=pd.to_datetime(rt["players"]["last"]))
     id1 = match_names(m["player_1"], tours, players, since)["id"]
@@ -231,12 +240,31 @@ def model_probs(m: pd.DataFrame, rt: dict | None, now: pd.Timestamp) -> pd.DataF
         out.at[i, "model_n1"], out.at[i, "model_n2"] = int(ra["n"]), int(rb["n"])
         if min(ra["n"], rb["n"]) < MIN_RATED:
             continue
-        s = rt["surfaces"].get(m.at[i, "sport_key"])
+        s = surfaces[i] if isinstance(surfaces[i], str) and surfaces[i] else None   # NaN/None = unknown
         for x, pid in ((ra, a), (rb, b)):   # unknown surface: overall rating; no match on it: START
             x["selo"] = surf.get((t, pid, s), elo.START) if s else x["elo"]
-        p = elo_plus.page_prob(ra, rb, rt["mean_spw"][t], best_of(m.at[i, "sport_key"]), rt["cal"])
+        p = elo_plus.page_prob(ra, rb, rt["mean_spw"][t], int(best_ofs[i]), rt["cal"])
         out.at[i, "model_p1"] = round(p, 4)
     return out
+
+
+def challenger_block(session, cache: Path, now: pd.Timestamp, rt: dict | None) -> dict:
+    """odds.json `challengers` (upsets.polymarket). On a failed fetch: the last saved block with an error
+    status (never str(e): only the exception class and HTTP code)."""
+    def model_fn(f):
+        return _probs(f, f["tour"], f["surface"], pd.Series(3, index=f.index), rt, now)
+    try:
+        ch, n, unknown = polymarket.challengers(session, now, (rt or {}).get("tiers"),
+                                                model_fn if rt and "ratings" in rt else None)
+        _write_json(cache / "challengers.json", ch)
+        print(f"[challengers: {len(ch['matches'])} matches, {n} requests; "
+              f"{len(unknown)} atp/wta events of unknown tier left out: {', '.join(unknown) or 'none'}]")
+        return ch
+    except Exception as e:
+        code = getattr(getattr(e, "response", None), "status_code", None)
+        last = _read_json(cache / "challengers.json", {"source": "polymarket_intl", "fetched_at": None, "matches": []})
+        last["status"] = f"error: {type(e).__name__}" + (f" {code}" if code else "")
+        return last
 
 
 # --- page data ---------------------------------------------------------------------------------
@@ -274,7 +302,8 @@ def page_matches(snaps: pd.DataFrame, titles: dict, rt: dict | None, now: pd.Tim
 
 def build(out: Path, cache: Path, archive: Path, floor: int = 5000, month_cap: int = 3000,
           now: pd.Timestamp | None = None, key: str | None = None, session=None,
-          run_every_h: float = 3.0) -> dict:
+          run_every_h: float = 3.0, pm_session=None) -> dict:
+    """pm_session: an HTTP session for Polymarket's public APIs; None leaves the Challengers block out."""
     now = now or utcnow()
     cache.mkdir(parents=True, exist_ok=True)
     led = load_ledger(cache, now)
@@ -336,6 +365,8 @@ def build(out: Path, cache: Path, archive: Path, floor: int = 5000, month_cap: i
         "tournaments": [{"sport_key": k, "title": titles.get(k, k), "tour": _tour(k)} for k in shown],
         "matches": matches,
     }
+    if pm_session is not None:
+        doc["challengers"] = challenger_block(pm_session, cache, now, rt)
     _write_json(out / "odds.json", doc)
     trades = paper(cache, matches, now, doc["odds_fetched_at"], api, led, month_cap)
     _write_json(cache / "ledger.json", led)
@@ -376,7 +407,8 @@ def main(argv=None) -> None:
     ap.add_argument("--month-cap", type=int, default=3000)
     ap.add_argument("--run-every-h", type=float, default=3.0)
     a = ap.parse_args(argv)
-    doc = build(a.out, a.cache, a.archive, a.floor, a.month_cap, run_every_h=a.run_every_h)
+    doc = build(a.out, a.cache, a.archive, a.floor, a.month_cap, run_every_h=a.run_every_h,
+                pm_session=requests.Session())
     print(f"[odds.json: status={doc['status']}, {len(doc['matches'])} matches, "
           f"credits used this month {doc['credits']['used_this_month']}/{a.month_cap}, "
           f"balance {_read_json(a.cache / 'ledger.json', {}).get('left')}]")
