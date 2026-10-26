@@ -102,4 +102,12 @@ Milestones (scheduled start) cover start dates from ~Feb 2025 onward.
 | 2026-10-26 01:10–01:40 | Kalshi `/series`, set-winner listings (KXATP/KXWTASETWINNER events + `/historical/markets`) | all settled | ≈ 85 | 13 × 429 in one burst, then resumed from cache; `sets.parquet` for group 0 |
 
 ## The Odds API spends
-None. No key, no budget yet.
+Shared paid-plan key since 2026-10-26 (owner). Global floor 5,000; dk_live reserve 481. Per-call log:
+`data/raw/odds_api/spend.log` (DK history) and `data/raw/odds_api/live/spend.log` (dk_live), gitignored.
+
+| Date (UTC) | Who / job | Endpoint | Calls | Credits | Balance after |
+|---|---|---|---|---|---|
+| 2026-10-26 04:16 | Upsets, DK history 250/500 (owner-approved; cap 5,423 = 10,904 − 5,000 − 481) | start balance | — | — | 10,904 |
+| 2026-10-26 04:16–04:20 | Upsets, phase (a) listings, 62 key-events, 478 listing calls | `/historical/sports/{key}/events` | 136 non-empty (342 empty, 0 credits) | 136 | 10,768 |
+| 2026-10-26 04:22–04:24 | Upsets, phase (c) odds, 6 h cells, `bookmakers=draftkings,pinnacle` | `/historical/sports/{key}/odds` | 151 | 1,510 | 9,258 |
+| | **Total for the 250/500 pull** | | 287 | **1,646** | 9,258 |
