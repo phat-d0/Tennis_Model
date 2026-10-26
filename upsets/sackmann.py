@@ -32,6 +32,7 @@ SLAM = {"G"}
 THOUSAND = {"atp": {"M"}, "wta": {"PM", "T1"}}
 TEAM = {"D"}  # Davis Cup / Fed-BJK Cup ties
 FINALS = {"F"}
+STAT_COLS = ("minutes", "w_svpt", "w_1stWon", "w_2ndWon", "l_svpt", "l_1stWon", "l_2ndWon")
 
 
 def level_group(tour: str, level: str) -> str:
@@ -113,6 +114,8 @@ def normalize(raw: pd.DataFrame, tour: str, lower: bool = False) -> pd.DataFrame
         "score": r["score"].astype("string"),
         "w1": w1, "l1": l1, "comment": comment,
         "match_num": num("match_num"),
+        # match length and serve stats (NaN where the file has none): used by upsets.elo_plus
+        **{c: (num(c) if c in r else np.nan) for c in STAT_COLS},
     })
     size = out["round"].map(ROUND_SIZE).astype("float64")
     first = _first_round_size(out["draw_size"], size, out["tourney_id"])
