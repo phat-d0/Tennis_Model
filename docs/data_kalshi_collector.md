@@ -139,3 +139,22 @@ Trial 2026-10-24 10:34 UTC (3 min, 15 s polls, 0.5 req/s cap, next to the runnin
 - Disk estimate at 10 s polls and ~90 matches: on the order of 100 MB/day of part files before
   compaction. Check the compacted size on the VPS before publishing; day files may need splitting
   under the 50 MB `data-store` limit.
+
+## Set-winner markets (`kalshi_sets.py`, 2026-10-26)
+```
+python -m swinglock.collectors.kalshi_sets --out data/processed/kalshi_g0   # writes sets.parquet
+```
+- Series: `KXATPSETWINNER`, `KXWTASETWINNER` (quadratic, mult 1). `GET /series?category=Sports` lists no
+  Challenger, WTA 125 or ITF set series. (Related but not collected: KXATPANYSET, KXATPSETSWEEP,
+  KXATPTOTALSETS, KXATPEXACTSETS.)
+- One event per set, `KXATPSETWINNER-<match code>-<n>`, one market per player (`...-<n>-FAR`). The
+  match is `KXATPMATCH-<match code>`. `close_time` = when the set ended; `result` yes/no, or `scalar`
+  (fair price: not started, or not decidable after a retirement).
+- **Kalshi only lists sets before the decider:** sets 1–2 in best-of-3 (never set 3) and sets 1–4 in
+  best-of-5 (never set 5). Set 4 shows up only when the match reached a fourth set, and not always.
+  The decider's winner is the match winner, and it ends at about the match market's close.
+- Listings only: settled events (nested markets) + the series' `/historical/markets` for pre-cutoff
+  events, cached like the backfill. Rows kept for match_ids in `<out>/matches.parquet`.
+- Table `sets`: match_id, set_no, event_ticker, close_time, settlement_ts, winner_side (A/B via the
+  player suffix vs the match's instrument tickers; NA unless decided), status (decided | fair_price |
+  unsettled).

@@ -1,0 +1,106 @@
+{
+ "_source": "GET /events?series_ticker=KXATPSETWINNER&status=settled&with_nested_markets=true and GET /historical/markets?series_ticker=KXATPSETWINNER, trimmed, 2026-10-26",
+ "events": [
+  {
+   "event_ticker": "KXATPSETWINNER-26OCT24FARBRU-2",
+   "markets": [
+    {
+     "ticker": "KXATPSETWINNER-26OCT24FARBRU-2-FAR",
+     "event_ticker": "KXATPSETWINNER-26OCT24FARBRU-2",
+     "result": "no",
+     "status": "finalized",
+     "close_time": "2026-10-24T13:42:33Z",
+     "settlement_ts": "2026-10-24T13:48:32.395816Z",
+     "yes_sub_title": "Jaime Faria",
+     "settlement_value_dollars": "0.0000"
+    },
+    {
+     "ticker": "KXATPSETWINNER-26OCT24FARBRU-2-BRU",
+     "event_ticker": "KXATPSETWINNER-26OCT24FARBRU-2",
+     "result": "yes",
+     "status": "finalized",
+     "close_time": "2026-10-24T13:42:33Z",
+     "settlement_ts": "2026-10-24T13:48:32.395816Z",
+     "yes_sub_title": "Mika Brunold",
+     "settlement_value_dollars": "1.0000"
+    }
+   ]
+  },
+  {
+   "event_ticker": "KXATPSETWINNER-26OCT24FARBRU-1",
+   "markets": [
+    {
+     "ticker": "KXATPSETWINNER-26OCT24FARBRU-1-FAR",
+     "event_ticker": "KXATPSETWINNER-26OCT24FARBRU-1",
+     "result": "no",
+     "status": "finalized",
+     "close_time": "2026-10-24T12:36:51Z",
+     "settlement_ts": "2026-10-24T12:42:52.334159Z",
+     "yes_sub_title": "Jaime Faria",
+     "settlement_value_dollars": "0.0000"
+    },
+    {
+     "ticker": "KXATPSETWINNER-26OCT24FARBRU-1-BRU",
+     "event_ticker": "KXATPSETWINNER-26OCT24FARBRU-1",
+     "result": "yes",
+     "status": "finalized",
+     "close_time": "2026-10-24T12:36:51Z",
+     "settlement_ts": "2026-10-24T12:42:52.334159Z",
+     "yes_sub_title": "Mika Brunold",
+     "settlement_value_dollars": "1.0000"
+    }
+   ]
+  },
+  {
+   "event_ticker": "KXATPSETWINNER-26OCT25STRBUB-2",
+   "markets": [
+    {
+     "ticker": "KXATPSETWINNER-26OCT25STRBUB-2-STR",
+     "event_ticker": "KXATPSETWINNER-26OCT25STRBUB-2",
+     "result": "scalar",
+     "status": "finalized",
+     "close_time": "2026-10-25T05:27:58Z",
+     "settlement_ts": "2026-10-25T05:33:02.33188Z",
+     "yes_sub_title": "Dominic Stricker",
+     "settlement_value_dollars": "0.1800"
+    },
+    {
+     "ticker": "KXATPSETWINNER-26OCT25STRBUB-2-BUB",
+     "event_ticker": "KXATPSETWINNER-26OCT25STRBUB-2",
+     "result": "scalar",
+     "status": "finalized",
+     "close_time": "2026-10-25T05:27:58Z",
+     "settlement_ts": "2026-10-25T05:33:02.33188Z",
+     "yes_sub_title": "Alexander Bublik",
+     "settlement_value_dollars": "0.8200"
+    }
+   ]
+  },
+  {
+   "event_ticker": "KXATPSETWINNER-26AUG18ZHEMUS-2",
+   "markets": []
+  }
+ ],
+ "historical_markets": [
+  {
+   "ticker": "KXATPSETWINNER-26AUG18ZHEMUS-2-ZHE",
+   "event_ticker": "KXATPSETWINNER-26AUG18ZHEMUS-2",
+   "result": "no",
+   "status": "finalized",
+   "close_time": "2026-08-18T18:10:56Z",
+   "settlement_ts": "2026-08-18T18:17:02.349129Z",
+   "yes_sub_title": "Michael Zheng",
+   "settlement_value_dollars": "0.0000"
+  },
+  {
+   "ticker": "KXATPSETWINNER-26AUG18ZHEMUS-2-MUS",
+   "event_ticker": "KXATPSETWINNER-26AUG18ZHEMUS-2",
+   "result": "yes",
+   "status": "finalized",
+   "close_time": "2026-08-18T18:10:56Z",
+   "settlement_ts": "2026-08-18T18:17:02.349129Z",
+   "yes_sub_title": "Lorenzo Musetti",
+   "settlement_value_dollars": "1.0000"
+  }
+ ]
+}
