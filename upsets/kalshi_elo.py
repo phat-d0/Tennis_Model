@@ -6,8 +6,8 @@
 Runs where the Kalshi data lives (the Data container); prints aggregates only.
 
 1. Players: Kalshi names (`player_a/b`, e.g. "Jaime Faria") are matched to Sackmann player ids
-   per tour, accent- and punctuation-insensitive: exact, then word order, then surname + first
-   initial, then a close spelling, each only when unique.
+   per tour by upsets/names.py, accent- and punctuation-insensitive: exact, then word order, then
+   surname + first initial, then a close spelling, each only when unique.
 2. Elo timeline: every Sackmann match (tour + qualifying/Challenger/ITF files) gets an estimated
    time (tournament start + its round's share of the event); a Sackmann match that is also a
    Kalshi match takes Kalshi's scheduled start (and its seeds/ranks come along). Kalshi matches
@@ -24,115 +24,17 @@ Runs where the Kalshi data lives (the Data container); prints aggregates only.
 from __future__ import annotations
 
 import argparse
-import difflib
-import re
-import unicodedata
 from pathlib import Path
 
 import numpy as np
 import pandas as pd
 
 from . import elo, kalshi_preview as kp, model, sackmann, seeds
+from .names import match_names, name_key, norm_name, player_table  # noqa: F401 (name_key, norm_name re-exported)
 
 TOURS = {"KXATPMATCH": "atp", "KXWTAMATCH": "wta"}
 EDGE_GRID = (0.0, 0.02, 0.05, 0.08, 0.10, 0.15)
 LN10_400 = np.log(10) / 400.0
-
-
-# --- names -----------------------------------------------------------------------------------
-
-def name_key(name) -> str:
-    """'Félix Auger-Aliassime' -> 'felix auger aliassime'."""
-    if not isinstance(name, str):
-        return ""
-    s = unicodedata.normalize("NFKD", name).encode("ascii", "ignore").decode().lower()
-    return re.sub(r"\s+", " ", re.sub(r"[^a-z ]", " ", s)).strip()
-
-
-def _sorted_key(key: str) -> str:
-    return " ".join(sorted(key.split()))
-
-
-def _initial_keys(key: str) -> set[str]:
-    """Every 'surname initial' reading of a full name ('alex de minaur' -> {'de minaur a',
-    'minaur a'})."""
-    p = key.split()
-    return {f"{' '.join(p[k:])} {p[0][0]}" for k in range(1, len(p))} if len(p) > 1 else {key}
-
-
-def player_table(sack: pd.DataFrame) -> pd.DataFrame:
-    """tour, id, name, key, last (date of the player's last match)."""
-    long = pd.concat([
-        sack[["tour", "winner_id", "winner", "date"]].set_axis(["tour", "id", "name", "date"], axis=1),
-        sack[["tour", "loser_id", "loser", "date"]].set_axis(["tour", "id", "name", "date"], axis=1)])
-    t = long.sort_values("date").groupby(["tour", "id"], as_index=False).agg(
-        name=("name", "last"), last=("date", "max"))
-    t["key"] = t["name"].map(name_key)
-    return t
-
-
-def _index(pool: pd.DataFrame) -> dict:
-    """Lookup tables for one tour's player pool: key/word-order/initial -> set of ids."""
-    idx = {"exact": {}, "order": {}, "initial": {}, "keys": {}}
-    for pid, key in zip(pool["id"], pool["key"]):
-        idx["exact"].setdefault(key, set()).add(pid)
-        idx["order"].setdefault(_sorted_key(key), set()).add(pid)
-        for k in _initial_keys(key):
-            idx["initial"].setdefault(k, set()).add(pid)
-        idx["keys"].setdefault(key, set()).add(pid)
-    idx["key_list"] = list(idx["keys"])
-    return idx
-
-
-def _lookup(key: str, idx: dict):
-    """-> (id or None, how, ambiguous?) within one pool."""
-    for how, wants in (("exact", [key]), ("order", [_sorted_key(key)]),
-                       ("initial", sorted(_initial_keys(key)))):
-        ids = set().union(*(idx[how].get(w, set()) for w in wants))
-        if len(ids) == 1:
-            return next(iter(ids)), how, False
-        if len(ids) > 1:
-            return None, "ambiguous", True
-    close = difflib.get_close_matches(key, idx["key_list"], n=2, cutoff=0.88)
-    if close:
-        r0 = difflib.SequenceMatcher(None, key, close[0]).ratio()
-        r1 = difflib.SequenceMatcher(None, key, close[1]).ratio() if len(close) > 1 else 0.0
-        ids = idx["keys"][close[0]]
-        if len(ids) == 1 and r0 - r1 >= 0.03:
-            return next(iter(ids)), "fuzzy", False
-        return None, "ambiguous", True
-    return None, "none", False
-
-
-def match_names(names: pd.Series, tours: pd.Series, players: pd.DataFrame,
-                active_since: pd.Timestamp | None = None) -> pd.DataFrame:
-    """Kalshi names -> Sackmann ids. Returns id (NA if none or ambiguous) and how
-    (exact | order | initial | fuzzy | ambiguous | none). Players active since `active_since`
-    are tried first; everyone else only when the active pool has no candidate at all."""
-    pools: dict = {}
-
-    def pools_for(tour):
-        if tour not in pools:
-            p = players[players["tour"] == tour]
-            ps = [_index(p[p["last"] >= active_since])] if active_since is not None else []
-            pools[tour] = ps + [_index(p)]
-        return pools[tour]
-
-    cache: dict = {}
-    out = []
-    for name, tour in zip(names, tours):
-        k = (name_key(name), tour)
-        if k not in cache:
-            res = (pd.NA, "none")
-            if k[0]:
-                for idx in pools_for(tour):
-                    pid, how, amb = _lookup(k[0], idx)
-                    if pid is not None or amb:
-                        res = (pid if pid is not None else pd.NA, how)
-                        break
-            cache[k] = res
-        out.append(cache[k])
-    return pd.DataFrame(out, columns=["id", "how"], index=names.index)
 
 
 # --- timeline --------------------------------------------------------------------------------
