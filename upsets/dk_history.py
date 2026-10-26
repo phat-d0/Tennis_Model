@@ -55,7 +55,27 @@ KEY_NAMES = {
     "shanghai_masters": ["Shanghai Masters"], "paris_masters": ["Paris Masters"],
     "monte_carlo_masters": ["Monte Carlo Masters"], "china_open": ["Beijing"],
     "wuhan_open": ["Wuhan"], "dubai": ["Dubai"], "qatar_open": ["Doha"],
+    # 250/500 keys (in scope only with levels including "other")
+    "barcelona_open": ["Barcelona"], "halle_open": ["Halle"], "hamburg_open": ["Hamburg"],
+    "japan_open": ["Tokyo"], "munich": ["Munich"], "queens_club_champ": ["Queen's Club"],
+    "washington_open": ["Washington"], "bad_homburg_open": ["Bad Homburg"],
+    "charleston_open": ["Charleston"], "german_open": ["Berlin"], "guadalajara_open": ["Guadalajara"],
+    "monterrey_open": ["Monterrey"], "ningbo_open": ["Ningbo"], "singapore_open": ["Singapore"],
+    "strasbourg": ["Strasbourg"], "stuttgart_open": ["Stuttgart"],
 }
+
+
+# Every tennis key /v4/sports?all=true listed on 2026-10-26 (free call); used by --offline-keys.
+LISTED_KEYS = tuple(f"tennis_{k}" for k in """
+atp_aus_open_singles atp_barcelona_open atp_canadian_open atp_china_open atp_cincinnati_open atp_dubai
+atp_french_open atp_halle_open atp_hamburg_open atp_indian_wells atp_italian_open atp_japan_open
+atp_madrid_open atp_miami_open atp_monte_carlo_masters atp_munich atp_paris_masters atp_qatar_open
+atp_queens_club_champ atp_shanghai_masters atp_us_open atp_washington_open atp_wimbledon
+wta_aus_open_singles wta_bad_homburg_open wta_canadian_open wta_charleston_open wta_china_open
+wta_cincinnati_open wta_dubai wta_french_open wta_german_open wta_guadalajara_open wta_indian_wells
+wta_italian_open wta_madrid_open wta_miami_open wta_monterrey_open wta_ningbo_open wta_qatar_open
+wta_queens_club_champ wta_singapore_open wta_strasbourg wta_stuttgart_open wta_us_open
+wta_washington_open wta_wimbledon wta_wuhan_open""".split())
 
 
 # --- cache -----------------------------------------------------------------------------------
@@ -83,15 +103,35 @@ def iso(ts: pd.Timestamp) -> str:
 
 # --- stage 1: tournaments --------------------------------------------------------------------
 
-def tournaments(sack: pd.DataFrame, keys: list[str], end: pd.Timestamp | None = None) -> pd.DataFrame:
-    """One row per (key, Sackmann event) in scope, with the round 1-2 window (UTC days)."""
-    main = sack[sack["level_group"].isin(HIST_START)]
+def tournaments(sack: pd.DataFrame, keys: list[str], end: pd.Timestamp | None = None,
+                hist_start: dict | None = None, project_until: pd.Timestamp | None = None) -> pd.DataFrame:
+    """One row per (key, Sackmann event) in scope, with the round 1-2 window (UTC days).
+
+    hist_start: level_group -> first date with history (default HIST_START: Slams + 1000s only;
+    add "other" for the 250/500 keys). project_until: also plan events after Sackmann's end by
+    shifting the previous year's edition +52 weeks (projected=True; their results must come from
+    elsewhere, e.g. Kalshi settlements)."""
+    hist_start = hist_start or HIST_START
+    main = sack[sack["level_group"].isin(hist_start)]
     # Sackmann gives a Slam the same tourney_id on both tours: key events by (tour, tourney_id)
     ev = (main.groupby(["tour", "tourney_id"])
           .agg(name=("tournament", "first"), date=("date", "first"),
-               draw=("draw_size", "max"), level_group=("level_group", "first"))
+               draw=("draw_size", "max"), level_group=("level_group", "first"),
+               n_r12=("round_idx", lambda x: int((x <= 2).sum())))
           .reset_index())
-    end = end if end is not None else sack["date"].max()
+    ev["projected"] = False
+    last = sack["date"].max()
+    end = end if end is not None else last
+    if project_until is not None:
+        # next edition of events from the year before Sackmann's end, not yet in the data
+        prev = ev[(ev["date"] > last - pd.Timedelta(days=365)) & (ev["date"] + pd.Timedelta(weeks=52) > last)]
+        nxt = prev.assign(date=prev["date"] + pd.Timedelta(weeks=52), projected=True,
+                          tourney_id=prev["tourney_id"] + "+52w")
+        nxt = nxt[nxt["date"] <= project_until]
+        have = set(zip(ev["tour"], ev["name"], ev["date"].dt.year))
+        nxt = nxt[[(t, n, d.year) not in have for t, n, d in zip(nxt["tour"], nxt["name"], nxt["date"])]]
+        ev = pd.concat([ev, nxt], ignore_index=True)
+        end = max(end, project_until)
     rows = []
     for key in keys:
         m = re.match(r"tennis_(atp|wta)_(.+)$", key)
@@ -100,19 +140,23 @@ def tournaments(sack: pd.DataFrame, keys: list[str], end: pd.Timestamp | None = 
         tour, names = m.group(1), [n.lower() for n in KEY_NAMES[m.group(2)]]
         hit = ev[(ev["tour"] == tour) & ev["name"].str.lower().isin(names)]
         for r in hit.itertuples():
-            if r.date < HIST_START[r.level_group] or r.date > end:
+            if r.date < hist_start[r.level_group] or r.date > end:
                 continue
             # Round 1-2 play days around Sackmann's start date (a Slam's Monday, a 1000's first
             # day): Slams Sun -> Fri, 96/128 draws 4 days, 56/64 draws 3 days; one spare day
             # before for early listings
             slam, big = r.level_group == "slam", r.draw >= 96
             first, last = (-2, 5) if slam else ((-1, 5) if big else (-1, 3))
+            days = 5 if slam else (4 if big or (r.level_group == "other" and r.draw >= 48) else 3)
             rows.append({"key": key, "tourney_id": r.tourney_id, "tour": tour, "name": r.name,
                          "date": r.date, "draw": r.draw, "level_group": r.level_group,
-                         "season": r.date.year,
+                         "season": r.date.year, "projected": r.projected, "n_r12": r.n_r12,
                          "win_start": r.date + pd.Timedelta(days=first),
                          "win_end": r.date + pd.Timedelta(days=last),
-                         "r12_days": 5 if slam else (4 if big else 3)})
+                         "r12_days": days})
+    if not rows:
+        return pd.DataFrame(columns=["key", "tourney_id", "tour", "name", "date", "draw", "level_group",
+                                     "season", "projected", "n_r12", "win_start", "win_end", "r12_days"])
     return pd.DataFrame(rows).sort_values(["date", "key"]).reset_index(drop=True)
 
 
@@ -357,7 +401,7 @@ def collect(t: pd.DataFrame, sack: pd.DataFrame, events_step_h: float = 24.0, le
 def _keys(api=None) -> list[str]:
     if api is not None:
         return sorted(s["key"] for s in api.sports(all_sports=True) if s["key"].startswith("tennis_"))
-    return sorted(f"tennis_{t}_{k}" for t in ("atp", "wta") for k in KEY_NAMES)
+    return sorted(LISTED_KEYS)
 
 
 def main(argv=None) -> None:
@@ -371,6 +415,10 @@ def main(argv=None) -> None:
     ap.add_argument("--cap", type=float, default=15000, help="max credits for this pull (spend log total)")
     ap.add_argument("--floor", type=int, default=1000)
     ap.add_argument("--offline-keys", action="store_true", help="plan from the built-in key list (no API call)")
+    ap.add_argument("--other-from", default=None,
+                    help="also plan 250/500 keys, with history assumed from this date (e.g. 2024-01-01)")
+    ap.add_argument("--project-until", default=None,
+                    help="also plan editions after Sackmann's end up to this date (results from Kalshi)")
     ap.add_argument("--yes", action="store_true", help="required for paid stages")
     a = ap.parse_args(argv)
 
@@ -378,7 +426,9 @@ def main(argv=None) -> None:
     sack = sackmann.load(a.sackmann, start=2019)
     api = None if (a.stage == "plan" and a.offline_keys) else OddsApi(
         floor=a.floor, spend_log=a.cache / "spend.log")
-    t = tournaments(sack, _keys(api))
+    hs = {**HIST_START, "other": pd.Timestamp(a.other_from)} if a.other_from else None
+    t = tournaments(sack, _keys(api), hist_start=hs,
+                    project_until=pd.Timestamp(a.project_until) if a.project_until else None)
     text, parts = dry_run(t, sack, a.events_step_h, a.snap_h, a.lead_min, a.cache)
     if api is not None:
         text += (f"\nBalance now: {api.remaining:,.0f} credits; floor {a.floor:,}; this pull's cap "
