@@ -3,8 +3,8 @@
 # cloud-init (deploy/cloud-init.yaml) clones the repo to /opt/swinglock and runs this; it is safe to
 # re-run by hand: sudo bash /opt/swinglock/deploy/bootstrap.sh
 #
-# Steps: swap -> Docker Engine + compose (Docker's apt repo) -> data/ + positions -> systemd unit +
-# logrotate -> Tailscale (auth key from /root/tailscale-authkey, then deleted) + `tailscale serve`
+# Steps: swap -> Docker Engine + compose (Docker's apt repo) -> data/ + empty positions -> systemd units
+# (stack + lookback timer) + logrotate -> Tailscale (auth key from /root/tailscale-authkey, then deleted) + `tailscale serve`
 # -> ufw -> start the stack. Public SSH is closed only once Tailscale is up, so a failed join never locks you out.
 #
 # Env switches (for testing in a container): SKIP_SYSTEMD=1, SKIP_TAILSCALE=1, SKIP_UFW=1.
@@ -52,19 +52,27 @@ if [ ! -d "$APP_DIR/.git" ]; then
   git clone --depth 1 https://github.com/phat-d0/Tennis_Model.git "$APP_DIR"
 fi
 cd "$APP_DIR"
-mkdir -p data/live
-[ -f data/positions.json ] || cp positions.example.json data/positions.json
+mkdir -p data/live data/paper
+# Holdings start empty (paper trading doesn't use them). Replaces a copy of the example rows left by
+# an earlier bootstrap; a positions file you edited is kept.
+if [ ! -f data/positions.json ] || cmp -s data/positions.json positions.example.json; then
+  echo '[]' > data/positions.json
+fi
 chown -R 1000:1000 data          # containers run as uid 1000
 
-step "systemd unit + logrotate"
+step "systemd units (stack + nightly lookback timer) + logrotate"
 install -m 0644 deploy/logrotate/swinglock /etc/logrotate.d/swinglock
-install -m 0644 deploy/systemd/swinglock.service /etc/systemd/system/swinglock.service
+for unit in swinglock.service swinglock-lookback.service swinglock-lookback.timer; do
+  install -m 0644 "deploy/systemd/$unit" "/etc/systemd/system/$unit"
+done
 if [ "${SKIP_SYSTEMD:-0}" = 1 ]; then
-  echo "SKIP_SYSTEMD=1: not enabling the unit"
+  echo "SKIP_SYSTEMD=1: not enabling the units"
 else
   systemctl daemon-reload
   systemctl enable --now docker
   systemctl enable swinglock      # started at the end, after Tailscale is up
+  systemctl enable --now swinglock-lookback.timer   # nightly paper lookback, ~04:00 UTC
+  systemctl list-timers swinglock-lookback.timer --no-pager || true
 fi
 
 TS_UP=0

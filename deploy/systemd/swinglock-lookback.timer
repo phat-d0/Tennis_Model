@@ -1,0 +1,11 @@
+# Runs swinglock-lookback.service daily at about 04:00 UTC (catches up after downtime).
+[Unit]
+Description=Daily swing-lock paper lookback
+
+[Timer]
+OnCalendar=*-*-* 04:00:00 UTC
+RandomizedDelaySec=600
+Persistent=true
+
+[Install]
+WantedBy=timers.target

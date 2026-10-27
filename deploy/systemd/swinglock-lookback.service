@@ -1,0 +1,14 @@
+# Nightly paper-rule lookback over the recorder's order books -> data/paper/lookback.json.
+# Started by swinglock-lookback.timer; installed by deploy/bootstrap.sh. Read-only (see docs/scanner_paper.md).
+# Run it now by hand: sudo systemctl start swinglock-lookback && journalctl -u swinglock-lookback -n 30
+[Unit]
+Description=Swing-lock paper lookback (backtest swing sim over recorded books)
+Requires=docker.service
+After=docker.service swinglock.service
+
+[Service]
+Type=oneshot
+WorkingDirectory=/opt/swinglock
+ExecStart=/usr/bin/docker compose -f deploy/docker-compose.yml run --rm --no-deps scanner python -m swinglock.scanner.lookback
+TimeoutStartSec=3600
+Nice=10
