@@ -114,6 +114,7 @@ def aggregate(trades: pd.DataFrame, rules: tuple[PaperRule, ...] = RULES) -> lis
                 "win_rate": round(float((t["pnl"] > 0).mean()), 4) if n else None,
                 "pnl_locked": round(float(t.loc[t["locked"], "pnl"].sum()), 4) if n else 0.0,
                 "pnl_unlocked": round(float(t.loc[~t["locked"].astype(bool), "pnl"].sum()), 4) if n else 0.0,
+                "contracts": round(float(t["contracts"].sum()), 4) if n else 0.0,   # entered
                 "capital": round(float(t["capital"].sum()), 4) if n else 0.0,
             })
     return rows
