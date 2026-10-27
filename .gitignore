@@ -19,3 +19,5 @@ data/reports/
 data/sackmann/
 data/site_cache/
 _site/
+# paper trading ledger/lookback: live Kalshi-derived data, never committed
+data/paper/
