@@ -109,6 +109,13 @@ result.
 - `by_day` is at 0¢ slippage, keyed by settlement day.
 
 ## Reading results honestly
+- **Start-up entries.** "First observation" means the first one the scanner sees. When paper trading
+  starts, or after a long outage, every match already listed is entered at its current price, not at
+  the moment it first crossed X. In the dry run (2026-10-27, 108 open matches), 168 trades opened in
+  the first poll: P1 34, P2 81, P3 11, P4 42. Matches listed afterwards behave like the backtest.
+- **Thin books.** Size is min(100, size at the ask), so a trade can be tiny when only a fraction of a
+  contract is resting. In the dry run, 4 of 168 entries were under 0.5 contracts. This is the
+  backtest's rule; the P&L tables weight trades by dollars, so tiny trades barely count.
 - Paper fills assume the whole size fills at the displayed ask the moment it's seen. There's no queue,
   latency or market impact, so results are optimistic about fills.
 - A few weeks of paper trades are a small sample. A rule "works" only if it passes the gate in
