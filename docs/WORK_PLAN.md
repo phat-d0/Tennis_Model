@@ -212,7 +212,13 @@ The owner asked for a public phone page like the soccer app, refreshed every 3 h
   - Private **Tennis Backtest Explorer**, every bet for 20+ strategies, owner-only: https://claude.ai/artifact/3bDnTdzVARrgthoU8GHNVC.
   - Polymarket intl Challenger/WTA 125 section on the page (#105, #107, #111; ~108 matches, 12 requests/build, no key).
   - Portfolio and the page's fair chance on the **power de-vig** (#112). Line backtest is now 205 bets, +9.2% realized / +8.0% expected (in-sample).
-  - Hetzner + Tailscale deploy ready (#109); **owner set-up pending**.
+  - Hetzner + Tailscale deploy (#109): **LIVE 2026-10-27**. The scanner, dashboard and recorder run on `tennis-scanner` (Tailscale
+    only), watching ~109 markets with Challengers + WTA 125 included. Windows browsers need secure DNS off for MagicDNS.
+- **In progress (owner 2026-10-27):** automatic Kalshi **paper trading** on the server instead of the owner's positions.
+  - Pre-registered swing-lock rules (`docs/scanner_paper.md`), fills at the ask + fees.
+  - A nightly lookback of the same rules over recorded order books.
+  - A Paper tab on the dashboard (Scanner + Dashboard; Backtest checks the rules match its swing sim).
+  - Dashboard fixes: the arb tile only counts arbs above the alert threshold; WTA 125 gets its own label.
   - OddsPapi test of DK Challenger lines waits on the owner: `ODDSPAPI_KEY` + allow oddspapi.io / api.oddspapi.io.
 - **Status:** jobs A, B and C and the DK report are done. Remaining leads: a live forward test of line shopping via the Portfolio tab
   (from Jan 2027). Next ideas need the owner.

@@ -379,7 +379,9 @@ the newest 200. Format changes go through the Lead (Scanner proposes, Dashboard 
   `deploy/bootstrap.sh`, recorder on, no public ports (phat-d0/Tennis_Model#109). ITF series dropped from scanner, recorder
   and backfill defaults. The page model is now tuned Elo + serve/return (#106). Line-shopping drawdown = luck on a thin
   edge (#108); the Portfolio switches to the power de-vig. Challengers come from Polymarket intl, owner OK'd its terms
-  (#105, #107). Owner set-up of the server is pending.
+  (#105, #107). Server live 2026-10-27 (owner set-up done).
+- 2026-10-27 (owner): no manual positions; the server paper-trades pre-registered swing-lock rules live and replays them nightly
+  over recorded books (in progress, Scanner/Dashboard).
 - 2026-10-26: **Tennis Odds page live** at https://phat-d0.github.io/Tennis_Model/ (GitHub Pages, `.github/workflows/publish.yml`,
   every 3 h, ≤ 3,000 credits/month; phat-d0/Tennis_Model#85, #89–#92). Name matching moved to `upsets/names.py` (token-sorted
   keys + aliases). The cloud container can't reach github.io (network policy), so check runs via the Actions log.
