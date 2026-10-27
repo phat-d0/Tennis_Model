@@ -389,6 +389,8 @@ Since phat-d0/Tennis_Model#116 also: `min_arb_profit_per_contract` (the alert th
   `python -m swinglock.scanner.lookback`) under gitignored `data/paper/`; state.json gains `paper` and `min_arb_profit_per_contract`.
   Start-up entries are excluded from headline numbers. 273 tests passing. Incident: Scanner's dry-run ledger was committed to
   `team/scanner` (ae08bf5, public); the file is removed and the branch is to be deleted. Always stage explicit paths.
+- 2026-10-27: Dashboard Paper tab merged (phat-d0/Tennis_Model#118, #119 adds `contracts` to by_rule): per-contract P&L,
+  start-up split, lookback panel; served `/lookback.json` (204 until the first nightly run). 281 tests passing.
 - 2026-10-26: **Tennis Odds page live** at https://phat-d0.github.io/Tennis_Model/ (GitHub Pages, `.github/workflows/publish.yml`,
   every 3 h, ≤ 3,000 credits/month; phat-d0/Tennis_Model#85, #89–#92). Name matching moved to `upsets/names.py` (token-sorted
   keys + aliases). The cloud container can't reach github.io (network policy), so check runs via the Actions log.
