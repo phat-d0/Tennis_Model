@@ -6,7 +6,7 @@
     {
       "match_id": "KXATPMATCH-26OCT24KRULI",
       "series": "KXATPMATCH",
-      "tier": "ATP",
+      "tier": "atp",
       "player_a": "Mitchell Krueger",
       "player_b": "Li Tu",
       "phase": "live",
@@ -25,7 +25,7 @@
     {
       "match_id": "KXATPMATCH-26OCT24FARBRU",
       "series": "KXATPMATCH",
-      "tier": "ATP",
+      "tier": "atp",
       "player_a": "Jaime Faria",
       "player_b": "Nicolas Brunold",
       "phase": "live",
@@ -44,7 +44,7 @@
     {
       "match_id": "KXWTAMATCH-26OCT24SWIPAO",
       "series": "KXWTAMATCH",
-      "tier": "WTA",
+      "tier": "wta",
       "player_a": "Iga Swiatek",
       "player_b": "Jasmine Paolini",
       "phase": "pre",
@@ -63,7 +63,7 @@
     {
       "match_id": "KXATPCHALLENGERMATCH-26OCT24MOROGU",
       "series": "KXATPCHALLENGERMATCH",
-      "tier": "ATP Challenger",
+      "tier": "challenger",
       "player_a": "Juan Moro",
       "player_b": "Kaito Oguchi",
       "phase": "live",
@@ -82,7 +82,7 @@
     {
       "match_id": "KXITFWMATCH-26OCT24KIMSAN",
       "series": "KXITFWMATCH",
-      "tier": "ITF W",
+      "tier": "itf",
       "player_a": "Ha-eun Kim",
       "player_b": "Lucia Santos",
       "phase": "unknown",
@@ -97,6 +97,25 @@
       "combined_with_fees": null,
       "arb_contracts": 0.0,
       "arb_profit": 0.0
+    },
+    {
+      "match_id": "KXWTACHALLENGERMATCH-26OCT24BONSOU",
+      "series": "KXWTACHALLENGERMATCH",
+      "tier": "challenger",
+      "player_a": "Martina Bonardi",
+      "player_b": "Laura Souza",
+      "phase": "live",
+      "quote_ts": "2026-10-24T08:29:58Z",
+      "ask_a": 0.46,
+      "ask_b": 0.5,
+      "size_a": 19.34,
+      "size_b": 40.0,
+      "bid_a": 0.44,
+      "bid_b": 0.48,
+      "combined": 0.96,
+      "combined_with_fees": 0.99516,
+      "arb_contracts": 19.34,
+      "arb_profit": 0.0936
     }
   ],
   "positions": [

@@ -118,14 +118,32 @@ function profitableLocks(s) {
   }
   return ids;
 }
-const isArb = (m) => isNum(m.arb_profit) && m.arb_profit > 0;
+// An arb counts as open only when its profit per contract clears the scanner's alert threshold
+// (state.min_arb_profit_per_contract if the scanner sends it, else config.yaml's default).
+// A positive profit below it rounds to about $0.00 at real size: shown as "break-even".
+const DEFAULT_MIN_ARB = 0.005;   // config.yaml scanner.min_arb_profit_per_contract
+function minArb() {
+  const v = state && state.min_arb_profit_per_contract;
+  return isNum(v) && v >= 0 ? v : DEFAULT_MIN_ARB;
+}
+const arbEdge = (m) => (isNum(m.arb_profit) && m.arb_profit > 0 && isNum(m.arb_contracts) && m.arb_contracts > 0
+  ? m.arb_profit / m.arb_contracts : null);
+const isArb = (m) => { const e = arbEdge(m); return e !== null && e >= minArb() - 1e-12; };
+const isBreakEven = (m) => arbEdge(m) !== null && !isArb(m);
+
+// Scanner's `tier` lumps ATP Challenger and WTA 125 together as "challenger"; label from the series.
+const SERIES_LABEL = {
+  KXATPMATCH: "ATP", KXWTAMATCH: "WTA", KXATPCHALLENGERMATCH: "ATP Challenger",
+  KXWTACHALLENGERMATCH: "WTA 125", KXITFMATCH: "ITF Men", KXITFWMATCH: "ITF Women",
+};
+const tierLabel = (m) => SERIES_LABEL[m.series] || m.tier || m.series || "";
 
 const PHASE_ORDER = { live: 0, pre: 1, unknown: 2 };
 const SORTS = {
   cwf: (a, b) => nullLast(a.combined_with_fees, b.combined_with_fees),
   combined: (a, b) => nullLast(a.combined, b.combined),
   arb: (a, b) => nullLast(b.arb_profit, a.arb_profit, true) || nullLast(a.combined_with_fees, b.combined_with_fees),
-  tier: (a, b) => String(a.tier || "").localeCompare(String(b.tier || "")) || nullLast(a.combined_with_fees, b.combined_with_fees),
+  tier: (a, b) => tierLabel(a).localeCompare(tierLabel(b)) || nullLast(a.combined_with_fees, b.combined_with_fees),
   phase: (a, b) => (PHASE_ORDER[a.phase] ?? 3) - (PHASE_ORDER[b.phase] ?? 3) || nullLast(a.combined_with_fees, b.combined_with_fees),
 };
 function nullLast(x, y, swapped = false) {
@@ -143,7 +161,7 @@ function phaseBadge(phase) {
 function matchCell(m) {
   return el("td", { class: "match" },
     el("div", { class: "players" }, `${m.player_a || "?"} vs ${m.player_b || "?"}`),
-    el("div", { class: "sub" }, m.tier || m.series || "", m.phase !== null && phaseBadge(m.phase), m.badges || []));
+    el("div", { class: "sub" }, m.label ?? tierLabel(m), m.phase !== null && phaseBadge(m.phase), m.badges || []));
 }
 // Cell content sits in one span so the phone card layout keeps label and value as two flex items.
 const td = (label, ...kids) => el("td", { class: "num", "data-label": label }, el("span", {}, ...kids));
@@ -153,7 +171,7 @@ const hasBothAsks = (m) => isNum(m.ask_a) && isNum(m.ask_b);
 function matchesFilter(m, q, phase) {
   if (phase !== "all" && (m.phase || "unknown") !== phase) return false;
   if (!q) return true;
-  const hay = [m.player_a, m.player_b, m.tier, m.series, m.match_id].join(" ").toLowerCase();
+  const hay = [m.player_a, m.player_b, tierLabel(m), m.tier, m.series, m.match_id].join(" ").toLowerCase();
   return q.split(/\s+/).every((w) => hay.includes(w));
 }
 
@@ -192,8 +210,10 @@ function renderMarkets(s) {
     body.append(el("tr", {}, el("td", { colspan: 7, class: "empty" }, msg)));
   }
   for (const m of rows) {
-    const arb = isArb(m), lock = locks.has(m.match_id);
-    const badges = [arb && el("span", { class: "badge arb" }, "arb"), lock && el("span", { class: "badge lock" }, "lock")];
+    const arb = isArb(m), even = isBreakEven(m), lock = locks.has(m.match_id);
+    const badges = [arb && el("span", { class: "badge arb" }, "arb"),
+      even && el("span", { class: "badge", title: `under ${(minArb() * 100).toFixed(1)}¢ per contract after fees` }, "break-even"),
+      lock && el("span", { class: "badge lock" }, "lock")];
     const cwf = m.combined_with_fees;
     body.append(el("tr", { class: arb ? "hot-arb" : lock ? "hot-lock" : "" },
       matchCell({ ...m, badges }),
@@ -201,8 +221,10 @@ function renderMarkets(s) {
       td("Ask " + (m.player_b || "B"), cents(m.ask_b)),
       td("Depth A / B", `${qty(m.size_a)} / ${qty(m.size_b)}`),
       td("Combined", cents(m.combined)),
-      td("Combined + fees", isNum(cwf) ? el("span", { class: cwf < 1 ? "pos" : "" }, cents(cwf)) : cents(cwf)),
-      td("Arb", arb ? [qty(m.arb_contracts) + " ct · ", money(m.arb_profit)] : el("span", { class: "na" }, "—"))));
+      td("Combined + fees", isNum(cwf) ? el("span", { class: arb ? "pos" : "" }, cents(cwf)) : cents(cwf)),
+      td("Arb", arb ? [qty(m.arb_contracts) + " ct · ", money(m.arb_profit)]
+        : even ? el("span", { class: "na" }, `${qty(m.arb_contracts)} ct · $${m.arb_profit.toFixed(2)}`)
+        : el("span", { class: "na" }, "—"))));
   }
 
   // Matches missing an ask on a side (often ended, suspended or not yet listed): one collapsed group.
@@ -213,7 +235,7 @@ function renderMarkets(s) {
       : `no ask on ${(!isNum(m.ask_a) ? m.player_a : m.player_b) || "one side"}`;
     return el("li", {},
       el("span", { class: "players" }, `${m.player_a || "?"} vs ${m.player_b || "?"}`),
-      el("span", { class: "why" }, `${m.tier || m.series || ""} · ${m.phase || "unknown"} · ${missing}`));
+      el("span", { class: "why" }, `${tierLabel(m)} · ${m.phase || "unknown"} · ${missing}`));
   }));
 }
 
@@ -240,7 +262,7 @@ function renderPositions(s) {
          L.depth_ok === false ? el("div", { class: "flag" }, "not enough depth") : null]
       : el("span", { class: "na" }, "balanced");
     body.append(el("tr", { class: hot ? "hot-lock" : "" },
-      matchCell({ player_a: p.player_a, player_b: p.player_b, tier: p.match_id,
+      matchCell({ player_a: p.player_a, player_b: p.player_b, label: p.match_id,
                   phase: (byId.get(p.match_id) || {}).phase ?? null,
                   badges: hot ? [el("span", { class: "badge lock" }, "lock")] : [] }),
       td("Held " + (p.player_a || "A"), held(p.contracts_a, p.avg_a)),
