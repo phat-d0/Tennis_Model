@@ -405,20 +405,21 @@ function paperRules(paper) {
     const h = ts.filter((t) => !isStartup(paper, t)), s = ts.filter((t) => isStartup(paper, t));
     head.push(...h); start.push(...s);
     rows.push(ruleRow(b.rule || "?", ruleText(rules.get(b.rule)), agg(h)));
-    if (s.length) startRows.push(ruleRow(b.rule || "?", "start-up entries", agg(s), "startup"));
+    if (s.length) startRows.push(ruleRow(b.rule || "?", "start-up entries (excluded)", agg(s), "startup"));
   }
   if (!rows.length) rows.push(el("tr", {}, el("td", { colspan: 8, class: "empty" }, "No rules in state.json.")));
   else if (!truncated && ids.length > 1) rows.push(ruleRow("All rules", "excluding start-up entries", agg(head), "total"));
   if (startRows.length) {
     rows.push(el("tr", { class: "group" }, el("td", { colspan: 8 },
-      `Start-up entries (opened at the first poll, ${fmtDateTime(paper.since)}; possibly mid-match): not in the numbers above`)));
+      `Start-up entries (entered at the price when paper trading began, ${fmtDateTime(paper.since)}; excluded)`)));
     rows.push(...startRows);
   }
   const out = [table("paper-rules", [["Rule"], ["Trades", 1], ["Open / locked / settled", 1], ["Lock rate", 1],
     ["Settled P&L", 1], ["Locked, unsettled", 1], ["P&L / contract", 1], ["Capital", 1]], rows)];
   out.push(el("p", { class: "meta-line" },
     "P&L per contract = (settled + locked P&L) ÷ contracts on settled and locked trades; open trades have no P&L yet."
-    + (truncated ? " Some rules have more trades than the list carries (200), so their start-up split and per-contract figure aren't shown." : "")));
+    + (truncated ? " Some rules have more trades than the list carries (200), so their start-up split and per-contract figure aren't shown."
+      : trades.length >= 200 ? " The trade list is capped at 200, so the start-up split may be incomplete." : "")));
   return out;
 }
 
@@ -548,11 +549,16 @@ function lookbackSection() {
     td("Per trade at 0¢", money(s0?.pnl_per_trade)),
     td("P&L at 1¢ slippage", money(s1?.pnl)),
     td("Per trade at 1¢", money(s1?.pnl_per_trade)),
+    td("Per contract at 0¢", perCt(s0 && isNum(s0.contracts) && s0.contracts > 0 ? s0.pnl / s0.contracts : null)),
+    td("Per contract at 1¢", perCt(s1 && isNum(s1.contracts) && s1.contracts > 0 ? s1.pnl / s1.contracts : null)),
     td("Win rate", pctText(s0?.win_rate)),
     td("Locked / unlocked P&L", [money(s0?.pnl_locked), " / ", money(s0?.pnl_unlocked)])));
-  if (!trs.length) trs.push(el("tr", {}, el("td", { colspan: 9, class: "empty" }, "No lookback trades yet.")));
+  if (!trs.length) trs.push(el("tr", {}, el("td", { colspan: 11, class: "empty" }, "No lookback trades yet.")));
   out.push(table("lookback", [["Rule"], ["Trades", 1], ["Locked", 1], ["P&L 0¢", 1], ["Per trade 0¢", 1], ["P&L 1¢", 1],
-    ["Per trade 1¢", 1], ["Win rate", 1], ["Locked / unlocked", 1]], trs));
+    ["Per trade 1¢", 1], ["Per ct 0¢", 1], ["Per ct 1¢", 1], ["Win rate", 1], ["Locked / unlocked", 1]], trs));
+  if (objs(L.by_rule).length && !objs(L.by_rule).some((b) => isNum(b.contracts))) {
+    out.push(el("p", { class: "meta-line" }, "Per contract needs a `contracts` total in the lookback's by_rule rows (requested from Scanner)."));
+  }
 
   const days = objs(L.by_day);
   const chart = dayChart(days);
@@ -586,7 +592,7 @@ function renderPaper() {
   paperKey = key;
   const out = [el("div", { class: "paper-note", role: "note" },
     el("span", { class: "badge hypo" }, "Hypothetical, no orders"), " ",
-    el("b", {}, "Pre-registered rules, expected −3 to −5¢/contract; a negative result is the expected outcome. "),
+    el("b", {}, "Expected result (pre-registered): about −3 to −5¢ per contract. A rule clearly above zero over ≥ 30 settled trades would be the surprise. "),
     "Rules frozen 2026-10-27. Fills assume the whole size at the displayed ask plus fees, so results are optimistic about fills.")];
   if (!paper) {
     out.push(el("div", { class: "card-note" }, state ? "The scanner isn't paper trading (no `paper` in state.json; it may run with --no-paper)." : "Loading…"));

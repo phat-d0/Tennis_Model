@@ -297,6 +297,7 @@ def test_page_in_browser(serve, tmp_path, fresh):
         # headline excludes the two start-up entries (entry_ts == paper.since); P4's other trade is still open
         assert p["perContract"] == ["+82.0¢", "+6.6¢", "+8.0¢", "—"] and p["total"] == "+35.9¢"
         assert p["startup"] == 2 and p["startupBadges"] == 2
+        assert p["intro"].startswith("Expected result (pre-registered): about −3 to −5¢ per contract.")
         assert res["firstMarket"] == "Jaime Faria vs Nicolas Brunold"   # sorted by combined + fees
         f = res["filters"]
         assert f["search"] == {"rows": 1, "noMarket": 0, "label": "1 of 6 matches"}
@@ -363,6 +364,17 @@ def test_paper_tab_with_lookback(serve, tmp_path):
         p = res["paper"]
         assert p["lookbackRows"] == len(lb["rules"]) and p["days"] == 14 and p["notes"] == []
         assert p["chart"] and p["chartLines"] == len(lb["rules"])
+        assert set(p["lbPerCt"]) == {"—"} and any("needs a `contracts` total" in m for m in p["metaLines"])
+    # once Scanner sends `contracts` per by_rule row, per contract = P&L / contracts
+    lb["generated_at"] = _fresh(3)
+    for b in lb["by_rule"]:
+        b["contracts"] = b["trades"] * 50.0
+    lbf.write_text(json.dumps(lb))
+    want = [f"{'+' if b['pnl'] > 0 else '−'}{abs(b['pnl'] / b['contracts'] * 100):.1f}¢"
+            for b in lb["by_rule"] if b["slippage"] == 0.0]
+    for res in _run_check(serve(state, lbf)):
+        assert res["paper"]["lbPerCt"] == want
+        assert not any("needs a `contracts` total" in m for m in res["paper"]["metaLines"])
     lb["generated_at"] = _fresh(60)
     lbf.write_text(json.dumps(lb))
     for res in _run_check(serve(state, lbf)):

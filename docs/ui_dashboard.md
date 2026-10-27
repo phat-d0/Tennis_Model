@@ -51,14 +51,15 @@ an SSH tunnel (`ssh -L 8000:127.0.0.1:8000 vps`) or a VPN; there is no login on 
 ## Paper tab
 A "Live | Paper" switch under the header (`#paper` in the URL). The Paper view reads `state.paper` and `/lookback.json`
 (both from Scanner; contract approved with phat-d0/Tennis_Model#116, docs/scanner_paper.md):
-- **Banner:** a "Hypothetical, no orders" label and "Pre-registered rules, expected −3 to −5¢/contract; a negative result
-  is the expected outcome", plus the note that fills are optimistic.
+- **Banner:** a "Hypothetical, no orders" label and "Expected result (pre-registered): about −3 to −5¢ per contract. A rule
+  clearly above zero over ≥ 30 settled trades would be the surprise.", plus the note that fills are optimistic.
 - **P&L by rule:** trades, open / locked / settled, lock rate, **settled P&L** and **locked-but-unsettled P&L** in separate
   columns, **P&L per contract** (settled + locked P&L ÷ contracts on those trades; open trades have no P&L yet) and
   capital, plus an "All rules" total.
 - **Start-up entries:** trades with `entry_ts == paper.since` (opened at the first poll, possibly mid-match) are left out
   of the headline rows and the total. They get their own rows under a separate heading, and a "start-up" badge in
-  the trade list. The numbers are computed from `paper.trades`. If a rule has more trades than the list carries (it's
+  the trade list. The section is labelled "Start-up entries (entered at the price when paper trading began; excluded)". The
+  numbers are computed from `paper.trades`; when that list is at its 200 cap, a note says the split may be incomplete. If a rule has more trades than the list carries (it's
   capped at 200), that rule falls back to the scanner's `by_rule` totals, with no split and no per-contract figure, and
   a note says so.
 - **Trades:** status chips (All / Open / Locked / Settled, with counts) and a rule filter. Each trade shows the entry, the
@@ -66,7 +67,8 @@ A "Live | Paper" switch under the header (`#paper` in the URL). The Paper view r
   once locked, and the final P&L plus the winner once settled.
 - **Nightly lookback:**
   - run time, data range and match counts;
-  - per rule at 0¢ and 1¢: trades, locked (rate), P&L, P&L per trade, win rate, locked / unlocked P&L;
+  - per rule at 0¢ and 1¢: trades, locked (rate), P&L, P&L per trade, **P&L per contract** (needs a `contracts` total in
+    each by_rule row, requested from Scanner; until then a note says so), win rate, locked / unlocked P&L;
   - a **cumulative P&L chart by settlement day** (inline SVG, one line per rule), with the daily numbers in a
     collapsible table;
   - a warning when the run is over 36 h old.
