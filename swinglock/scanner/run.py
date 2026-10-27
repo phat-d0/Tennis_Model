@@ -28,6 +28,7 @@ from .client import KalshiReadClient
 from .engine import Engine, Settings, holdings_from_positions
 from .market import MatchPair, match_quote, pairs_from_events
 from .output import AlertSink, StateWriter
+from .paper import PaperBook, load_settlements, save_settlements, settlement_from_markets
 
 log = logging.getLogger("swinglock.scanner")
 
@@ -43,7 +44,8 @@ def _path(p: str | Path) -> Path:
 
 class Scanner:
     def __init__(self, cfg: dict[str, Any], client: KalshiReadClient, *, positions_path: Path,
-                 sink: AlertSink, state: StateWriter, now: Callable[[], datetime] = utcnow):
+                 sink: AlertSink, state: StateWriter, now: Callable[[], datetime] = utcnow,
+                 paper: PaperBook | None = None, settlements_path: Path | None = None):
         self.cfg = cfg
         self.sc = cfg.get("scanner", {})
         self.client = client
@@ -58,6 +60,8 @@ class Scanner:
         self._positions_mtime: float | None = None
         self._positions = []
         self._stretched = False
+        self.paper = paper                       # independent of positions.json
+        self.settlements_path = settlements_path
 
     def load_fees(self) -> None:
         for s in self.sc.get("series", []):
@@ -75,6 +79,23 @@ class Scanner:
         self.pairs = pairs
         self._discovered_at = self.now()
         log.info("discovered %d open matches", len(pairs))
+        if self.paper:
+            self.settle_paper()
+
+    def settle_paper(self) -> None:
+        """Settle paper trades whose match left the open list (one GET /markets per 50 matches)."""
+        pending = self.paper.unsettled({p.match_id for p in self.pairs})
+        if not pending:
+            return
+        markets = self.client.markets([t for pair in pending.values() for t in pair])
+        cache = load_settlements(self.settlements_path) if self.settlements_path else {}
+        for match_id, tickers in pending.items():
+            pay = settlement_from_markets(markets, tickers)
+            if pay is not None:
+                self.paper.settle(match_id, *pay, self.now())
+                cache[match_id] = list(pay)
+        if self.settlements_path:
+            save_settlements(self.settlements_path, cache)
 
     def positions(self):
         try:
@@ -99,8 +120,10 @@ class Scanner:
         quotes = {p.match_id: q for p in self.pairs if (q := match_quote(p, books)) is not None}
         holdings = holdings_from_positions(self.positions(), {p.match_id: p for p in self.pairs})
         result = self.engine.step(self.pairs, quotes, self.fees, holdings, quote_ts, quote_ts)
+        if self.paper:
+            self.paper.step(self.pairs, quotes, self.fees, quote_ts)
         self.sink.emit(result.alerts)
-        self.state.write(result, quote_ts)
+        self.state.write(result, quote_ts, self.paper.summary() if self.paper else None)
         return result
 
     def run(self, once: bool = False, sleep: Callable[[float], None] = time.sleep,
@@ -143,16 +166,24 @@ def main(argv: list[str] | None = None) -> None:
     ap.add_argument("--positions", default=None, help="positions.json/csv (default: scanner.positions_file)")
     ap.add_argument("--state", default="data/live/state.json")
     ap.add_argument("--once", action="store_true")
+    ap.add_argument("--no-paper", action="store_true", help="disable paper trading")
     ap.add_argument("-v", "--verbose", action="store_true")
     args = ap.parse_args(argv)
     logging.basicConfig(level=logging.DEBUG if args.verbose else logging.INFO,
                         format="%(asctime)s %(levelname)s %(name)s: %(message)s")
     cfg = load_config(args.config)
     sc = cfg.get("scanner", {})
+    pc = cfg.get("paper") or {}
     scanner = Scanner(
         cfg, KalshiReadClient(min_interval=float(sc.get("min_request_interval", 1.0))),
         positions_path=_path(args.positions or sc.get("positions_file", "positions.json")),
         sink=AlertSink(_path(sc.get("alert_log", "data/alerts.log"))),
-        state=StateWriter(_path(args.state), sc.get("poll_seconds", 5)),
+        state=StateWriter(_path(args.state), sc.get("poll_seconds", 5), extra={
+            # the dashboard counts an arb as open only above the alert threshold
+            "min_arb_profit_per_contract": Settings.from_config(cfg).min_arb_profit_per_contract}),
+        paper=None if args.no_paper else PaperBook(
+            ledger_path=_path(pc.get("ledger", "data/paper/ledger.jsonl")),
+            slippage=float(cfg.get("execution", {}).get("slippage", 0.0))),
+        settlements_path=_path(pc.get("settlements", "data/paper/settlements.json")),
     )
     scanner.run(once=args.once)

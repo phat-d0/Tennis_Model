@@ -41,10 +41,12 @@ class AlertSink:
 
 
 class StateWriter:
-    def __init__(self, path: str | Path, poll_seconds: float, venue: str = "kalshi"):
+    def __init__(self, path: str | Path, poll_seconds: float, venue: str = "kalshi",
+                 extra: dict | None = None):
         self.path = Path(path)
         self.poll_seconds = poll_seconds
         self.venue = venue
+        self.extra = dict(extra or {})   # optional top-level keys, e.g. min_arb_profit_per_contract
         self.alerts: deque[dict] = deque(maxlen=MAX_ALERTS)
         self.path.parent.mkdir(parents=True, exist_ok=True)
         try:   # keep alert history across restarts
@@ -53,7 +55,7 @@ class StateWriter:
         except (OSError, ValueError, AttributeError):
             pass
 
-    def write(self, result: StepResult, now: datetime) -> dict:
+    def write(self, result: StepResult, now: datetime, paper: dict | None = None) -> dict:
         self.alerts.extend(result.alerts)
         state = {
             "generated_at": iso(now),
@@ -63,6 +65,9 @@ class StateWriter:
             "positions": result.positions,
             "alerts": list(reversed(self.alerts)),     # newest first
         }
+        state.update(self.extra)
+        if paper is not None:
+            state["paper"] = paper                     # paper trading summary (docs/scanner_paper.md)
         tmp = self.path.with_suffix(self.path.suffix + ".tmp")
         tmp.write_text(json.dumps(state, indent=1))
         os.replace(tmp, self.path)

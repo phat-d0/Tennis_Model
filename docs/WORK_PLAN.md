@@ -214,10 +214,23 @@ The owner asked for a public phone page like the soccer app, refreshed every 3 h
   - Portfolio and the page's fair chance on the **power de-vig** (#112). Line backtest is now 205 bets, +9.2% realized / +8.0% expected (in-sample).
   - Hetzner + Tailscale deploy (#109): **LIVE 2026-10-27**. The scanner, dashboard and recorder run on `tennis-scanner` (Tailscale
     only), watching ~109 markets with Challengers + WTA 125 included. Windows browsers need secure DNS off for MagicDNS.
-- **In progress (owner 2026-10-27):** automatic Kalshi **paper trading** on the server instead of the owner's positions.
-  - Pre-registered swing-lock rules (`docs/scanner_paper.md`), fills at the ask + fees.
-  - A nightly lookback of the same rules over recorded order books.
-  - A Paper tab on the dashboard (Scanner + Dashboard; Backtest checks the rules match its swing sim).
+- **Paper trading (owner 2026-10-27): engine merged (#116), server update pending.** Automatic Kalshi paper trading replaces the
+  owner's positions (`positions.json` = `[]`).
+  - 4 pre-registered rules (`docs/scanner_paper.md`): P1 X0.20/Y0.90, P2 0.40/0.95, P3 0.30/0.94 live-only, P4 0.30/0.94 pre-only.
+    Mode "first", 100 contracts capped by depth, fills at the ask + taker fee. Expected result: **−3 to −5¢ per contract**;
+    a rule clearly > 0 over ≥ 30 settled trades would be the surprise.
+  - Live engine in the scanner, ledger `data/paper/ledger.jsonl`. Nightly lookback (systemd timer ~04:00 UTC) runs the same RULES
+    through `swing.simulate` over recorded books at 0¢/1¢ → `data/paper/lookback.json`. Everything stays on the server.
+  - **Lead reading rule (pre-registered 2026-10-27):** start-up entries (trades with `entry_ts` = `paper.since`, i.e. matches already
+    listed when paper trading began, entered at their current price) are reported on a separate line and excluded from the headline.
+  - Backtest confirmed the rules match its swing sim. Dashboard is building the Paper tab.
+  - Owner update on the server: `cd /opt/swinglock && git pull && bash deploy/bootstrap.sh` (installs the lookback timer).
+- **Incident 2026-10-27 (Scanner): Kalshi-derived paper ledger pushed to the public repo.** Commit ae08bf5 on `team/scanner` holds
+  `data/paper/ledger.jsonl` (167 lines from the dry run). The file was removed in e61df0d and `data/paper/` is gitignored, but the
+  commit stays reachable while the branch exists. No PR from that branch has been merged, and the repo has no forks. Fix: the owner
+  deletes `team/scanner` on GitHub, then Scanner recreates it from main. The work was redone on the clean `team/scanner-paper` (#116,
+  ancestry checked). Rule for every role: stage explicit paths, never `git add -A`/`.` with data present; `tests/test_scanner_paper.py`
+  fails if anything under `data/` is tracked.
   - Dashboard fixes: the arb tile only counts arbs above the alert threshold; WTA 125 gets its own label.
   - OddsPapi test of DK Challenger lines waits on the owner: `ODDSPAPI_KEY` + allow oddspapi.io / api.oddspapi.io.
 - **Status:** jobs A, B and C and the DK report are done. Remaining leads: a live forward test of line shopping via the Portfolio tab
