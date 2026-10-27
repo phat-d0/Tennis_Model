@@ -257,7 +257,8 @@
         "lock_rate": 0.0,
         "pnl_settled": 82.01,
         "pnl_locked_unsettled": 0,
-        "capital": 22.75
+        "capital": 22.75,
+        "contracts": 125.0
       },
       {
         "rule": "P2-x40-y95",
@@ -268,7 +269,8 @@
         "lock_rate": 0.5,
         "pnl_settled": -37.62,
         "pnl_locked_unsettled": 6.6,
-        "capital": 131.02
+        "capital": 131.02,
+        "contracts": 200.0
       },
       {
         "rule": "P3-x30-y94-live",
@@ -279,7 +281,8 @@
         "lock_rate": 1.0,
         "pnl_settled": 4.78,
         "pnl_locked_unsettled": 0,
-        "capital": 55.22
+        "capital": 55.22,
+        "contracts": 60.0
       },
       {
         "rule": "P4-x30-y94-pre",
@@ -290,7 +293,8 @@
         "lock_rate": 0.0,
         "pnl_settled": -29.42,
         "pnl_locked_unsettled": 0,
-        "capital": 59.87
+        "capital": 59.87,
+        "contracts": 200.0
       }
     ],
     "trades": [

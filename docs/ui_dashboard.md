@@ -68,7 +68,7 @@ A "Live | Paper" switch under the header (`#paper` in the URL). The Paper view r
 - **Nightly lookback:**
   - run time, data range and match counts;
   - per rule at 0¢ and 1¢: trades, locked (rate), P&L, P&L per trade, **P&L per contract** (needs a `contracts` total in
-    each by_rule row, requested from Scanner; until then a note says so), win rate, locked / unlocked P&L;
+    each by_rule row, added by phat-d0/Tennis_Model#119; an older file shows dashes and a note), win rate, locked / unlocked P&L;
   - a **cumulative P&L chart by settlement day** (inline SVG, one line per rule), with the daily numbers in a
     collapsible table;
   - a warning when the run is over 36 h old.

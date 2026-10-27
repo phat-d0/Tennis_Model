@@ -557,7 +557,7 @@ function lookbackSection() {
   out.push(table("lookback", [["Rule"], ["Trades", 1], ["Locked", 1], ["P&L 0¢", 1], ["Per trade 0¢", 1], ["P&L 1¢", 1],
     ["Per trade 1¢", 1], ["Per ct 0¢", 1], ["Per ct 1¢", 1], ["Win rate", 1], ["Locked / unlocked", 1]], trs));
   if (objs(L.by_rule).length && !objs(L.by_rule).some((b) => isNum(b.contracts))) {
-    out.push(el("p", { class: "meta-line" }, "Per contract needs a `contracts` total in the lookback's by_rule rows (requested from Scanner)."));
+    out.push(el("p", { class: "meta-line" }, "Per contract needs a `contracts` total in the lookback's by_rule rows (scanner update phat-d0/Tennis_Model#119)."));
   }
 
   const days = objs(L.by_day);

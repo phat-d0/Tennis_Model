@@ -67,7 +67,8 @@
    "win_rate": 0.4524,
    "pnl_locked": 57.75,
    "pnl_unlocked": -117.67,
-   "capital": 6741.0
+   "capital": 6741.0,
+   "contracts": 15515.0
   },
   {
    "rule": "P1-x20-y90",
@@ -80,7 +81,8 @@
    "win_rate": 0.4351,
    "pnl_locked": -43.2,
    "pnl_unlocked": -209.32,
-   "capital": 6741.0
+   "capital": 6741.0,
+   "contracts": 15515.0
   },
   {
    "rule": "P2-x40-y95",
@@ -93,7 +95,8 @@
    "win_rate": 0.4851,
    "pnl_locked": 123.75,
    "pnl_unlocked": -360.43,
-   "capital": 12222.0
+   "capital": 12222.0,
+   "contracts": 28130.0
   },
   {
    "rule": "P2-x40-y95",
@@ -106,7 +109,8 @@
    "win_rate": 0.4272,
    "pnl_locked": -94.5,
    "pnl_unlocked": -491.38,
-   "capital": 12222.0
+   "capital": 12222.0,
+   "contracts": 28130.0
   },
   {
    "rule": "P3-x30-y94-live",
@@ -119,7 +123,8 @@
    "win_rate": 0.4736,
    "pnl_locked": 50.6,
    "pnl_unlocked": -108.68,
-   "capital": 5544.0
+   "capital": 5544.0,
+   "contracts": 12760.0
   },
   {
    "rule": "P3-x30-y94-live",
@@ -132,7 +137,8 @@
    "win_rate": 0.4566,
    "pnl_locked": -37.8,
    "pnl_unlocked": -178.68,
-   "capital": 5544.0
+   "capital": 5544.0,
+   "contracts": 12760.0
   },
   {
    "rule": "P4-x30-y94-pre",
@@ -145,7 +151,8 @@
    "win_rate": 0.4258,
    "pnl_locked": 31.35,
    "pnl_unlocked": -95.7,
-   "capital": 4504.5
+   "capital": 4504.5,
+   "contracts": 10367.5
   },
   {
    "rule": "P4-x30-y94-pre",
@@ -158,7 +165,8 @@
    "win_rate": 0.4707,
    "pnl_locked": -22.95,
    "pnl_unlocked": -170.1,
-   "capital": 4504.5
+   "capital": 4504.5,
+   "contracts": 10367.5
   }
  ],
  "by_day": [

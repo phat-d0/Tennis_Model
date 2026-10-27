@@ -117,7 +117,9 @@ def test_static_is_self_contained_and_read_only():
 RULE_KEYS = {"id", "x", "y", "entry_phase", "min_entry_ask", "min_minutes_from_start", "max_minutes_from_start",
              "contracts", "mode"}
 BY_RULE_KEYS = {"rule", "trades", "open", "locked", "settled", "lock_rate", "pnl_settled", "pnl_locked_unsettled",
-                "capital"}
+                "capital", "contracts"}
+# `contracts` (total entered) comes with phat-d0/Tennis_Model#119; until it's on main, Scanner's output may lack it.
+NEW_KEYS = {"contracts"}
 TRADE_KEYS = {"trade_id", "rule", "match_id", "series", "tier", "player_a", "player_b", "side", "status", "entry_ts",
               "entry_phase", "entry_ask", "entry_source", "contracts", "entry_cost", "lock_ts", "lock_ask",
               "lock_source", "lock_contracts", "lock_cost", "settle_ts", "settle_a", "settle_b", "pnl", "pnl_if_a",
@@ -126,7 +128,7 @@ LB_KEYS = {"generated_at", "source", "data_from", "data_to", "matches_recorded",
            "matches_with_trades", "matches_new_this_run", "matches_awaiting_result", "settlement_requests",
            "rules", "by_rule", "by_day"}
 LB_RULE_KEYS = {"rule", "slippage", "trades", "locked", "lock_rate", "pnl", "pnl_per_trade", "win_rate",
-                "pnl_locked", "pnl_unlocked", "capital"}
+                "pnl_locked", "pnl_unlocked", "capital", "contracts"}
 
 
 def test_sample_paper_matches_contract(sample):
@@ -364,17 +366,18 @@ def test_paper_tab_with_lookback(serve, tmp_path):
         p = res["paper"]
         assert p["lookbackRows"] == len(lb["rules"]) and p["days"] == 14 and p["notes"] == []
         assert p["chart"] and p["chartLines"] == len(lb["rules"])
-        assert set(p["lbPerCt"]) == {"—"} and any("needs a `contracts` total" in m for m in p["metaLines"])
-    # once Scanner sends `contracts` per by_rule row, per contract = P&L / contracts
-    lb["generated_at"] = _fresh(3)
-    for b in lb["by_rule"]:
-        b["contracts"] = b["trades"] * 50.0
-    lbf.write_text(json.dumps(lb))
+        assert "—" not in p["lbPerCt"] and not any("needs a `contracts` total" in m for m in p["metaLines"])
     want = [f"{'+' if b['pnl'] > 0 else '−'}{abs(b['pnl'] / b['contracts'] * 100):.1f}¢"
             for b in lb["by_rule"] if b["slippage"] == 0.0]
     for res in _run_check(serve(state, lbf)):
         assert res["paper"]["lbPerCt"] == want
-        assert not any("needs a `contracts` total" in m for m in res["paper"]["metaLines"])
+    # an older lookback without `contracts`: dashes and a note
+    for b in lb["by_rule"]:
+        b.pop("contracts")
+    lbf.write_text(json.dumps(lb))
+    for res in _run_check(serve(state, lbf)):
+        assert set(res["paper"]["lbPerCt"]) == {"—"}
+        assert any("needs a `contracts` total" in m for m in res["paper"]["metaLines"])
     lb["generated_at"] = _fresh(60)
     lbf.write_text(json.dumps(lb))
     for res in _run_check(serve(state, lbf)):
@@ -425,12 +428,12 @@ def test_contract_matches_scanner_output(sample, tmp_path):
     mine = sample["paper"]
     assert set(paper) == set(mine)
     assert set(paper["rules"][0]) == set(mine["rules"][0]) == RULE_KEYS
-    assert set(paper["by_rule"][0]) == set(mine["by_rule"][0]) == BY_RULE_KEYS
+    assert set(paper["by_rule"][0]) | NEW_KEYS == set(mine["by_rule"][0]) == BY_RULE_KEYS
     assert set(paper["trades"][0]) == set(mine["trades"][0]) == TRADE_KEYS
     assert [r["id"] for r in paper["rules"]] == [r["id"] for r in mine["rules"]]   # same frozen rules
     mine_lb = json.loads(SAMPLE_LOOKBACK.read_text())
     assert set(lb) == set(mine_lb) == LB_KEYS
-    assert set(lb["by_rule"][0]) == set(mine_lb["by_rule"][0]) == LB_RULE_KEYS
+    assert set(lb["by_rule"][0]) | NEW_KEYS == set(mine_lb["by_rule"][0]) == LB_RULE_KEYS
     assert set(lb["by_day"][0]) == set(mine_lb["by_day"][0])
 
 
