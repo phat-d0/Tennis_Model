@@ -71,7 +71,10 @@ def test_sample_matches_contract(sample):
 
 def test_sample_covers_display_cases(sample):
     ms = sample["matches"]
-    assert any(m["arb_profit"] > 0 for m in ms)                       # an open arb
+    edge = lambda m: m["arb_profit"] / m["arb_contracts"] if m["arb_contracts"] else 0  # noqa: E731
+    assert any(edge(m) >= 0.005 for m in ms)                          # an open arb
+    assert any(0 < edge(m) < 0.005 for m in ms)                       # a break-even one (below the alert threshold)
+    assert {m["tier"] for m in ms} <= {"atp", "wta", "challenger", "itf", "other"}   # the scanner's own values
     assert any(m["ask_b"] is None and m["combined"] is None for m in ms)  # a side with no ask
     locks = [p["lock"] for p in sample["positions"]]
     assert None in locks                                              # balanced holding
@@ -195,13 +198,15 @@ def test_page_in_browser(serve, tmp_path, fresh):
     state.write_text(json.dumps(s))
     for res in _run_check(serve(state), "swiatek"):
         assert res["status"] == ("ok" if fresh else "stale")
-        assert res["markets"] == 4 and res["noMarket"] == 1 and res["alerts"] == 3
+        assert res["markets"] == 5 and res["noMarket"] == 1 and res["alerts"] == 3
         assert res["arbRows"] == 1 and res["lockRows"] == 1
+        assert res["breakEven"] == 1 and res["arbTile"] == "1"     # the $0.09 / 19.34 ct arb doesn't count
+        assert res["tierLabels"] == ["ATP", "ATP Challenger", "WTA", "WTA 125"]
         assert res["firstMarket"] == "Jaime Faria vs Nicolas Brunold"   # sorted by combined + fees
         f = res["filters"]
-        assert f["search"] == {"rows": 1, "noMarket": 0, "label": "1 of 5 matches"}
-        assert f["pre"] == {"rows": 1, "noMarket": 0, "label": "1 of 5 matches"}
-        assert f["all"] == {"rows": 4, "noMarket": 1, "label": "5 matches"}
+        assert f["search"] == {"rows": 1, "noMarket": 0, "label": "1 of 6 matches"}
+        assert f["pre"] == {"rows": 1, "noMarket": 0, "label": "1 of 6 matches"}
+        assert f["all"] == {"rows": 5, "noMarket": 1, "label": "6 matches"}
 
 
 @pytest.mark.skipif(not _node_playwright(), reason="needs node + playwright")
@@ -229,3 +234,15 @@ def test_page_with_many_matches(serve, tmp_path):
         assert 0 < res["filters"]["search"]["rows"] == len(hits) < 100 - no_ask
         assert res["filters"]["pre"]["rows"] + res["filters"]["pre"]["noMarket"] == len(pre)
         assert res["filters"]["all"]["label"] == "100 matches"
+
+
+@pytest.mark.skipif(not _node_playwright(), reason="needs node + playwright")
+def test_arb_threshold_from_state(serve, tmp_path):
+    """If the scanner sends `min_arb_profit_per_contract`, the page uses it instead of the config default."""
+    s = json.loads(SAMPLE_STATE.read_text())
+    s["generated_at"] = _now()
+    s["min_arb_profit_per_contract"] = 0.004     # the Bonardi-Souza arb (0.48c/ct) now clears it
+    state = tmp_path / "state.json"
+    state.write_text(json.dumps(s))
+    for res in _run_check(serve(state)):
+        assert res["arbRows"] == 2 and res["breakEven"] == 0 and res["arbTile"] == "2"

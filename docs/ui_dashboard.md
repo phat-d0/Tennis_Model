@@ -27,6 +27,12 @@ an SSH tunnel (`ssh -L 8000:127.0.0.1:8000 vps`) or a VPN; there is no login on 
   the future = a clock problem). **Offline** banner when `/state.json` can't be loaded.
 - Summary tiles: markets, live now, arbs open, locks available.
 - Alerts, newest first (by `ts`), coloured by type (arb / lock / cross venue).
+- **Arb rule:** a row is an open arb (green row, ARB badge, "Arbs open" tile) only when `arb_profit / arb_contracts` is at
+  least the scanner's alert threshold: `state.min_arb_profit_per_contract` if the scanner sends it, otherwise config.yaml's
+  default of 0.005 $/contract. A positive profit below it (e.g. 19.34 ct for $0.09) gets a muted "break-even" tag and
+  isn't counted.
+- **Tier labels** come from `series`, because the scanner's `tier` says "challenger" for both: ATP, WTA, ATP Challenger,
+  WTA 125, ITF Men, ITF Women.
 - Markets: players, tier, phase, ask A, ask B, depth A / B, combined, combined + fees, arb
   contracts and profit. Sort by combined + fees (default, cheapest first), combined, arb profit,
   tier or phase. **Search** (player, tier, series or ticker; every word must match) and a **phase
