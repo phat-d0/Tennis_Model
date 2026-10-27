@@ -155,6 +155,31 @@ table.grid { width: 100%; border-collapse: collapse; background: var(--surface);
 .nomarket .players { font-weight: 600; overflow-wrap: anywhere; }
 .nomarket .why { color: var(--muted); }
 
+/* Live / Paper switch */
+.views { display: flex; gap: 4px; margin-top: 8px; background: var(--surface-2); border-radius: 8px; padding: 3px; max-width: 320px; }
+.views button {
+  flex: 1; font: inherit; font-size: 13px; font-weight: 600; border: 0; border-radius: 6px; padding: 5px 0;
+  background: none; color: var(--muted); cursor: pointer;
+}
+.views button[aria-selected="true"] { background: var(--surface); color: var(--text); box-shadow: 0 1px 2px rgba(0, 0, 0, 0.12); }
+
+/* Paper tab */
+.paper-note { font-size: 13px; color: var(--muted); margin: 0 0 12px; }
+.paper-note b { color: var(--text); }
+.card-note { background: var(--surface); border: 1px solid var(--line); border-radius: 8px; padding: 12px; color: var(--muted); margin-bottom: 18px; }
+.meta-line { font-size: 12px; color: var(--muted); margin: 0 0 8px; }
+.banner.inline { border-radius: 8px; border: 1px solid var(--line); margin-bottom: 8px; font-size: 13px; }
+.subline { font-size: 11px; color: var(--muted); font-weight: 400; }
+h3 { font-size: 14px; margin: 10px 0 0; }
+#view-paper section { margin-bottom: 18px; }
+#view-paper table.grid { margin-bottom: 14px; }
+.filters select { font-size: 13px; }
+table.by-day { width: 100%; border-collapse: collapse; background: var(--surface); border: 1px solid var(--line); border-radius: 8px; overflow: hidden; font-size: 13px; }
+table.by-day th, table.by-day td { padding: 5px 8px; border-bottom: 1px solid var(--line); text-align: left; }
+table.by-day th { font-size: 12px; color: var(--muted); background: var(--surface-2); }
+table.by-day .num { text-align: right; white-space: nowrap; }
+table.by-day tr:last-child td { border-bottom: 0; }
+
 .foot { color: var(--muted); font-size: 12px; }
 
 /* Phone: tables become stacked cards; each cell shows its column name. */

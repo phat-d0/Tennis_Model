@@ -6,7 +6,8 @@ venue API calls from the browser, no external CDNs, no build step.
 ## Run
 ```bash
 python -m swinglock.dashboard --state data/live/state.json   # what the scanner writes
-python -m swinglock.dashboard --sample                       # bundled sample, no network
+python -m swinglock.dashboard --sample                       # bundled sample + sample lookback, no network
+# --lookback FILE (default: <state dir>/../paper/lookback.json, i.e. data/paper/lookback.json)
 # options: --host 127.0.0.1 (default) --port 8000
 ```
 Open http://127.0.0.1:8000/. On the VPS keep the default `127.0.0.1` bind and reach it through
@@ -15,7 +16,7 @@ an SSH tunnel (`ssh -L 8000:127.0.0.1:8000 vps`) or a VPN; there is no login on 
 ## Files
 | File | What |
 |---|---|
-| `swinglock/dashboard/server.py` | `ThreadingHTTPServer`: `/` page, `/app.js`, `/style.css`, `/state.json` (re-read per request). Missing file → 503, half-written/invalid JSON → 502; the page keeps its last good copy |
+| `swinglock/dashboard/server.py` | `ThreadingHTTPServer`: `/` page, `/app.js`, `/style.css`, `/state.json` and `/lookback.json` (re-read per request). Missing file → 503, half-written/invalid JSON → 502; the page keeps its last good copy |
 | `swinglock/dashboard/static/` | `index.html`, `app.js`, `style.css` |
 | `swinglock/dashboard/sample_state.json` | Sample matching the CLAUDE.md contract: an open arb (Faria/Brunold), a side with no ask, the Krueger/Li worked example as a position (11.44 @ 42.7¢, 27.62 @ 54.3¢ → buy 16.18 Krueger @ 42.7¢, cost $7.19 with Kalshi fees, locked +$0.55), an unprofitable lock, a balanced holding, one alert of each type. Numbers come from `swinglock.locks` |
 | `swinglock/dashboard/check_page.js` | Playwright (Node) check: phone 390×844 + laptop 1280×800, light + dark; fails on page/console errors, external requests, horizontal overflow; optional screenshots |
@@ -46,6 +47,22 @@ an SSH tunnel (`ssh -L 8000:127.0.0.1:8000 vps`) or a VPN; there is no login on 
   depth" flag when `depth_ok` is false), cost, locked P&L. Profitable locks highlighted and listed first.
 - Polls `/state.json` every `poll_seconds` (capped at 30s); re-polls when the tab regains focus.
 - Theme: Auto (follows the device) / Light / Dark, remembered in localStorage.
+
+## Paper tab
+A "Live | Paper" switch under the header (`#paper` in the URL). The Paper view reads `state.paper` and `/lookback.json`
+(both from Scanner, docs/scanner_paper.md):
+- A note on top: hypothetical, pre-registered 2026-10-27, every rule lost money in the backtest, fills optimistic.
+- **P&L by rule:** trades, open / locked / settled, lock rate, **realized P&L (settled)** and **locked but not settled**
+  in separate columns, and capital. Each rule shows its X / Y / phase in words.
+- **Trades:** status and rule filters. Each trade shows entry (contracts, player, ask, time, phase, cost), lock (or "not
+  locked"), and P&L: "if A / if B" while open, locked P&L ("pays at settlement") once locked, and the final P&L plus the
+  winner once settled. Locked rows are highlighted.
+- **Nightly lookback:** run time, data range and match counts, then per rule: trades, locked (rate), P&L and P&L per trade
+  at 0¢, P&L at 1¢, win rate, and locked / unlocked P&L. Below that, the last 14 settlement days per rule (a compact
+  table on phones too). There's a warning when the run is over 36 h old.
+- **Missing pieces:** no `paper` key (scanner on `--no-paper`) or no lookback yet, each with a message. The server
+  answers **204** for a lookback file that doesn't exist yet, so the browser logs no error before the first nightly run.
+- The view only redraws when its data changes, so an open filter menu isn't reset by the 5 s poll.
 
 ## Re-checking
 ```bash

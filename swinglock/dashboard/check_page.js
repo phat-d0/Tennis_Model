@@ -46,6 +46,34 @@ const VIEWPORTS = { phone: { width: 390, height: 844 }, laptop: { width: 1280, h
         fs.mkdirSync(outDir, { recursive: true });
         await page.screenshot({ path: path.join(outDir, `dashboard-${tag}.png`), fullPage: true });
       }
+      // Paper tab: rules, trades (all, then settled only), lookback.
+      await page.click('.views button[data-view="paper"]');
+      await page.waitForFunction(() => !document.getElementById("view-paper").hidden);
+      await page.waitForFunction(() => !document.getElementById("view-paper").textContent.includes("Loading…"));
+      const paperGrab = () => page.evaluate(() => {
+        const box = document.getElementById("view-paper");
+        return {
+          rules: box.querySelectorAll("table.paper-rules tbody tr:not(:has(td.empty))").length,
+          trades: box.querySelectorAll("table.paper-trades tbody tr:not(:has(td.empty))").length,
+          locked: box.querySelectorAll("table.paper-trades tr.hot-lock").length,
+          lookbackRows: box.querySelectorAll("table.lookback tbody tr:not(:has(td.empty))").length,
+          days: box.querySelectorAll("table.by-day tbody tr").length,
+          height: document.documentElement.scrollHeight,
+          notes: [...box.querySelectorAll(".card-note, .banner.inline")].map((n) => n.textContent),
+          overflow: document.documentElement.scrollWidth - window.innerWidth,
+          liveHidden: document.getElementById("view-live").hidden,
+        };
+      });
+      info.paper = await paperGrab();
+      if (info.paper.overflow > 0) problems.push(`${tag} paper overflow ${info.paper.overflow}px`);
+      if (outDir) await page.screenshot({ path: path.join(outDir, `dashboard-paper-${tag}.png`), fullPage: true });
+      if (await page.$("#view-paper select[aria-label='Trade status']")) {
+        await page.selectOption("#view-paper select[aria-label='Trade status']", "settled");
+        info.paperSettled = (await paperGrab()).trades;
+        await page.selectOption("#view-paper select[aria-label='Trade status']", "all");
+      }
+      await page.click('.views button[data-view="live"]');
+
       // Filters: row counts after a search, after a phase filter, and with both cleared.
       const count = () => page.evaluate(() => ({
         rows: document.querySelectorAll("#markets tr:not(:has(td.empty))").length,

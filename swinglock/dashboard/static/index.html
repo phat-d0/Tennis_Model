@@ -23,11 +23,16 @@
       </select>
     </label>
   </div>
+  <nav class="views" role="tablist" aria-label="View">
+    <button role="tab" data-view="live" aria-selected="true">Live</button>
+    <button role="tab" data-view="paper" aria-selected="false">Paper</button>
+  </nav>
 </header>
 
 <div class="banner" id="banner" hidden></div>
 
 <main>
+ <div id="view-live">
   <section class="summary" id="summary" aria-label="Summary"></section>
 
   <section aria-labelledby="h-alerts">
@@ -85,8 +90,11 @@
       <tbody id="positions"></tbody>
     </table>
   </section>
+ </div>
 
-  <p class="foot">Read-only view of the scanner's <code>state.json</code>. Prices are asks; costs include fees. No orders are placed from here.</p>
+ <div id="view-paper" hidden></div>
+
+  <p class="foot">Read-only view of the scanner's <code>state.json</code> and paper-trading lookback. Prices are asks; costs include fees. No orders are placed from here; paper trades are hypothetical.</p>
 </main>
 <script src="app.js"></script>
 </body>

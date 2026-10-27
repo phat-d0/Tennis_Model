@@ -14,9 +14,9 @@ from pathlib import Path
 
 import pytest
 
-from swinglock.dashboard.server import SAMPLE_STATE, STATIC_DIR, make_server
+from swinglock.dashboard.server import SAMPLE_LOOKBACK, SAMPLE_STATE, STATIC_DIR, default_lookback, make_server
 from swinglock.fees import kalshi_fee_model
-from swinglock.locks import Holding, lock_quote
+from swinglock.locks import Holding, buy_cost, lock_quote
 
 # The live state contract from CLAUDE.md (key -> allowed JSON types).
 NUM, STR, NULLNUM = (int, float), (str,), (int, float, type(None))
@@ -51,7 +51,7 @@ def sample() -> dict:
 
 
 def test_sample_matches_contract(sample):
-    _check(sample, TOP, "state")
+    _check({k: v for k, v in sample.items() if k != "paper"}, TOP, "state")   # `paper` is optional (Scanner)
     _iso(sample["generated_at"])
     for m in sample["matches"]:
         _check(m, MATCH, m["match_id"])
@@ -106,15 +106,92 @@ def test_static_is_self_contained_and_read_only():
         assert "kalshi.com" not in text and "polymarket.com" not in text  # never calls venue APIs
         assert not re.search(r"\b(place|submit|send)[ _-]?order|<form|method=.post", text, re.I), f.name
     html = (STATIC_DIR / "index.html").read_text()
-    assert "<button" not in html  # no action buttons at all; only sort/theme selects
+    # no action buttons: the only buttons switch between the Live and Paper views
+    buttons = re.findall(r"<button[^>]*>", html)
+    assert buttons and all("data-view=" in b for b in buttons), buttons
+
+
+# ---------------------------------------------------------------- paper contract (Scanner, docs/scanner_paper.md)
+
+RULE_KEYS = {"id", "x", "y", "entry_phase", "min_entry_ask", "min_minutes_from_start", "max_minutes_from_start",
+             "contracts", "mode"}
+BY_RULE_KEYS = {"rule", "trades", "open", "locked", "settled", "lock_rate", "pnl_settled", "pnl_locked_unsettled",
+                "capital"}
+TRADE_KEYS = {"trade_id", "rule", "match_id", "series", "tier", "player_a", "player_b", "side", "status", "entry_ts",
+              "entry_phase", "entry_ask", "entry_source", "contracts", "entry_cost", "lock_ts", "lock_ask",
+              "lock_source", "lock_contracts", "lock_cost", "settle_ts", "settle_a", "settle_b", "pnl", "pnl_if_a",
+              "pnl_if_b"}
+LB_KEYS = {"generated_at", "source", "data_from", "data_to", "matches_recorded", "matches_processed",
+           "matches_with_trades", "matches_new_this_run", "matches_awaiting_result", "settlement_requests",
+           "rules", "by_rule", "by_day"}
+LB_RULE_KEYS = {"rule", "slippage", "trades", "locked", "lock_rate", "pnl", "pnl_per_trade", "win_rate",
+                "pnl_locked", "pnl_unlocked", "capital"}
+
+
+def test_sample_paper_matches_contract(sample):
+    paper = sample["paper"]
+    assert set(paper) == {"since", "rules", "by_rule", "trades"}
+    for r in paper["rules"]:
+        assert set(r) == RULE_KEYS
+    ids = [r["id"] for r in paper["rules"]]
+    assert [b["rule"] for b in paper["by_rule"]] == ids
+    for t in paper["trades"]:
+        assert set(t) == TRADE_KEYS, t["trade_id"]
+        assert t["status"] in ("open", "locked", "settled") and t["side"] in ("A", "B") and t["rule"] in ids
+        assert (t["pnl"] is None) == (t["status"] == "open")
+        assert (t["lock_ts"] is None) == (t["lock_ask"] is None)
+    order = [t["status"] for t in paper["trades"]]
+    assert order == sorted(order, key=lambda st: st == "settled")      # open/locked before settled
+    for b in paper["by_rule"]:
+        assert set(b) == BY_RULE_KEYS
+        ts = [t for t in paper["trades"] if t["rule"] == b["rule"]]
+        assert b["trades"] == len(ts)
+        for st in ("open", "locked", "settled"):
+            assert b[st] == sum(t["status"] == st for t in ts)
+        assert b["pnl_settled"] == pytest.approx(sum(t["pnl"] for t in ts if t["status"] == "settled"))
+        assert b["pnl_locked_unsettled"] == pytest.approx(sum(t["pnl"] for t in ts if t["status"] == "locked"))
+    assert {t["status"] for t in paper["trades"]} == {"open", "locked", "settled"}
+
+
+def test_sample_paper_trades_priced_with_core_math(sample):
+    """Entry cost = ask x contracts + Kalshi taker fee; a locked trade's P&L = lock_quote's locked P&L."""
+    for t in sample["paper"]["trades"]:
+        fees = kalshi_fee_model("quadratic" if "CHALLENGER" in t["series"] else "quadratic_with_maker_fees")
+        assert t["entry_cost"] == pytest.approx(buy_cost(t["entry_ask"], t["contracts"], fees), abs=1e-6)
+        if t["lock_ask"] is not None:
+            n, c = t["contracts"], t["entry_cost"]
+            h = Holding(n, c, 0, 0) if t["side"] == "A" else Holding(0, 0, n, c)
+            ask_a, ask_b = (0.99, t["lock_ask"]) if t["side"] == "A" else (t["lock_ask"], 0.99)
+            q = lock_quote(h, ask_a, ask_b, fees)
+            assert t["lock_cost"] == pytest.approx(q.cost, abs=1e-6)
+            if t["status"] == "locked":
+                assert t["pnl"] == pytest.approx(q.locked_pnl, abs=1e-6)
+
+
+def test_sample_lookback_matches_contract():
+    lb = json.loads(SAMPLE_LOOKBACK.read_text())
+    assert set(lb) == LB_KEYS
+    for r in lb["rules"]:
+        assert set(r) == RULE_KEYS
+    for b in lb["by_rule"]:
+        assert set(b) == LB_RULE_KEYS and b["slippage"] in (0.0, 0.01)
+    assert len(lb["by_rule"]) == 2 * len(lb["rules"])                 # one row per rule per slippage
+    for d in lb["by_day"]:
+        assert set(d) == {"day", "rule", "trades", "locked", "pnl"}
+        datetime.strptime(d["day"], "%Y-%m-%d")
+
+
+def test_default_lookback_path():
+    assert default_lookback("data/live/state.json") == Path("data/paper/lookback.json")
 
 
 @pytest.fixture()
 def serve(tmp_path):
     servers = []
 
-    def start(state_path: Path) -> str:
-        httpd = make_server(state_path, "127.0.0.1", 0)
+    def start(state_path: Path, lookback: Path | None = None) -> str:
+        # default: a lookback that doesn't exist yet (the normal state before the first nightly run)
+        httpd = make_server(state_path, "127.0.0.1", 0, lookback or tmp_path / "missing-lookback.json")
         threading.Thread(target=httpd.serve_forever, daemon=True).start()
         servers.append(httpd)
         return f"http://127.0.0.1:{httpd.server_address[1]}"
@@ -164,6 +241,15 @@ def test_server_errors(serve, tmp_path):
     assert code == 502 and "not valid JSON" in json.loads(body)["error"]
 
     assert _get(missing + "/../../CLAUDE.md")[0] == 404
+    # lookback: 204 while the nightly job hasn't run yet, 502 when half-written, 200 when there
+    state = tmp_path / "state.json"
+    shutil.copy(SAMPLE_STATE, state)
+    assert _get(serve(state) + "/lookback.json")[0] == 204
+    lb = tmp_path / "lookback.json"
+    lb.write_text("{")
+    assert _get(serve(state, lb) + "/lookback.json")[0] == 502
+    code, ctype, body = _get(serve(state, SAMPLE_LOOKBACK) + "/lookback.json")
+    assert code == 200 and json.loads(body) == json.loads(SAMPLE_LOOKBACK.read_text())
     assert _get(missing + "/server.py")[0] == 404
 
 
@@ -202,6 +288,10 @@ def test_page_in_browser(serve, tmp_path, fresh):
         assert res["arbRows"] == 1 and res["lockRows"] == 1
         assert res["breakEven"] == 1 and res["arbTile"] == "1"     # the $0.09 / 19.34 ct arb doesn't count
         assert res["tierLabels"] == ["ATP", "ATP Challenger", "WTA", "WTA 125"]
+        p = res["paper"]
+        assert p["liveHidden"] and p["rules"] == 4 and p["trades"] == 7 and p["locked"] == 1
+        assert res["paperSettled"] == 4 and p["lookbackRows"] == 0
+        assert any("No lookback yet" in n for n in p["notes"])
         assert res["firstMarket"] == "Jaime Faria vs Nicolas Brunold"   # sorted by combined + fees
         f = res["filters"]
         assert f["search"] == {"rows": 1, "noMarket": 0, "label": "1 of 6 matches"}
@@ -246,3 +336,42 @@ def test_arb_threshold_from_state(serve, tmp_path):
     state.write_text(json.dumps(s))
     for res in _run_check(serve(state)):
         assert res["arbRows"] == 2 and res["breakEven"] == 0 and res["arbTile"] == "2"
+
+
+def _fresh(dt_hours_ago: float = 0) -> str:
+    from datetime import timedelta
+    return (datetime.now(UTC) - timedelta(hours=dt_hours_ago)).strftime("%Y-%m-%dT%H:%M:%SZ")
+
+
+@pytest.mark.skipif(not _node_playwright(), reason="needs node + playwright")
+def test_paper_tab_with_lookback(serve, tmp_path):
+    """Lookback present: per-rule rows (0c and 1c), last 14 days; an old run gets a warning."""
+    s = json.loads(SAMPLE_STATE.read_text())
+    s["generated_at"] = _now()
+    state = tmp_path / "state.json"
+    state.write_text(json.dumps(s))
+    lb = json.loads(SAMPLE_LOOKBACK.read_text())
+    lb["generated_at"] = _fresh(3)
+    lbf = tmp_path / "lookback.json"
+    lbf.write_text(json.dumps(lb))
+    for res in _run_check(serve(state, lbf)):
+        p = res["paper"]
+        assert p["lookbackRows"] == len(lb["rules"]) and p["days"] == 14 and p["notes"] == []
+    lb["generated_at"] = _fresh(60)
+    lbf.write_text(json.dumps(lb))
+    for res in _run_check(serve(state, lbf)):
+        assert any("nightly run may have failed" in n for n in res["paper"]["notes"])
+
+
+@pytest.mark.skipif(not _node_playwright(), reason="needs node + playwright")
+def test_paper_tab_without_paper_key(serve, tmp_path):
+    """Scanner run with --no-paper: the tab says so and stays usable."""
+    s = json.loads(SAMPLE_STATE.read_text())
+    s["generated_at"] = _now()
+    s.pop("paper")
+    state = tmp_path / "state.json"
+    state.write_text(json.dumps(s))
+    for res in _run_check(serve(state)):
+        p = res["paper"]
+        assert p["rules"] == 0 and p["trades"] == 0
+        assert any("isn't paper trading" in n for n in p["notes"])
