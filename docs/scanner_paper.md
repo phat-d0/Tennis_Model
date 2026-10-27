@@ -34,6 +34,20 @@ Common to all four:
   that never started (`Holding.pnl_settled`).
 - **Scope:** the scanner's series (ATP, WTA, ATP Challenger, WTA 125; ITF was dropped 2026-10-26).
 
+**Expected result, pre-registered so the test can fail.** None of these rules passed the gate. Out of
+sample, the backtest lost about 3–4¢ per contract at 0¢ slippage and 4–5¢ at 1¢:
+- ATP/WTA: −$0.32 / −$0.47 per 10-contract trade.
+- Challenger + WTA 125: −$0.39 / −$0.53 per 10-contract trade.
+
+At 100 contracts that is **roughly −$3 to −$5 per trade**, before the depth-gate effect (below).
+**Compare per contract**, not per trade. A rule clearly above zero over **≥ 30 settled trades** would be
+the surprise worth reporting; a few weeks of losses would just confirm the backtest.
+
+Backtest (2026-10-27) checked these rules against its swing sim. The semantics match, and `backtest_cfg`
+sets every filter the sim reads. It suggested an optional swap of P4 for X 0.30 / Y 0.94 in the first
+hour of play (0–60 min), a walk-forward-tested variant. Pre-match-only P4 was kept as the contrast to
+P3; the Lead can make that swap before results exist.
+
 **Rules are frozen.** Adding or changing one needs a new dated entry in this section, written before
 its results exist. Never re-tune on paper results. The definitions live in one place,
 `swinglock/scanner/paper.py` (`RULES`); `tests/test_scanner_paper.py` fails if this table and the
@@ -109,6 +123,17 @@ result.
 - `by_day` is at 0¢ slippage, keyed by settlement day.
 
 ## Reading results honestly
+- **Compare live and lookback on aggregates, not trade by trade.** The live engine sees one snapshot per
+  scanner poll. The lookback sees the recorder's ~10 s books through align's as-of join (the union of
+  A/B times, 60 s staleness). Different observation grids can give a different entry or lock moment.
+  The equivalence test only proves the logic on a shared grid.
+- **Depth gate.** A lock needs the top-of-book size at a single price level to cover the whole position,
+  with no walking the book. At 100 contracts this blocks locks that the candle backtest took, because
+  its depth was unknown and the gate always passed. Expect a **lower lock rate than the findings
+  report** (48.8% for P1). The gate is conservative and identical in both engines.
+- **Size vs research.** The research used 10 contracts. At 100 contracts the fee rounding per order costs
+  slightly less per contract. When entry depth is small (1–5 contracts), the 1¢ minimum fee per order
+  costs more per contract.
 - **Start-up entries.** "First observation" means the first one the scanner sees. When paper trading
   starts, or after a long outage, every match already listed is entered at its current price, not at
   the moment it first crossed X. In the dry run (2026-10-27, 108 open matches), 168 trades opened in
