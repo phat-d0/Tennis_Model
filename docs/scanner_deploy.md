@@ -69,8 +69,9 @@ Then:
 tail -50 /var/log/swinglock-bootstrap.log
 ```
 
-| Symptom in the log | Fix |
+| Symptom | Fix |
 |---|---|
+| The device shows in Tailscale but the `…ts.net` address doesn't resolve (`NXDOMAIN`, `DNS_PROBE_FINISHED_NXDOMAIN`), seen on **Windows Chrome / Edge** | The browser's **Secure DNS** bypasses Tailscale's MagicDNS. Turn it off. Chrome: Settings → Privacy and security → Security → *Use secure DNS*. Edge: Settings → Privacy, search, and services → Security → *Use secure DNS*. Then reload. |
 | `no Tailscale auth key` or `tailscale up failed` (the key was missing, used or expired) | Run `tailscale up --hostname=tennis-scanner --ssh` and open the login link it prints, then `tailscale serve --bg 8000`. Public SSH stays open until Tailscale is up. |
 | `tailscale serve failed` | Turn on HTTPS Certificates (step 1.3), then run `tailscale serve --bg 8000` |
 | Anything else | Re-run `bash /opt/swinglock/deploy/bootstrap.sh`. It's safe to run again. |
@@ -87,12 +88,14 @@ docker compose -f deploy/docker-compose.yml logs -f --tail 50 scanner   # or: re
 tail -f data/alerts.log                                       # alerts (also on the dashboard)
 
 git pull && systemctl restart swinglock                       # update to the latest main (rebuilds)
+git pull && bash deploy/bootstrap.sh                          # update that adds systemd units (safe to re-run)
 systemctl restart swinglock                                   # restart all services
 systemctl stop swinglock                                      # stop everything
 ```
 
-- **Your positions:** edit them with `nano /opt/swinglock/data/positions.json`. The format is in
-  `positions.example.json`. The scanner reloads the file when it changes; no restart is needed.
+- **Your positions:** the file starts empty (`[]`). To track real holdings, edit
+  `nano /opt/swinglock/data/positions.json` using the format in `positions.example.json`. The scanner
+  reloads it when it changes; no restart is needed. Paper trading doesn't use this file.
 - **Thresholds:** they're in `config.yaml`. Changing them to a tested rule needs the owner's go-ahead
   (CLAUDE.md). Run `systemctl restart swinglock` afterwards.
 - **Is the recorder writing?** New part files should appear every minute, and finished days are
@@ -100,6 +103,13 @@ systemctl stop swinglock                                      # stop everything
   ```bash
   ls -lt data/recorded/kalshi/quotes/$(date -u +%F)/ | head -3
   docker compose -f deploy/docker-compose.yml logs --tail 20 recorder
+  ```
+- **Paper trading** (docs/scanner_paper.md) runs inside the scanner. Its ledger, settlements and the
+  nightly lookback are under `data/paper/`. The dashboard shows them on its Paper tab.
+  ```bash
+  tail -3 data/paper/ledger.jsonl                               # latest paper events
+  systemctl list-timers swinglock-lookback.timer                # next lookback run (~04:00 UTC)
+  systemctl start swinglock-lookback && journalctl -u swinglock-lookback -n 20   # run it now
   ```
 - **Disk:** recorded data grows every day. Check it with `du -sh data/recorded` and `df -h /`.
 
@@ -170,5 +180,6 @@ systemctl stop swinglock                                      # stop everything
 | `deploy/bootstrap.sh` | Swap, Docker, data dir, systemd and logrotate, Tailscale and `serve`, ufw, start. Safe to re-run |
 | `deploy/Dockerfile`, `deploy/docker-compose.yml` | One image; services `scanner`, `dashboard`, `recorder` (profile), `caddy` (profile) |
 | `deploy/systemd/swinglock.service` | Starts the stack at boot with `COMPOSE_PROFILES=recorder` |
+| `deploy/systemd/swinglock-lookback.{service,timer}` | Nightly paper lookback at ~04:00 UTC (`python -m swinglock.scanner.lookback` in the scanner image) |
 | `deploy/logrotate/swinglock` | Rotation for `data/*.log` |
 | `deploy/env.example` | Template for `deploy/.env` (gitignored). Nothing in it is needed today |

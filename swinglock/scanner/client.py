@@ -96,6 +96,14 @@ class KalshiReadClient:
             if not cursor:
                 return events, milestones
 
+    def markets(self, tickers: Iterable[str]) -> list[dict]:
+        """Market objects (status, result, settlement_value_dollars) for up to 100 tickers per call."""
+        tickers, out = list(tickers), []
+        for i in range(0, len(tickers), MAX_TICKERS_PER_ORDERBOOKS):
+            chunk = tickers[i:i + MAX_TICKERS_PER_ORDERBOOKS]
+            out += self.get("/markets", {"tickers": ",".join(chunk), "limit": 1000}).get("markets") or []
+        return out
+
     def orderbooks(self, tickers: Iterable[str]) -> dict[str, dict]:
         """{ticker: orderbook_fp} for many markets, 100 tickers per request."""
         tickers = list(tickers)
