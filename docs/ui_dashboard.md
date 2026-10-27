@@ -6,7 +6,8 @@ venue API calls from the browser, no external CDNs, no build step.
 ## Run
 ```bash
 python -m swinglock.dashboard --state data/live/state.json   # what the scanner writes
-python -m swinglock.dashboard --sample                       # bundled sample, no network
+python -m swinglock.dashboard --sample                       # bundled sample + sample lookback, no network
+# --lookback FILE (default: <state dir>/../paper/lookback.json, i.e. data/paper/lookback.json)
 # options: --host 127.0.0.1 (default) --port 8000
 ```
 Open http://127.0.0.1:8000/. On the VPS keep the default `127.0.0.1` bind and reach it through
@@ -15,7 +16,7 @@ an SSH tunnel (`ssh -L 8000:127.0.0.1:8000 vps`) or a VPN; there is no login on 
 ## Files
 | File | What |
 |---|---|
-| `swinglock/dashboard/server.py` | `ThreadingHTTPServer`: `/` page, `/app.js`, `/style.css`, `/state.json` (re-read per request). Missing file → 503, half-written/invalid JSON → 502; the page keeps its last good copy |
+| `swinglock/dashboard/server.py` | `ThreadingHTTPServer`: `/` page, `/app.js`, `/style.css`, `/state.json` and `/lookback.json` (re-read per request). Missing file → 503, half-written/invalid JSON → 502; the page keeps its last good copy |
 | `swinglock/dashboard/static/` | `index.html`, `app.js`, `style.css` |
 | `swinglock/dashboard/sample_state.json` | Sample matching the CLAUDE.md contract: an open arb (Faria/Brunold), a side with no ask, the Krueger/Li worked example as a position (11.44 @ 42.7¢, 27.62 @ 54.3¢ → buy 16.18 Krueger @ 42.7¢, cost $7.19 with Kalshi fees, locked +$0.55), an unprofitable lock, a balanced holding, one alert of each type. Numbers come from `swinglock.locks` |
 | `swinglock/dashboard/check_page.js` | Playwright (Node) check: phone 390×844 + laptop 1280×800, light + dark; fails on page/console errors, external requests, horizontal overflow; optional screenshots |
@@ -46,6 +47,36 @@ an SSH tunnel (`ssh -L 8000:127.0.0.1:8000 vps`) or a VPN; there is no login on 
   depth" flag when `depth_ok` is false), cost, locked P&L. Profitable locks highlighted and listed first.
 - Polls `/state.json` every `poll_seconds` (capped at 30s); re-polls when the tab regains focus.
 - Theme: Auto (follows the device) / Light / Dark, remembered in localStorage.
+
+## Paper tab
+A "Live | Paper" switch under the header (`#paper` in the URL). The Paper view reads `state.paper` and `/lookback.json`
+(both from Scanner; contract approved with phat-d0/Tennis_Model#116, docs/scanner_paper.md):
+- **Banner:** a "Hypothetical, no orders" label and "Expected result (pre-registered): about −3 to −5¢ per contract. A rule
+  clearly above zero over ≥ 30 settled trades would be the surprise.", plus the note that fills are optimistic.
+- **P&L by rule:** trades, open / locked / settled, lock rate, **settled P&L** and **locked-but-unsettled P&L** in separate
+  columns, **P&L per contract** (settled + locked P&L ÷ contracts on those trades; open trades have no P&L yet) and
+  capital, plus an "All rules" total.
+- **Start-up entries:** trades with `entry_ts == paper.since` (opened at the first poll, possibly mid-match) are left out
+  of the headline rows and the total. They get their own rows under a separate heading, and a "start-up" badge in
+  the trade list. The section is labelled "Start-up entries (entered at the price when paper trading began; excluded)". The
+  numbers are computed from `paper.trades`; when that list is at its 200 cap, a note says the split may be incomplete. If a rule has more trades than the list carries (it's
+  capped at 200), that rule falls back to the scanner's `by_rule` totals, with no split and no per-contract figure, and
+  a note says so.
+- **Trades:** status chips (All / Open / Locked / Settled, with counts) and a rule filter. Each trade shows the entry, the
+  lock (or "not locked"), and P&L: the amount if each player wins while open, the locked P&L ("pays at settlement")
+  once locked, and the final P&L plus the winner once settled.
+- **Nightly lookback:**
+  - run time, data range and match counts;
+  - per rule at 0¢ and 1¢: trades, locked (rate), P&L, P&L per trade, **P&L per contract** (needs a `contracts` total in
+    each by_rule row, added by phat-d0/Tennis_Model#119; an older file shows dashes and a note), win rate, locked / unlocked P&L;
+  - a **cumulative P&L chart by settlement day** (inline SVG, one line per rule), with the daily numbers in a
+    collapsible table;
+  - a warning when the run is over 36 h old.
+- **Missing pieces:** no `paper` key (scanner on `--no-paper`) or no lookback yet, each with a message. The server
+  answers **204** for a lookback file that doesn't exist yet, so the browser logs no error before the first nightly run.
+- **Redraws:** the view only redraws when its data changes, so an open filter menu isn't reset by the 5 s poll.
+- **Tests:** `tests/test_dashboard.py` also runs Scanner's own code on its synthetic fixtures (tests/test_scanner_paper.py)
+  and checks that the key sets match and that the page renders that output. A field rename on either side fails CI.
 
 ## Re-checking
 ```bash

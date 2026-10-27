@@ -46,6 +46,44 @@ const VIEWPORTS = { phone: { width: 390, height: 844 }, laptop: { width: 1280, h
         fs.mkdirSync(outDir, { recursive: true });
         await page.screenshot({ path: path.join(outDir, `dashboard-${tag}.png`), fullPage: true });
       }
+      // Paper tab: rules, trades (all, then settled only), lookback.
+      await page.click('.views button[data-view="paper"]');
+      await page.waitForFunction(() => !document.getElementById("view-paper").hidden);
+      await page.waitForFunction(() => !document.getElementById("view-paper").textContent.includes("Loading…"));
+      const paperGrab = () => page.evaluate(() => {
+        const box = document.getElementById("view-paper");
+        return {
+          rules: box.querySelectorAll("table.paper-rules tbody tr:not(.total):not(.group):not(.startup):not(:has(td.empty))").length,
+          startup: box.querySelectorAll("table.paper-rules tr.startup").length,
+          total: box.querySelector("table.paper-rules tr.total td:nth-child(7)")?.textContent || "",
+          perContract: [...box.querySelectorAll("table.paper-rules tbody tr:not(.total):not(.group):not(.startup) td:nth-child(7)")].map((td) => td.textContent),
+          startupBadges: [...box.querySelectorAll("table.paper-trades .badge")].filter((b) => b.textContent === "start-up").length,
+          chart: !!box.querySelector("svg.daychart"),
+          chartLines: box.querySelectorAll("svg.daychart path, svg.daychart circle").length,
+          hypo: box.querySelector(".badge.hypo")?.textContent || "",
+          intro: box.querySelector(".paper-note b")?.textContent || "",
+          lbPerCt: [...box.querySelectorAll("table.lookback tbody tr td:nth-child(8)")].map((td) => td.textContent),
+          metaLines: [...box.querySelectorAll(".meta-line")].map((n) => n.textContent),
+          trades: box.querySelectorAll("table.paper-trades tbody tr:not(:has(td.empty))").length,
+          locked: box.querySelectorAll("table.paper-trades tr.hot-lock").length,
+          lookbackRows: box.querySelectorAll("table.lookback tbody tr:not(:has(td.empty))").length,
+          days: box.querySelectorAll("table.by-day tbody tr").length,
+          height: document.documentElement.scrollHeight,
+          notes: [...box.querySelectorAll(".card-note, .banner.inline")].map((n) => n.textContent),
+          overflow: document.documentElement.scrollWidth - window.innerWidth,
+          liveHidden: document.getElementById("view-live").hidden,
+        };
+      });
+      info.paper = await paperGrab();
+      if (info.paper.overflow > 0) problems.push(`${tag} paper overflow ${info.paper.overflow}px`);
+      if (outDir) await page.screenshot({ path: path.join(outDir, `dashboard-paper-${tag}.png`), fullPage: true });
+      if (await page.$("#view-paper .chip[data-filter='settled']")) {
+        await page.click("#view-paper .chip[data-filter='settled']");
+        info.paperSettled = (await paperGrab()).trades;
+        await page.click("#view-paper .chip[data-filter='all']");
+      }
+      await page.click('.views button[data-view="live"]');
+
       // Filters: row counts after a search, after a phase filter, and with both cleared.
       const count = () => page.evaluate(() => ({
         rows: document.querySelectorAll("#markets tr:not(:has(td.empty))").length,
