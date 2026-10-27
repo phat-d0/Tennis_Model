@@ -118,8 +118,6 @@ RULE_KEYS = {"id", "x", "y", "entry_phase", "min_entry_ask", "min_minutes_from_s
              "contracts", "mode"}
 BY_RULE_KEYS = {"rule", "trades", "open", "locked", "settled", "lock_rate", "pnl_settled", "pnl_locked_unsettled",
                 "capital", "contracts"}
-# `contracts` (total entered) comes with phat-d0/Tennis_Model#119; until it's on main, Scanner's output may lack it.
-NEW_KEYS = {"contracts"}
 TRADE_KEYS = {"trade_id", "rule", "match_id", "series", "tier", "player_a", "player_b", "side", "status", "entry_ts",
               "entry_phase", "entry_ask", "entry_source", "contracts", "entry_cost", "lock_ts", "lock_ask",
               "lock_source", "lock_contracts", "lock_cost", "settle_ts", "settle_a", "settle_b", "pnl", "pnl_if_a",
@@ -428,12 +426,12 @@ def test_contract_matches_scanner_output(sample, tmp_path):
     mine = sample["paper"]
     assert set(paper) == set(mine)
     assert set(paper["rules"][0]) == set(mine["rules"][0]) == RULE_KEYS
-    assert set(paper["by_rule"][0]) | NEW_KEYS == set(mine["by_rule"][0]) == BY_RULE_KEYS
+    assert set(paper["by_rule"][0]) == set(mine["by_rule"][0]) == BY_RULE_KEYS
     assert set(paper["trades"][0]) == set(mine["trades"][0]) == TRADE_KEYS
     assert [r["id"] for r in paper["rules"]] == [r["id"] for r in mine["rules"]]   # same frozen rules
     mine_lb = json.loads(SAMPLE_LOOKBACK.read_text())
     assert set(lb) == set(mine_lb) == LB_KEYS
-    assert set(lb["by_rule"][0]) | NEW_KEYS == set(mine_lb["by_rule"][0]) == LB_RULE_KEYS
+    assert set(lb["by_rule"][0]) == set(mine_lb["by_rule"][0]) == LB_RULE_KEYS
     assert set(lb["by_day"][0]) == set(mine_lb["by_day"][0])
 
 
