@@ -128,6 +128,7 @@ def test_summary_shape_and_pnl():
     assert [r["id"] for r in s["rules"]] == [r.id for r in RULES]
     p1 = next(r for r in s["by_rule"] if r["rule"] == RULES[0].id)
     assert p1["trades"] == 1 and p1["locked"] == 1 and p1["open"] == 0 and p1["pnl_locked_unsettled"] > 0
+    assert next(r for r in s["by_rule"] if r["rule"] == RULES[1].id)["contracts"] == 60   # depth-capped entry
     row = next(t for t in s["trades"] if t["rule"] == RULES[0].id)
     assert row["status"] == "locked" and row["pnl"] == pytest.approx(min(row["pnl_if_a"], row["pnl_if_b"]))
     book.settle(MID, *PAY, T0 + timedelta(hours=3))
@@ -207,6 +208,7 @@ def test_lookback_runs_rules_over_recorded_books_incrementally(tmp_path):
     assert set(by) == {(r.id, sl) for r in RULES for sl in (0.0, 0.01)}
     assert by[(RULES[0].id, 0.0)]["trades"] == 1 and by[(RULES[0].id, 0.0)]["locked"] == 1
     assert by[(RULES[1].id, 0.0)]["locked"] == 0 and by[(RULES[1].id, 0.0)]["pnl"] < 0
+    assert by[(RULES[0].id, 0.0)]["contracts"] == 100 and by[(RULES[1].id, 0.0)]["contracts"] == 60
     # same P&L as the live engine at 0c
     live = live_book()
     live.settle(MID, *PAY, now)

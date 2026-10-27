@@ -284,6 +284,7 @@ class PaperBook:
                 "lock_rate": round(len(locked) / len(ts), 4) if ts else None,
                 "pnl_settled": round(sum(t.pnl for t in settled), 6),
                 "pnl_locked_unsettled": round(sum(t.holding.locked_pnl for t in pending), 6),
+                "contracts": round(sum(t.contracts for t in ts), 6),    # entered (per-contract P&L)
                 "capital": round(sum(t.holding.total_cost for t in ts), 6),
             })
         live = [t for t in trades if t.status != "settled"]
