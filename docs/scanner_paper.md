@@ -94,7 +94,7 @@ result.
              "min_minutes_from_start": null, "max_minutes_from_start": null, "contracts": 100.0,
              "mode": "first"}],
   "by_rule": [{"rule": "P1-x20-y90", "trades": 0, "open": 0, "locked": 0, "settled": 0,
-               "lock_rate": null, "pnl_settled": 0.0, "pnl_locked_unsettled": 0.0, "capital": 0.0}],
+               "lock_rate": null, "pnl_settled": 0.0, "pnl_locked_unsettled": 0.0, "contracts": 0.0, "capital": 0.0}],
   "trades": [{"trade_id": "P1-x20-y90:KXATPMATCH-…", "rule": "P1-x20-y90", "match_id": "", "series": "",
               "tier": "", "player_a": "", "player_b": "", "side": "A|B", "status": "open|locked|settled",
               "entry_ts": "", "entry_phase": "pre|live|unknown", "entry_ask": 0.0, "entry_source": "yes:<ticker>",
@@ -108,6 +108,8 @@ result.
 - `pnl` is null while open, the locked P&L once locked, and the final P&L once settled.
 - `pnl_if_a` / `pnl_if_b` are the settlement P&L if A / B wins. `capital` is dollars spent (entry + lock).
 - `lock_rate` counts locked trades (settled or not) over all trades.
+- `contracts` (in `by_rule`, here and in lookback.json) is the total entered, before lock buys. P&L per
+  contract = `pnl` / `contracts`, which is the pre-registered comparison. Added 2026-10-27 at Dashboard's request.
 
 **`data/paper/lookback.json`** (the dashboard reads it next to state.json):
 ```json
@@ -116,7 +118,8 @@ result.
  "matches_new_this_run": 0, "matches_awaiting_result": 0, "settlement_requests": 0,
  "rules": [ …same as state.json paper.rules… ],
  "by_rule": [{"rule": "", "slippage": 0.0, "trades": 0, "locked": 0, "lock_rate": null, "pnl": 0.0,
-              "pnl_per_trade": null, "win_rate": null, "pnl_locked": 0.0, "pnl_unlocked": 0.0, "capital": 0.0}],
+              "pnl_per_trade": null, "win_rate": null, "pnl_locked": 0.0, "pnl_unlocked": 0.0, "contracts": 0.0,
+              "capital": 0.0}],
  "by_day": [{"day": "YYYY-MM-DD", "rule": "", "trades": 0, "locked": 0, "pnl": 0.0}]}
 ```
 - `by_rule` has one row per rule per slippage (0.0 and 0.01).
