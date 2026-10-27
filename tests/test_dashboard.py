@@ -102,6 +102,7 @@ def test_sample_worked_example_position(sample):
 def test_static_is_self_contained_and_read_only():
     for f in STATIC_DIR.iterdir():
         text = f.read_text()
+        text = text.replace("http://www.w3.org/2000/svg", "")   # the SVG namespace id, never fetched
         assert not re.search(r"(https?:)?//[a-z0-9.-]+\.[a-z]{2,}/", text, re.I), f"external URL in {f.name}"
         assert "kalshi.com" not in text and "polymarket.com" not in text  # never calls venue APIs
         assert not re.search(r"\b(place|submit|send)[ _-]?order|<form|method=.post", text, re.I), f.name
@@ -290,8 +291,12 @@ def test_page_in_browser(serve, tmp_path, fresh):
         assert res["tierLabels"] == ["ATP", "ATP Challenger", "WTA", "WTA 125"]
         p = res["paper"]
         assert p["liveHidden"] and p["rules"] == 4 and p["trades"] == 7 and p["locked"] == 1
-        assert res["paperSettled"] == 4 and p["lookbackRows"] == 0
+        assert res["paperSettled"] == 4 and p["lookbackRows"] == 0 and not p["chart"]
         assert any("No lookback yet" in n for n in p["notes"])
+        assert p["hypo"] == "Hypothetical, no orders"
+        # headline excludes the two start-up entries (entry_ts == paper.since); P4's other trade is still open
+        assert p["perContract"] == ["+82.0¢", "+6.6¢", "+8.0¢", "—"] and p["total"] == "+35.9¢"
+        assert p["startup"] == 2 and p["startupBadges"] == 2
         assert res["firstMarket"] == "Jaime Faria vs Nicolas Brunold"   # sorted by combined + fees
         f = res["filters"]
         assert f["search"] == {"rows": 1, "noMarket": 0, "label": "1 of 6 matches"}
@@ -357,6 +362,7 @@ def test_paper_tab_with_lookback(serve, tmp_path):
     for res in _run_check(serve(state, lbf)):
         p = res["paper"]
         assert p["lookbackRows"] == len(lb["rules"]) and p["days"] == 14 and p["notes"] == []
+        assert p["chart"] and p["chartLines"] == len(lb["rules"])
     lb["generated_at"] = _fresh(60)
     lbf.write_text(json.dumps(lb))
     for res in _run_check(serve(state, lbf)):
@@ -375,3 +381,60 @@ def test_paper_tab_without_paper_key(serve, tmp_path):
         p = res["paper"]
         assert p["rules"] == 0 and p["trades"] == 0
         assert any("isn't paper trading" in n for n in p["notes"])
+
+
+# ---------------------------------------------------------------- Scanner's own synthetic output
+
+def _scanner_samples(tmp_path) -> tuple[dict, dict]:
+    """state.paper and lookback.json produced by Scanner's code from its synthetic test fixtures
+    (tests/test_scanner_paper.py; no Kalshi data). If Scanner renames a field, these tests fail."""
+    import importlib.util
+    from datetime import timedelta
+
+    import pandas as pd
+
+    from swinglock.scanner import lookback
+
+    spec = importlib.util.spec_from_file_location("tsp", Path(__file__).parent / "test_scanner_paper.py")
+    tsp = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(tsp)
+    paper = tsp.live_book().summary()
+    rec = tmp_path / "recorded"
+    (rec / "quotes").mkdir(parents=True)
+    tsp.quotes_frame().to_parquet(rec / "quotes" / "2026-10-27.parquet", index=False)
+    tsp.matches_frame().assign(winner=pd.NA, settle_a=float("nan"), settle_b=float("nan")).to_parquet(
+        rec / "matches.parquet", index=False)
+    lb = lookback.run(tsp.CFG, rec, tmp_path / "paper", tsp.FakeClient(), now=tsp.T0 + timedelta(hours=8))
+    return json.loads(json.dumps(paper)), json.loads((tmp_path / "paper" / "lookback.json").read_text()) or lb
+
+
+def test_contract_matches_scanner_output(sample, tmp_path):
+    paper, lb = _scanner_samples(tmp_path)
+    mine = sample["paper"]
+    assert set(paper) == set(mine)
+    assert set(paper["rules"][0]) == set(mine["rules"][0]) == RULE_KEYS
+    assert set(paper["by_rule"][0]) == set(mine["by_rule"][0]) == BY_RULE_KEYS
+    assert set(paper["trades"][0]) == set(mine["trades"][0]) == TRADE_KEYS
+    assert [r["id"] for r in paper["rules"]] == [r["id"] for r in mine["rules"]]   # same frozen rules
+    mine_lb = json.loads(SAMPLE_LOOKBACK.read_text())
+    assert set(lb) == set(mine_lb) == LB_KEYS
+    assert set(lb["by_rule"][0]) == set(mine_lb["by_rule"][0]) == LB_RULE_KEYS
+    assert set(lb["by_day"][0]) == set(mine_lb["by_day"][0])
+
+
+@pytest.mark.skipif(not _node_playwright(), reason="needs node + playwright")
+def test_paper_tab_on_scanner_output(serve, tmp_path):
+    """The page on Scanner's real code output: P2's only trade is a start-up entry, so it's split out."""
+    paper, lb = _scanner_samples(tmp_path)
+    s = json.loads(SAMPLE_STATE.read_text())
+    s["generated_at"] = _now()
+    s["paper"] = paper
+    state = tmp_path / "state.json"
+    state.write_text(json.dumps(s))
+    lbf = tmp_path / "lb.json"
+    lbf.write_text(json.dumps(lb))
+    for res in _run_check(serve(state, lbf)):
+        p = res["paper"]
+        assert p["rules"] == 4 and p["trades"] == len(paper["trades"]) and p["startup"] == 1
+        assert p["perContract"] == ["+21.2¢", "—", "+15.0¢", "+11.9¢"] and p["total"] == "+16.0¢"
+        assert p["lookbackRows"] == 4 and p["chart"]

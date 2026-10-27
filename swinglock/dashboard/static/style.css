@@ -174,6 +174,37 @@ h3 { font-size: 14px; margin: 10px 0 0; }
 #view-paper section { margin-bottom: 18px; }
 #view-paper table.grid { margin-bottom: 14px; }
 .filters select { font-size: 13px; }
+.chips { display: flex; flex-wrap: wrap; gap: 6px; }
+.chip {
+  font: inherit; font-size: 12px; font-weight: 600; border: 1px solid var(--line); border-radius: 999px;
+  padding: 3px 10px; background: var(--surface); color: var(--muted); cursor: pointer;
+}
+.chip.on { background: var(--text); color: var(--bg); border-color: var(--text); }
+.badge.hypo { background: var(--info-bg); color: var(--info); }
+.grid tr.total td { font-weight: 600; background: var(--surface-2); }
+.grid tr.group td { font-size: 12px; color: var(--muted); background: var(--surface-2); font-weight: 600; }
+.grid tr.startup td { color: var(--muted); }
+.chart-card { background: var(--surface); border: 1px solid var(--line); border-radius: 8px; padding: 10px 12px; margin-bottom: 8px; }
+.daychart { width: 100%; height: auto; max-height: 260px; display: block; }
+.c-zero { stroke: var(--line); stroke-width: 1; }
+.c-lab { fill: var(--muted); font-size: 11px; font-variant-numeric: tabular-nums; }
+.daychart path { fill: none; stroke-width: 2; stroke-linejoin: round; }
+.c-s0 { stroke: #3b82f6; color: #3b82f6; fill: #3b82f6; }
+.c-s1 { stroke: #f59e0b; color: #f59e0b; fill: #f59e0b; }
+.c-s2 { stroke: #8b5cf6; color: #8b5cf6; fill: #8b5cf6; }
+.c-s3 { stroke: #14b8a6; color: #14b8a6; fill: #14b8a6; }
+.c-s4 { stroke: #ec4899; color: #ec4899; fill: #ec4899; }
+.c-s5 { stroke: #64748b; color: #64748b; fill: #64748b; }
+.daychart path.c-s0, .daychart path.c-s1, .daychart path.c-s2, .daychart path.c-s3, .daychart path.c-s4, .daychart path.c-s5 { fill: none; }
+.c-legend { display: flex; flex-wrap: wrap; gap: 4px 14px; font-size: 12px; margin-top: 6px; }
+.c-legend .k { fill: none; }
+.c-legend .k::before { content: ""; display: inline-block; width: 12px; height: 3px; border-radius: 2px; background: currentColor; margin-right: 6px; vertical-align: 3px; }
+.c-legend .k { color: var(--text); }
+.c-legend .k.c-s0::before { background: #3b82f6; } .c-legend .k.c-s1::before { background: #f59e0b; }
+.c-legend .k.c-s2::before { background: #8b5cf6; } .c-legend .k.c-s3::before { background: #14b8a6; }
+.c-legend .k.c-s4::before { background: #ec4899; } .c-legend .k.c-s5::before { background: #64748b; }
+.daydetails { margin-bottom: 14px; }
+.daydetails summary { cursor: pointer; font-size: 13px; color: var(--muted); margin: 4px 0 8px; }
 table.by-day { width: 100%; border-collapse: collapse; background: var(--surface); border: 1px solid var(--line); border-radius: 8px; overflow: hidden; font-size: 13px; }
 table.by-day th, table.by-day td { padding: 5px 8px; border-bottom: 1px solid var(--line); text-align: left; }
 table.by-day th { font-size: 12px; color: var(--muted); background: var(--surface-2); }

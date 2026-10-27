@@ -53,7 +53,14 @@ const VIEWPORTS = { phone: { width: 390, height: 844 }, laptop: { width: 1280, h
       const paperGrab = () => page.evaluate(() => {
         const box = document.getElementById("view-paper");
         return {
-          rules: box.querySelectorAll("table.paper-rules tbody tr:not(:has(td.empty))").length,
+          rules: box.querySelectorAll("table.paper-rules tbody tr:not(.total):not(.group):not(.startup):not(:has(td.empty))").length,
+          startup: box.querySelectorAll("table.paper-rules tr.startup").length,
+          total: box.querySelector("table.paper-rules tr.total td:nth-child(7)")?.textContent || "",
+          perContract: [...box.querySelectorAll("table.paper-rules tbody tr:not(.total):not(.group):not(.startup) td:nth-child(7)")].map((td) => td.textContent),
+          startupBadges: [...box.querySelectorAll("table.paper-trades .badge")].filter((b) => b.textContent === "start-up").length,
+          chart: !!box.querySelector("svg.daychart"),
+          chartLines: box.querySelectorAll("svg.daychart path, svg.daychart circle").length,
+          hypo: box.querySelector(".badge.hypo")?.textContent || "",
           trades: box.querySelectorAll("table.paper-trades tbody tr:not(:has(td.empty))").length,
           locked: box.querySelectorAll("table.paper-trades tr.hot-lock").length,
           lookbackRows: box.querySelectorAll("table.lookback tbody tr:not(:has(td.empty))").length,
@@ -67,10 +74,10 @@ const VIEWPORTS = { phone: { width: 390, height: 844 }, laptop: { width: 1280, h
       info.paper = await paperGrab();
       if (info.paper.overflow > 0) problems.push(`${tag} paper overflow ${info.paper.overflow}px`);
       if (outDir) await page.screenshot({ path: path.join(outDir, `dashboard-paper-${tag}.png`), fullPage: true });
-      if (await page.$("#view-paper select[aria-label='Trade status']")) {
-        await page.selectOption("#view-paper select[aria-label='Trade status']", "settled");
+      if (await page.$("#view-paper .chip[data-filter='settled']")) {
+        await page.click("#view-paper .chip[data-filter='settled']");
         info.paperSettled = (await paperGrab()).trades;
-        await page.selectOption("#view-paper select[aria-label='Trade status']", "all");
+        await page.click("#view-paper .chip[data-filter='all']");
       }
       await page.click('.views button[data-view="live"]');
 
