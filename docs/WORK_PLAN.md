@@ -225,11 +225,13 @@ The owner asked for a public phone page like the soccer app, refreshed every 3 h
     listed when paper trading began, entered at their current price) are reported on a separate line and excluded from the headline.
   - Backtest confirmed the rules match its swing sim. Dashboard **Paper tab merged** (#118; `contracts` per rule from #119): P&L by rule
     with per-contract figures, start-up entries split out, trades list, nightly lookback at 0¢/1¢ with a cumulative chart. 281 tests.
-  - Owner update on the server: `cd /opt/swinglock && git pull && bash deploy/bootstrap.sh` (installs the lookback timer).
+  - **Running on the server since 2026-10-27 17:34 UTC** (owner re-ran bootstrap; Paper tab checked from the owner's screenshot).
+    First lookback ~04:00 UTC 10-28.
 - **Incident 2026-10-27 (Scanner): Kalshi-derived paper ledger pushed to the public repo.** Commit ae08bf5 on `team/scanner` holds
   `data/paper/ledger.jsonl` (167 lines from the dry run). The file was removed in e61df0d and `data/paper/` is gitignored, but the
-  commit stays reachable while the branch exists. No PR from that branch has been merged, and the repo has no forks. Fix: the owner
-  deletes `team/scanner` on GitHub, then Scanner recreates it from main. The work was redone on the clean `team/scanner-paper` (#116,
+  commit stays reachable while the branch exists. No PR from that branch has been merged, and the repo has no forks. **Owner deleted
+  `team/scanner` 2026-10-27**; Lead checked that no branch or PR ref contains ae08bf5. GitHub still serves the orphaned commit by its full
+  SHA until its garbage collection (not linked from anywhere); a full purge needs GitHub Support. Scanner recreates the branch from main. The work was redone on the clean `team/scanner-paper` (#116,
   ancestry checked). Rule for every role: stage explicit paths, never `git add -A`/`.` with data present; `tests/test_scanner_paper.py`
   fails if anything under `data/` is tracked.
   - Dashboard fixes: the arb tile only counts arbs above the alert threshold; WTA 125 gets its own label.
