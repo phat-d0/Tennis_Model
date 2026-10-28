@@ -102,6 +102,16 @@ needs a new dated entry, written before the results exist.
 that adds them. It is recorded as that rule's `since` (in `paper.rules`). Their start-up entries
 (entry_ts == the rule's `since`) are reported apart, under the same reading rule as P1–P4.
 
+**Note 2026-10-28 (no rule change; Lead decision).** E1 is effectively consumed by the placeholder
+listing book. When a match is first listed, Kalshi's book holds placeholder offers (low bids, so both
+asks are high, combined ≈ $1.84 median per Data). No rule buys on them: the asks are far above every
+entry limit. But that observation *is* the match's first pre-match observation, so its E1 is used up
+with no entry. **Live C entries are therefore E2 apart from the start-up batch** (matches already listed
+at a deploy, with real books, reported separately). P1–P4 are unaffected; they check every observation.
+This is cashout.py's registered definition too, so live and lookback stay consistent. Backtest's E1r
+(the first *real* pre-match book) is a post-hoc, descriptive amendment there and doesn't change the
+live engine.
+
 ## How it runs
 **Live forward test:** `swinglock/scanner/paper.py`, called by the scanner loop every poll.
 - At each poll, each rule either opens a trade on a match (once per rule and match, ever) or checks
