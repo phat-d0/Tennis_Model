@@ -65,7 +65,7 @@ Each role also owns its own `tests/test_<area>*.py`.
    - **In the same PR as the work,** add your own lines to `CLAUDE.md`:
      - a Changelog entry: date, what changed, PR number, the key numbers and tests passing;
      - any new *verified* Key fact or Decision. Mark owner decisions "(owner)".
-   - **Update your role's row** in the Master plan at the top of `docs/WORK_PLAN.md`, and your own status
+   - **Update your role's block** in the Master plan at the top of `docs/WORK_PLAN.md`, and your own status
      lines further down.
    - **Append or edit your own lines only;** never rewrite another role's.
    - **Owner rules, team rules and plan order stay with the Lead.** The Owner's standing rules, these Team
@@ -211,6 +211,11 @@ Since phat-d0/Tennis_Model#116 also: `min_arb_profit_per_contract` (the alert th
   read API (WS needs a signed key), taker coefficient 0.0695. Walkover settlement differs
   (US: last fair price; intl: 50-50), so check rule mismatches before calling a cross-venue gap an arb.
   Details: docs/research/other_venues.md (some facts from search summaries; re-verify before coding).
+- Polymarket intl for the page (checked live 2026-10-26, Upsets): gamma `/events?tag_id=864&active=true&closed=false`
+  (~7 pages of 100) lists one event per match, titled "City: A vs B", `seriesSlug` atp / wta / itf / *-doubles, with
+  **no tier field**. The match-winner market is `sportsMarketType: "moneyline"` (outcomes = the two players, in token
+  order); filter on `acceptingOrders`, since played events can stay `active`. CLOB `POST /books` takes many tokens per
+  call and **answers 403 without a User-Agent**.
 - The Odds API (the-odds-api.com): `draftkings` is the DraftKings **Sportsbook** (region `us`), not
   DK Predictions; region `us_ex` lists Kalshi, Polymarket, Novig, ProphetX, BetOpenly. Tennis sport
   keys and credit costs: docs/research/odds_api.md. **Tennis coverage is tour-level only** (one key
@@ -274,6 +279,11 @@ Since phat-d0/Tennis_Model#116 also: `min_arb_profit_per_contract` (the alert th
   the test month; positive-folds check at the worst slippage, and total OOS P&L > 0 at every
   slippage; CI = match-clustered bootstrap. Per-trade CSVs in `reports/` are gitignored (Kalshi
   data is private); only markdown write-ups are committed.
+- 2026-10-26 (Lead, after #108): the public page and its Portfolio use the **power de-vig** everywhere (fair chance,
+  line rule, expected value, CLV), as every study does (phat-d0/Tennis_Model#112).
+- 2026-10-26: Challenger / WTA 125 tier on the page = Sackmann level-C names ("Brest CH", "Queretaro 125"; cities that
+  also host a tour-level event of that tour dropped) plus the curated `EXTRA` list in `upsets/polymarket.py`. Unknown
+  events are left out and logged, never guessed (phat-d0/Tennis_Model#111).
 
 ## Changelog
 - 2026-10-24: Project scaffold, core math + tests (12 passing), config, schema, CLAUDE.md.
@@ -394,6 +404,19 @@ Since phat-d0/Tennis_Model#116 also: `min_arb_profit_per_contract` (the alert th
   and backfill defaults. The page model is now tuned Elo + serve/return (#106). Line-shopping drawdown = luck on a thin
   edge (#108); the Portfolio switches to the power de-vig. Challengers come from Polymarket intl, owner OK'd its terms
   (#105, #107). Server live 2026-10-27 (owner set-up done).
+- 2026-10-26: Job B, Elo upgrades vs Pinnacle (phat-d0/Tennis_Model#103, `reports/upsets_elo_plus.md`): no edge. On the same
+  5,686 matches, log loss is Pinnacle 0.5552, DK 0.5572, current Elo 0.5859, and the best variant (+fatigue+serve) 0.5755.
+  Betting the edge at DK walk-forward loses 11.5–14.6% in every variant (CLV −9% to −10.5%). A QF-as-qualifying lookahead in
+  the fatigue feature was caught and fixed. 244 tests.
+- 2026-10-26: Page model = tuned Elo + serve/return (owner-approved; phat-d0/Tennis_Model#106). Portfolio model backtest
+  3,097 bets, −12.4% vs −5.9% expected. Line-shopping drawdown (#108, `reports/upsets_line_shop_drawdown.md`): the run-up was
+  +51u above expected (z +1.4), the drawdown −52u (z −1.5), and overall realized = expected (+30u). 246 tests.
+- 2026-10-26: Polymarket Challenger / WTA 125 block in `odds.json` (phat-d0/Tennis_Model#111, `upsets/polymarket.py`): 12
+  requests per build, no key, 0 credits. Live: 108 matches across 8 events, 69 thin, model chance for 85. A NaN-surface bug
+  was fixed. 260 tests.
+- 2026-10-26: Power de-vig on the page and Portfolio (phat-d0/Tennis_Model#112). Backtest: line 205 bets +9.2% vs +8.0%
+  expected (was 328, +9.2% vs +9.3% proportional); model −12.7% vs −10.8%; dogs −10.4% vs −12.0%. Private Tennis Backtest
+  Explorer (claude.ai artifact, owner-only; link in WORK_PLAN): every bet for 21 strategies. 252 tests.
 - 2026-10-27 (owner): no manual positions; the server paper-trades pre-registered swing-lock rules live and replays them nightly
   over recorded books (in progress, Scanner/Dashboard).
 - 2026-10-27: Paper engine merged (phat-d0/Tennis_Model#116): 4 frozen rules in `swinglock/scanner/paper.py` (`RULES`,
