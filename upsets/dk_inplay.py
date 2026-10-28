@@ -294,6 +294,8 @@ def window(q: pd.DataFrame, minutes: pd.Series | None = None) -> pd.DataFrame:
         c2 = ~settled2.astype(int).groupby(q["match"]).cummax().astype(bool)
         d2 = q["ts"] <= q["close_start"] + pd.Timedelta(hours=MAX_LIVE_H)
         q["live_close"] = a2 & b & c2 & d2
+        # (a‴) causal: also require the snapshot's own listed start to have stopped leap-frogging (<= its time)
+        q["live_started"] = q["live_close"] & (q["listed_start"] <= q["ts"])
     if minutes is not None:
         mm = q["match"].map(minutes)
         q["live_minutes"] = q["live"] & mm.notna() & (q["ts"] <= q["listed_start"] + pd.to_timedelta(mm + 30, unit="m"))
@@ -326,12 +328,19 @@ def coverage(w: pd.DataFrame, minutes: pd.Series, step_min: int = 10, slack_min:
     q = quotes(m)
     q["close_start"] = q["match"].map(m["commence"])
     q = window(q, mins)
+    # Pinnacle's own close (last quote >= 5 min before the close's listed start) vs each snapshot, by home side:
+    # real in-play prices move, pre-match ones mostly don't. Prices only, no results.
+    ph = (1 / q["pinnacle_home"]) / (1 / q["pinnacle_home"] + 1 / q["pinnacle_away"])
+    pre = q[q["ts"] <= q["close_start"] - pd.Timedelta(minutes=5)].assign(ph=ph)
+    p0 = pre.groupby("match")["ph"].last()
+    q["pin_moved"] = (ph - q["match"].map(p0)).abs() > 0.05
     per = q.groupby("match").agg(live=("live", "any"), live_close=("live_close", "any"),
+                                 live_started=("live_started", "any"),
                                  live_minutes=("live_minutes", "any"),
                                  live_final=("live_final", "any"), final_start=("listed_start", "last"),
                                  last_ts=("ts", "max"))
     m = m.join(per)
-    cols = ["live", "live_close", "live_minutes", "live_final"]
+    cols = ["live", "live_close", "live_started", "live_minutes", "live_final"]
     m[cols] = m[cols].fillna(False).astype(bool)
     m["finished"] = m["finished_at"].notna()
     m["postponed"] = m["final_start"].notna() & (m["final_start"] > m["last_ts"] - pd.Timedelta(minutes=LIVE_AFTER_MIN))
@@ -345,6 +354,16 @@ def coverage(w: pd.DataFrame, minutes: pd.Series, step_min: int = 10, slack_min:
                  f"{int(g['postponed'].sum()):,} |")
     pp = m[m["postponed"]].assign(commence=lambda x: x["final_start"])
     plan_credits = credits(pp, step_min, slack_min) if len(pp) else 0
+    L += ["", "| Season | Matches | (a) listed start in that snapshot | (a′) close's listed start | "
+          "(a‴) (a′) + listing stopped moving | (a‴) / (a′) | Pinnacle moved > 5 pp: (a) / (a′) / (a‴) |",
+          "|---|---|---|---|---|---|---|"]
+    q["season"] = q["match"].map(m["season"])
+    for season, g in m.groupby("season"):
+        qs = q[q["season"] == season]
+        sh = [qs.loc[qs[v], "pin_moved"].mean() for v in ("live", "live_close", "live_started")]
+        L.append(f"| {season} | {len(g):,} | {int(g['live'].sum()):,} | {int(g['live_close'].sum()):,} | "
+                 f"{int(g['live_started'].sum()):,} | {g['live_started'].sum() / max(g['live_close'].sum(), 1):.0%} | "
+                 + " / ".join(f"{x:.0%}" for x in sh) + " |")
     short = m[m["missing"] > 0]
     L += ["", f"Coverage of the real (close) event: {len(short):,} of {len(m):,} matches need snapshots we never pulled "
           f"(the pull's start/stop followed the name-matched listing); re-walking them costs {10 * len(set(misses)):,} "
