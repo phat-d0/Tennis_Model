@@ -531,6 +531,12 @@ Since phat-d0/Tennis_Model#116 also: `min_arb_profit_per_contract` (the alert th
   few-matches (14¢), and 50–63% of entries cost over 50¢. Reason `inactive` not observed (by construction). E1r (post hoc,
   not counted): formed pre-match book for 98.5% / 99.5% of matches; take-profit WF, DOG50, MISMATCH50 and U all FAIL in both
   groups; every take-profit Δ is negative (−2¢ to −6¢ per sale ATP/WTA at 0¢). No conclusion changes. Report only; 346 tests.
+- 2026-10-28 (Backtest): **fallen-favourite study pre-registered and built** (owner, via the Lead; docs/edge_favdip.md,
+  `swinglock/backtest/favdip.py`, CLI `python -m swinglock.backtest.favdip --data <dir> [--sets <dir>/sets.parquet]`).
+  Favourite = higher ask at the last formed pre-match row (ask_a + ask_b ≤ $1.05), bands 60–80 / 80–97 (50–60 context).
+  START (buy then) vs DIP50 (first formed live row with its ask ≤ 50¢; DIP45/40 descriptive), held to settlement; DIP50
+  gated per band as a fixed monthly rule. Expected: START ≈ −2% to +1%, DIP50 −3% to −6%, FAIL. Aggregates only; not run
+  yet (Data runs it). 9 new tests (pandas 3.0.5 and 3.1.0).
 - 2026-10-28 (Data): cash-out study run locally on main e41c055 (with #130); 0 Kalshi requests, 308 tests passing.
   g0 (4,695 ATP/WTA) and g12 (8,349 Challenger/WTA 125): every gate FAILs. DOG50 at 1¢: g0 −$226.07 (ROI −18.8%, 2/7 months +),
   g12 −$641.46 (−28.7%, 0/7); DOGL g0 1/6, g12 0/6 folds +; E1/E2 FAIL on both. bid(A) = 1 − ask(B) exactly (max gap 0).

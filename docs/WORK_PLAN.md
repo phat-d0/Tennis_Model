@@ -32,8 +32,9 @@ conflict (git merges edits that touch different blocks).
 
 - **Backtest.** Done: cash-out study complete, every gate FAILs (`reports/backtest_cashout.md`): DOG50, DOGL, take-profit,
   MISMATCH50, MISMATCH50-U (unranked players are often the favourite, not a dog); E1 invalid (listing-book placeholders),
-  E1r robustness check (post hoc, not counted) also FAILs everywhere. Next: re-run on recorded order books when the Lead
-  asks. Waiting on: nothing.
+  E1r robustness check (post hoc, not counted) also FAILs everywhere. Now: fallen-favourite study (owner; docs/edge_favdip.md,
+  `favdip.py`) pre-registered and built; expected FAIL. Next: write up Data's run in `reports/backtest_favdip.md`.
+  Waiting on: the PR merge, then Data's run on g0/g12.
 
 - **Scanner.** Now: paper trading live on the VPS since 2026-10-27 17:34 UTC; cash-out group C0–C4 (owner 2026-10-28)
   built and pre-registered, PR #132. Next: after merge the owner updates the server; watch 429s, the 04:00 UTC lookback and
