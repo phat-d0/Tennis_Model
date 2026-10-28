@@ -31,8 +31,9 @@ conflict (git merges edits that touch different blocks).
   doesn't matter for dogs (±1¢ vs hold), and the dog entry loses 11–29%. Next: re-run the cash-out and swing studies on
   recorded order books once the VPS recorder has history (real depth). Waiting on: recorder extracts.
 
-- **Scanner.** Now: paper trading live on the VPS since 2026-10-27 17:34 UTC. Next: watch 429s and the 04:00 UTC lookback;
-  fixes only. Waiting on: the owner's health-check paste.
+- **Scanner.** Now: paper trading live on the VPS since 2026-10-27 17:34 UTC; cash-out group C0–C4 (owner 2026-10-28)
+  built and pre-registered, PR #132. Next: after merge the owner updates the server; watch 429s, the 04:00 UTC lookback and
+  the C rules' first exits. Waiting on: Dashboard's contract-test update for the new keys; the owner's health-check paste.
 
 - **Dashboard.** Now: Paper tab live (#118, #121); first live screenshot checked 2026-10-27 (renders as designed).
   Next: check the lookback panel after the first 04:00 UTC run. Waiting on: an owner screenshot of the lookback.

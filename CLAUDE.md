@@ -440,6 +440,14 @@ Since phat-d0/Tennis_Model#116 also: `min_arb_profit_per_contract` (the alert th
   own row of WORK_PLAN's new **Master plan** (Team rule 7); the Lead keeps the plan's priority order and the owner rules.
   Cash-out study pre-registered (phat-d0/Tennis_Model#123, docs/edge_cashout.md): take-profit Δ vs hold on
   selection-neutral entries, plus the owner's DOG50 (dog < 20¢, cash out at 50¢); expected FAIL.
+- 2026-10-28 (owner: "add cash-out as a new portfolio to track live paper trade"): Scanner adds a **cash-out group** to the
+  paper engine (phat-d0/Tennis_Model#132). C0-dog20-hold (control), C1-dog20-sell50 (DOG50), C2-dog30-sell50, plus the owner's
+  same-day "50-50 or even winning" C3-dog20-sell60 and C4-dog20-sell70, all pre-registered in docs/scanner_paper.md before any
+  cash-out result. Semantics = `backtest/cashout.py` (E1/E2 entries, sell all at the bid when the net bid ≥ L with size); the
+  lookback calls `simulate_cashout` with each rule's level (70¢ is on #130's dog exit-level curve), and the live engine equals it
+  for all five rules. Expected Δ C1 vs C0 −1 to −3¢/contract. Additive contract: `group`, per-rule `since`, `exit` event, status `exited`.
+  Live dry run (C0–C2): 60 matches, C0/C1 12 and C2 24 start-up entries, 20 requests in 36 s. 316 tests pass + 2 Dashboard
+  contract tests that need its update.
 - 2026-10-28: Portfolio ledger restore (phat-d0/Tennis_Model#129, `upsets/site.py` `restore`, Lead-approved). The paper ledger
   and the month's page spend lived only in the Actions cache. Each build now merges the live page's `portfolio.json` (by
   trade id; the cache's copy wins) and takes this month's `used_this_month` from its `odds.json`, keeping the larger value.
