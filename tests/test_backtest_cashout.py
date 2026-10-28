@@ -5,8 +5,10 @@ import pandas as pd
 import pytest
 
 from swinglock.backtest.align import align
-from swinglock.backtest.cashout import (RULES, cash_paths, fee_vec, identity_check, main, match_months,
-                                        simulate_cashout, summarize, walk_forward_cashout)
+from swinglock.backtest.cashout import (RULES, cash_paths, dog_positions, dog_summary, fee_vec, fixed_rule_gate,
+                                        identity_check, main, match_months, simulate_cashout, summarize,
+                                        tag_set_split, walk_forward_cashout)
+from swinglock.backtest.walkforward import wf_settings
 from swinglock.fees import FeeModel
 from swinglock.schema import MATCH_COLUMNS, QUOTE_COLUMNS, conform
 
@@ -160,9 +162,73 @@ def test_cli_end_to_end(tmp_path):
     q.to_parquet(data / "quotes.parquet")
     out = tmp_path / "out"
     assert main(["--data", str(data), "--out", str(out)]) == 0
-    for f in ("cashout_summary.csv", "cashout_bands.csv", "cashout_exit_phase.csv", "cashout_positions.csv",
-              "cashout_wf_gate_E1.csv", "cashout_wf_folds_E2.csv", "cashout_summary.md"):
+    for f in ("cashout_summary.csv", "cashout_bands.csv", "cashout_exit_phase.csv", "cashout_set_split.csv",
+              "cashout_dog50.csv", "cashout_dog30_band.csv", "cashout_dog50_gate.csv", "cashout_wf_gate_E1.csv",
+              "cashout_wf_folds_E2.csv", "cashout_summary.md"):
         assert (out / f).exists()
+    assert not (out / "cashout_positions.csv").exists()                  # aggregates only
     md = (out / "cashout_summary.md").read_text()
-    assert "Identity check" in md and "Walk-forward gate, E1" in md
+    assert "Identity check" in md and "Walk-forward gate, E1" in md and "DOG50" in md and "Set end" in md
     assert main(["--data", str(tmp_path / "none"), "--out", str(out)]) == 0
+
+
+# ---- amendment 2026-10-28: level rules, set split, DOG50 --------------------------
+
+def test_level_rule_is_take_profit_only():
+    df = positions(book(PATH), matches("M1"))
+    r = pick(df, rule="L=50c")
+    # A all-in 0.417 < 0.50; net >= 0.50 first at the 0.55 live bid: 0.55 - 0.018 = 0.532
+    assert r["exit_ts"] == t(200) and r["exit_value"] == pytest.approx(5.50 - 0.18)
+    assert not pick(df, rule="L=40c")["locked"]                          # bought above 40c: hold
+    assert not pick(df, side="B", rule="L=60c")["locked"]                # B all-in 0.637 >= 0.60: hold
+    assert len(RULES) == 12
+
+
+def test_set_split_tags():
+    df = positions(book(PATH, base=T0), matches("M1"))
+    sets = pd.DataFrame({"match_id": ["M1"], "set_no": [1], "close_time": [t(200 + 150)]})
+    out = tag_set_split(df, sets)
+    lv = out[(out["mode"] == "E1") & (out["side"] == "A")].set_index("rule")["set_split"]
+    assert lv["T=5c"] == "pre" and lv["L=50c"] == "set_end"             # live exit 150 s before set close
+    far = tag_set_split(df, sets.assign(close_time=[t(200 + 400)]))
+    assert far.loc[(far["mode"] == "E1") & (far["side"] == "A") & (far["rule"] == "L=50c"), "set_split"].iloc[0] \
+        == "mid_set"
+    none = tag_set_split(df, sets.assign(match_id=["OTHER"]))
+    assert set(none.loc[none["exit_phase"] == "live", "set_split"]) == {"no_set_data"}
+    assert set(tag_set_split(df, None).loc[lambda d: d["exit_phase"] == "live", "set_split"]) == {"no_set_data"}
+    assert out.loc[~out["locked"], "set_split"].isna().all()
+
+
+# A dog at 0.10 pre-match rises to a 0.55 bid in play; B wins.
+DOG = [(0, 0.10, 0.08, 0.92, 0.90), (60, 0.30, 0.28, 0.72, 0.70), (200, 0.57, 0.55, 0.45, 0.43)]
+
+
+def test_dog50_positions_and_summary():
+    df = positions(book(DOG), matches("M1"))
+    dog = dog_positions(df)
+    assert list(dog["side"]) == ["A"] and list(dog["dog_band"]) == ["10-20c"] and list(dog["mode"]) == ["E1"]
+    s = dog_summary(dog, ("mode",)).iloc[0]
+    # entry 1.00 + fee 0.07 = 1.07; sold at 0.55: 5.50 - 0.18 = 5.32; hold = -1.07 (B wins)
+    assert s["triggers"] == 1 and s["pnl_pc"] == pytest.approx((5.32 - 1.07) / 10)
+    assert s["roi"] == pytest.approx((5.32 - 1.07) / 1.07) and s["delta_pc"] == pytest.approx(0.532)
+    assert dog_positions(df, 0.30).equals(dog)                           # B at 0.92 is no dog either way
+
+
+def test_dog50_fixed_rule_gate():
+    qs, ms = [], []
+    for k in range(5):
+        for i in range(8):
+            base = pd.Timestamp(f"2026-0{k + 1}-{i + 1:02d} 12:00", tz="UTC")
+            qs.append(book(DOG, f"M{k}-{i}", base))
+            ms.append(matches(f"M{k}-{i}", start=base + pd.Timedelta(seconds=100)))
+    m, q = pd.concat(ms, ignore_index=True), pd.concat(qs, ignore_index=True)
+    paths = cash_paths(align(q, m), m, CFG)
+    by = {s: dog_positions(simulate_cashout(paths, CFG, s)) for s in (0.0, 0.01)}
+    g = fixed_rule_gate(by, match_months(paths), wf_settings({}))
+    assert g.passed, g.reasons
+    assert list(g.gate["months"]) == [5, 5] and list(g.gate["triggers"]) == [40, 40]
+    lose = {s: d.assign(rule_pnl=-1.0) for s, d in by.items()}
+    bad = fixed_rule_gate(lose, match_months(paths), wf_settings({}))
+    assert not bad.passed and any("0 of 5 months" in r for r in bad.reasons)
+    few = fixed_rule_gate({s: d.iloc[:10] for s, d in by.items()}, match_months(paths), wf_settings({}))
+    assert any("triggers; need >= 30" in r for r in few.reasons)
