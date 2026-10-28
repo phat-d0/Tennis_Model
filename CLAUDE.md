@@ -476,11 +476,17 @@ Since phat-d0/Tennis_Model#116 also: `min_arb_profit_per_contract` (the alert th
   that started ≥ 6 h before the match's day began. A test flips later results and checks the ranks don't move.
   Unmatched names are left blank. Synthetic check on the real archive: ~99.6% of names matched, 38 s per 3,000 matches,
   Sinner #1, Alcaraz #2. Data runs it; nothing committed. 341 tests (pandas 2 and 3.1).
+- 2026-10-28: Live Elo rank table for the VPS paper engine (phat-d0/Tennis_Model#144): `upsets.elo_ranks.current()` and CLI
+  `python -m upsets.elo_ranks current --sackmann <archive> [--results <matches.parquet>] --out data/paper/elo_ranks.json`
+  (atomic write). Per tour: active players by rank, with key (name_key), name, sackmann_id, elo, n and last_played,
+  plus generated_at, sackmann_through and results_through. Loading from 2010 peaks at 887 MB RSS and takes 17 s
+  (1990: 1,346 MB, 31 s); top-300 ranks differ from the 1990 load by a median of 2–4 places. Scanner owns the nightly job
+  (Lead, pending the MISMATCH50 backtest). 120-day staleness skip pre-registered in the PR. 342 tests.
 - 2026-10-28: Elo rank export follow-ups. #142 put the lagged pool (6 h replay), integer ranks and the flip test on main
   (#141 had merged before them). phat-d0/Tennis_Model#145 adds `reason_a`/`reason_b` for MISMATCH50-U (owner: account for unranked players):
   null when ranked, else `unmatched` (name not found), `few_matches` (< min_n rated matches; elo/n keep the provisional
   rating) or `inactive` (empty active pool on the match day; a player's own activity isn't required for a rank, so this
-  is rare). rank_a/rank_b unchanged. The CLI summary prints the reason counts. 6 rank tests; 343 tests (pandas 2 and 3.1).
+  is rare). rank_a/rank_b unchanged. The CLI summary prints the reason counts. 7 rank tests; 344 tests (pandas 2 and 3.1).
 - 2026-10-28 (Backtest): cash-out study code merged (phat-d0/Tennis_Model#125): `swinglock/backtest/cashout.py`, CLI
   `python -m swinglock.backtest.cashout --data <dir> [--sets <dir>/sets.parquet]`. Dated amendment (before any run):
   Level exits (12 gate rules), DOG50 fixed-rule gate on absolute P&L, DOG30 descriptive, set-end split (descriptive),

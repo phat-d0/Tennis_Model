@@ -139,6 +139,51 @@ def ranks(matches: pd.DataFrame, sack: pd.DataFrame, active_days: int = ACTIVE_D
     return out.reset_index(drop=True)
 
 
+def current(sack: pd.DataFrame, results: pd.DataFrame | None, now: pd.Timestamp,
+            active_days: int = ACTIVE_DAYS, min_n: int = MIN_N) -> dict:
+    """The live rank table for the VPS paper engine (data/paper/elo_ranks.json): every active player's Elo
+    rank per tour as of `now`, from Sackmann results plus the recorder's settled Kalshi matches (`results`:
+    a matches table with series, scheduled_start, player_a/b, settle_a; settled after Sackmann ends).
+    Same ratings and pool rule as `ranks`. Players are keyed by upsets.names.name_key for the scanner's lookup.
+    Each entry carries last_played, so a consumer can skip stale ratings."""
+    players = player_table(sack)
+    km = results if results is not None else pd.DataFrame(columns=["match_id", "series", "scheduled_start",
+                                                                   "player_a", "player_b", "settle_a"])
+    km = km[pd.to_datetime(km["scheduled_start"], utc=True) < now] if len(km) else km
+    km = ke.kalshi_matches(km, players, tours=SERIES) if len(km) else None
+    if km is not None and len(km):
+        rows, _ = ke.timeline(sack, km)
+    else:
+        s = sack.copy()
+        s["time"] = ke.round_monotone(s.assign(time=ke.estimated_time(s)))
+        s["wkey"], s["lkey"] = s["winner_id"].astype(str), s["loser_id"].astype(str)
+        rows = s.sort_values("time", kind="stable")[["tour", "time", "wkey", "lkey", "comment"]].reset_index(drop=True)
+    rating, played, last = defaultdict(lambda: elo.START), defaultdict(int), {}
+    days = pd.to_datetime(rows["time"]).to_numpy().astype("datetime64[D]")
+    walk = rows["comment"].fillna("").str.lower().str.startswith("walk").to_numpy()
+    for t, w, l, d, wk_ in zip(rows["tour"].to_numpy(), rows["wkey"].to_numpy(), rows["lkey"].to_numpy(), days, walk):
+        if not wk_:
+            _update(rating, played, last, (t, w), (t, l), d)
+    today = np.datetime64(now.tz_convert("UTC").tz_localize(None).date(), "D")
+    names = dict(zip(zip(players["tour"], players["id"].astype(str)), players["name"]))
+    tours = {}
+    for t in ("atp", "wta"):
+        act = [(p, r) for (tt, p), r in rating.items()
+               if tt == t and played[(tt, p)] >= min_n and last.get((tt, p), today) >= today - np.timedelta64(active_days, "D")]
+        act.sort(key=lambda x: -x[1])
+        out = []
+        for i, (p, r) in enumerate(act):
+            name = names.get((t, p)) or (p[2:] if str(p).startswith("k:") else None)
+            out.append({"key": ke.name_key(name) if name else None, "name": name,
+                        "sackmann_id": None if str(p).startswith("k:") else str(p), "rank": i + 1,
+                        "elo": round(float(r), 1), "n": int(played[(t, p)]), "last_played": str(last[(t, p)])})
+        tours[t] = out
+    return {"generated_at": now.strftime("%Y-%m-%dT%H:%M:%SZ"),
+            "sackmann_through": sack["date"].max().strftime("%Y-%m-%d"),
+            "results_through": None if km is None or not len(km) else km["start"].max().strftime("%Y-%m-%d"),
+            "min_n": min_n, "active_days": active_days, "tours": tours}
+
+
 def summary(r: pd.DataFrame) -> str:
     lines = [f"[elo_ranks: {len(r):,} matches]"]
     for (series, _), g in r.groupby(["series", "tour"]):
@@ -152,6 +197,10 @@ def summary(r: pd.DataFrame) -> str:
 
 
 def main(argv=None) -> None:
+    import sys
+    argv = sys.argv[1:] if argv is None else argv
+    if argv and argv[0] == "current":
+        return main_current(argv[1:])
     ap = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     ap.add_argument("--data", type=Path, action="append", required=True, help="dir(s) with matches.parquet")
     ap.add_argument("--sackmann", type=Path, required=True)
@@ -168,6 +217,26 @@ def main(argv=None) -> None:
     print(summary(r))
     print(f"[written: {a.out}]")
 
+
+def main_current(argv) -> None:
+    """python -m upsets.elo_ranks current --sackmann <archive> [--results <matches.parquet> ...] --out elo_ranks.json"""
+    import json
+    ap = argparse.ArgumentParser(prog="upsets.elo_ranks current")
+    ap.add_argument("--sackmann", type=Path, required=True)
+    ap.add_argument("--results", type=Path, action="append", default=[], help="matches.parquet with settled results")
+    ap.add_argument("--start", type=int, default=2010, help="first Sackmann season (2010 keeps RAM near 1 GB)")
+    ap.add_argument("--out", type=Path, required=True)
+    a = ap.parse_args(argv)
+    sack = sackmann.load(a.sackmann, start=a.start, lower=True)
+    res = pd.concat([pd.read_parquet(p) for p in a.results], ignore_index=True).drop_duplicates("match_id") \
+        if a.results else None
+    doc = current(sack, res, pd.Timestamp.now(tz="UTC"))
+    a.out.parent.mkdir(parents=True, exist_ok=True)
+    tmp = a.out.with_suffix(".tmp")
+    tmp.write_text(json.dumps(doc))
+    tmp.replace(a.out)   # atomic, like state.json
+    print(f"[elo_ranks current: atp {len(doc['tours']['atp']):,}, wta {len(doc['tours']['wta']):,} active players; "
+          f"sackmann through {doc['sackmann_through']}, results through {doc['results_through']}]")
 
 if __name__ == "__main__":
     main()
