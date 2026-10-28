@@ -39,6 +39,17 @@ BOOKS = ("draftkings", "pinnacle")
 INPLAY_CACHE = Path("data/raw/odds_api/inplay")
 
 
+def close_event_ids(t: pd.DataFrame, sack: pd.DataFrame) -> pd.Series:
+    """sack_row -> the event id dk_history.collect priced the match from (same join as collect)."""
+    from . import dk_history as dh
+    snaps = dh.all_snapshots(dh.CACHE)
+    ev = pd.concat([dh.load_events(dh.events_schedule(t, 24.0)), dh.snapshot_events(snaps, t)], ignore_index=True)
+    ev = ev.sort_values("listed").drop_duplicates(["key", "event_id"], keep="last")
+    j = dh.join_events(ev, sack)
+    need = j[(j["sack_row"] >= 0) & (j["round_idx"] <= 2)].drop_duplicates("sack_row")
+    return need.set_index("sack_row")["event_id"]
+
+
 def windows(priced: pd.DataFrame, sack: pd.DataFrame) -> pd.DataFrame:
     """One row per priced match: key, commence (UTC), dur (minutes), season, level, tourney_id, players."""
     s = sack.loc[priced["sack_row"].to_numpy()].reset_index(drop=True)
@@ -108,10 +119,13 @@ def walk(w: pd.DataFrame, fetch, step_min: int = 10, slack_min: int = 180) -> di
     """Walk each key's snapshot times in order; a time is fetched only while some match of that key is in its
     live window and not yet finished. A match is finished after GONE_SNAPSHOTS consecutive snapshots (each at
     least MIN_LIVE_MIN after its commence) without its event; a match whose event is never found (by player
-    names) is dropped the same way, since its prices can't be used. fetch(key, when_iso) -> snapshot dict, or None to
+    names) is dropped the same way, since its prices can't be used. A match with a `close_event_id` (the event its DK
+    close came from, joined to Sackmann by player ids) uses that event; player names only find the event otherwise
+    (DK can list duplicate events for one pairing, and a stale duplicate may be moved a day later). fetch(key, when_iso) -> snapshot dict, or None to
     stop (cap reached). -> {"fetched", "stopped", "matches": per-match frame}."""
     w = w.reset_index(drop=True)
-    st = pd.DataFrame({"event_id": pd.Series([None] * len(w), dtype=object), "snaps": 0, "gone": 0,
+    known = w["close_event_id"] if "close_event_id" in w else pd.Series([None] * len(w), index=w.index)
+    st = pd.DataFrame({"event_id": known.astype(object).where(known.notna(), None), "snaps": 0, "gone": 0,
                        "finished_at": pd.Series([pd.NaT] * len(w), dtype="datetime64[ns, UTC]"),
                        "first_seen": pd.Series([pd.NaT] * len(w), dtype="datetime64[ns, UTC]")}, index=w.index)
     fetched, stopped = 0, False
@@ -383,6 +397,8 @@ def main(argv=None) -> None:
     t = dh.tournaments(sack, dh._keys(), hist_start={**dh.HIST_START, "other": pd.Timestamp("2024-01-01")})
     priced = dh.collect(t, elo.add_elo(sack, keys=("winner_id", "loser_id")), 24.0)
     w = windows(priced, sack)
+    if a.cmd in ("pull", "window"):
+        w["close_event_id"] = close_event_ids(t, sack).reindex(priced["sack_row"].to_numpy()).to_numpy()
     if a.cmd == "plan":
         print(plan(w))
         return

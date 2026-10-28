@@ -61,9 +61,13 @@ Using DraftKings' own prices, through The Odds API's historical snapshots:
 ## Amendment 2026-10-28 (2): the in-play window (written before any outcome is read)
 **Why.** An audit of the pulled snapshots found two problems. It read only quote ages, price levels and listed start times,
 never a result.
-- **Postponed matches.** In 2024, 281 matches never dropped out of the snapshots. For those, DraftKings later moved the
-  listed start by a median of about 29 hours, so the match was played the next day. Their quotes in our window are
-  pre-match prices, not in-play ones.
+- **Duplicate listings.** In 2024, 281 matches never dropped out of the snapshots. For 248 of them, the walk was
+  following a different event id than the one their DK close came from. DK sometimes lists a duplicate event for the
+  same pairing, and matching by player names latched onto the stale duplicate, whose start is later moved by about a
+  day. The real event, joined to Sackmann by player ids, is in the same snapshots and finished on time. The walk now
+  uses the close's event id and falls back to names only when there is none (`close_event_ids`).
+- **Moved starts.** Separately, 2–4% of matches per season (2023–26) had their listed start move by more than 1 h after
+  the close, a median of 1.5 h (reports/upsets_dk_close_check.md).
 - **Lookahead risk.** Any snapshot taken after a match ended could show settled or near-settled odds. Those odds would give
   away the winner, so they could fake a "dog reached 50%" trigger or a hedge fill.
 

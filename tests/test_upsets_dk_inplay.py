@@ -208,3 +208,19 @@ def test_window_postponed_match_and_the_sensitivity_cuts():
     assert list(w["live"]) == [True, False, True, True]
     assert list(w["live_final"]) == [False, False, True, True]         # later information: drops the 10:30 row
     assert list(w["live_minutes"]) == [True, False, True, False]       # 12:00 + 100 + 30 min = 14:10
+
+
+def test_walk_follows_the_close_event_not_a_duplicate_listing():
+    # two listings of the same pairing: "dup" (stale, still listed later) and "e1" (the real one, which the close used)
+    def fetch(key, when):
+        ts = pd.Timestamp(when)
+        data = [{"id": "dup", "commence_time": "2024-01-15T10:00:00Z", "home_team": "Bee Bob", "away_team": "Ann Aye"}]
+        if ts <= pd.Timestamp("2024-01-15 11:20", tz="UTC"):
+            data.append({"id": "e1", "commence_time": "2024-01-15T10:05:00Z", "home_team": "Bee Bob",
+                         "away_team": "Ann Aye"})
+        return {"timestamp": when, "data": data}
+    by_name = di.walk(match_w(), fetch)["matches"].iloc[0]
+    assert by_name["event_id"] == "dup" and pd.isna(by_name["finished_at"])      # names alone pick the stale one
+    w = match_w().assign(close_event_id="e1")
+    got = di.walk(w, fetch)["matches"].iloc[0]
+    assert got["event_id"] == "e1" and got["finished_at"] == pd.Timestamp("2024-01-15 11:50", tz="UTC")
