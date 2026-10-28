@@ -48,6 +48,7 @@ def test_ranks_order_unmatched_and_challenger():
     assert r.loc["k1", "rank_b"] == 1 and r.loc["k1", "rank_a"] > 2          # p is #1, x1 below p and q
     assert r.loc["k2", "rank_a"] == 2                                       # q is #2
     assert pd.isna(r.loc["k2", "rank_b"]) and not r.loc["k2", "matched_b"]  # unmatched name: blank
+    assert r.loc["k2", "reason_b"] == "unmatched" and pd.isna(r.loc["k2", "reason_a"])
     assert r.loc["k3", "series"] == "KXATPCHALLENGERMATCH" and r.loc["k3", "rank_b"] == 2
     # k2's unmatched player is a real player rated from Kalshi results: in the pool from the next day, but
     # never given a rank himself
@@ -58,9 +59,12 @@ def test_min_n_and_inactive_players_are_blank_or_excluded():
     km = kmatches([("k1", "2025-12-01 10:00", "Xavier One", "Pedro Perez", 0.0)])
     r = er.ranks(km, sack(), min_n=5).set_index("match_id")
     assert pd.isna(r.loc["k1", "rank_a"]) and r.loc["k1", "rank_b"] == 1    # x1 has 3 matches < 5
+    assert r.loc["k1", "reason_a"] == "few_matches" and pd.isna(r.loc["k1", "reason_b"])
+    assert r.loc["k1", "n_a"] == 3 and np.isfinite(r.loc["k1", "elo_a"])     # provisional rating kept
     late = kmatches([("k9", "2027-06-01 10:00", "Xavier One", "Pedro Perez", 0.0)])
     r = er.ranks(late, sack(), min_n=1, active_days=365).set_index("match_id")
     assert pd.isna(r.loc["k9", "rank_a"]) and r.loc["k9", "pool"] == 0      # nobody active: no rank
+    assert r.loc["k9", "reason_a"] == "inactive" and r.loc["k9", "reason_b"] == "inactive"
 
 
 def test_same_day_results_are_not_in_the_pool_and_never_rank_a_player_below_himself():
