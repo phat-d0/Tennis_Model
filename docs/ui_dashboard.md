@@ -62,6 +62,14 @@ A "Live | Paper" switch under the header (`#paper` in the URL). The Paper view r
   numbers are computed from `paper.trades`; when that list is at its 200 cap, a note says the split may be incomplete. If a rule has more trades than the list carries (it's
   capped at 200), that rule falls back to the scanner's `by_rule` totals, with no split and no per-contract figure, and
   a note says so.
+- **Cash-out portfolio** (owner request 2026-10-28; Scanner's C0/C1/C2, `group: "cashout"`): its own section under the
+  swing rules, "Cash-out portfolio (pre-registered 2026-10-28)", with the pre-registered expectation (Δ C1 vs C0 about −1 to
+  −3¢ per contract). For each rule: trades, open / exited / final, exit rate, final P&L (settled + sold), P&L per contract,
+  capital, and **Δ vs C0 per contract**. Δ pairs each entry with the control's identical entry (same match, side and E1/E2)
+  once both are final, so C2's 20–30¢ entries (no C0 twin) don't count. Start-up rows are kept apart, with each rule's own
+  `since` (older state files fall back to `paper.since`). Exited trades show "sold @ X¢ bid", the time and the cash after
+  the fee, plus an E1/E2 badge; the trades list gets an "Exited" chip. The lookback adds a cash-out table (per contract and
+  Δ vs C0 at 0¢ and 1¢) and a separate cumulative chart, so the swing chart keeps the swing rules only.
 - **Trades:** status chips (All / Open / Locked / Settled, with counts) and a rule filter. Each trade shows the entry, the
   lock (or "not locked"), and P&L: the amount if each player wins while open, the locked P&L ("pays at settlement")
   once locked, and the final P&L plus the winner once settled.

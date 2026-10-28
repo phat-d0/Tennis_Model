@@ -114,51 +114,78 @@ def test_static_is_self_contained_and_read_only():
 
 # ---------------------------------------------------------------- paper contract (Scanner, docs/scanner_paper.md)
 
+# Swing rules (P1-P4, #116) and cash-out rules (C0-C2, owner request 2026-10-28). state.paper's rules carry
+# their own `since`; lookback.json's rules don't.
 RULE_KEYS = {"id", "x", "y", "entry_phase", "min_entry_ask", "min_minutes_from_start", "max_minutes_from_start",
-             "contracts", "mode"}
+             "contracts", "mode", "group"}
+CASH_RULE_KEYS = {"id", "max_ask", "level", "contracts", "entries", "group"}
 BY_RULE_KEYS = {"rule", "trades", "open", "locked", "settled", "lock_rate", "pnl_settled", "pnl_locked_unsettled",
-                "capital", "contracts"}
+                "capital", "contracts", "group"}
 TRADE_KEYS = {"trade_id", "rule", "match_id", "series", "tier", "player_a", "player_b", "side", "status", "entry_ts",
               "entry_phase", "entry_ask", "entry_source", "contracts", "entry_cost", "lock_ts", "lock_ask",
               "lock_source", "lock_contracts", "lock_cost", "settle_ts", "settle_a", "settle_b", "pnl", "pnl_if_a",
-              "pnl_if_b"}
+              "pnl_if_b", "group", "entry_type", "exit_ts", "exit_bid", "exit_value"}
 LB_KEYS = {"generated_at", "source", "data_from", "data_to", "matches_recorded", "matches_processed",
            "matches_with_trades", "matches_new_this_run", "matches_awaiting_result", "settlement_requests",
-           "rules", "by_rule", "by_day"}
+           "rules", "by_rule", "by_day", "matches_processed_cashout"}
 LB_RULE_KEYS = {"rule", "slippage", "trades", "locked", "lock_rate", "pnl", "pnl_per_trade", "win_rate",
-                "pnl_locked", "pnl_unlocked", "capital", "contracts"}
+                "pnl_locked", "pnl_unlocked", "capital", "contracts", "group"}
+# Added by Scanner's cash-out change; optional until it is on main, then the contract test is exact again.
+CASH_NEW_KEYS = {"group", "since", "entry_type", "exit_ts", "exit_bid", "exit_value", "matches_processed_cashout"}
+FINAL = ("settled", "exited")
+
+
+def _rule_keys(r: dict, with_since: bool) -> set:
+    keys = CASH_RULE_KEYS if r.get("group") == "cashout" else RULE_KEYS
+    return keys | {"since"} if with_since else keys
 
 
 def test_sample_paper_matches_contract(sample):
     paper = sample["paper"]
     assert set(paper) == {"since", "rules", "by_rule", "trades"}
     for r in paper["rules"]:
-        assert set(r) == RULE_KEYS
+        assert set(r) == _rule_keys(r, with_since=True) and r["group"] in ("swing", "cashout")
+        datetime.fromisoformat(r["since"].replace("Z", "+00:00"))
     ids = [r["id"] for r in paper["rules"]]
+    groups = {r["id"]: r["group"] for r in paper["rules"]}
     assert [b["rule"] for b in paper["by_rule"]] == ids
     for t in paper["trades"]:
         assert set(t) == TRADE_KEYS, t["trade_id"]
-        assert t["status"] in ("open", "locked", "settled") and t["side"] in ("A", "B") and t["rule"] in ids
+        assert t["status"] in ("open", "locked", "settled", "exited") and t["side"] in ("A", "B") and t["rule"] in ids
+        assert t["group"] == groups[t["rule"]]
         assert (t["pnl"] is None) == (t["status"] == "open")
         assert (t["lock_ts"] is None) == (t["lock_ask"] is None)
+        assert (t["entry_type"] is None) == (t["group"] == "swing")
+        if t["status"] == "exited":
+            assert t["pnl"] == pytest.approx(t["exit_value"] - t["entry_cost"]) == t["pnl_if_a"] == t["pnl_if_b"]
     order = [t["status"] for t in paper["trades"]]
-    assert order == sorted(order, key=lambda st: st == "settled")      # open/locked before settled
+    assert order == sorted(order, key=lambda st: st in FINAL)          # open/locked before settled/exited
     for b in paper["by_rule"]:
-        assert set(b) == BY_RULE_KEYS
+        assert set(b) == BY_RULE_KEYS and b["group"] == groups[b["rule"]]
         ts = [t for t in paper["trades"] if t["rule"] == b["rule"]]
-        assert b["trades"] == len(ts)
-        for st in ("open", "locked", "settled"):
-            assert b[st] == sum(t["status"] == st for t in ts)
-        assert b["pnl_settled"] == pytest.approx(sum(t["pnl"] for t in ts if t["status"] == "settled"))
-        assert b["pnl_locked_unsettled"] == pytest.approx(sum(t["pnl"] for t in ts if t["status"] == "locked"))
-    assert {t["status"] for t in paper["trades"]} == {"open", "locked", "settled"}
+        assert b["trades"] == len(ts) and b["open"] == sum(t["status"] == "open" for t in ts)
+        if b["group"] == "cashout":   # locked = exits, settled = final trades, sale P&L in pnl_settled
+            assert b["locked"] == sum(t["status"] == "exited" for t in ts)
+            assert b["settled"] == sum(t["status"] in FINAL for t in ts)
+            assert b["pnl_settled"] == pytest.approx(sum(t["pnl"] for t in ts if t["status"] in FINAL))
+            assert b["pnl_locked_unsettled"] == 0
+        else:
+            for st in ("locked", "settled"):
+                assert b[st] == sum(t["status"] == st for t in ts)
+            assert b["pnl_settled"] == pytest.approx(sum(t["pnl"] for t in ts if t["status"] == "settled"))
+            assert b["pnl_locked_unsettled"] == pytest.approx(sum(t["pnl"] for t in ts if t["status"] == "locked"))
+    assert {t["status"] for t in paper["trades"]} == {"open", "locked", "settled", "exited"}
 
 
 def test_sample_paper_trades_priced_with_core_math(sample):
-    """Entry cost = ask x contracts + Kalshi taker fee; a locked trade's P&L = lock_quote's locked P&L."""
+    """Entry cost = ask x contracts + Kalshi taker fee; a locked trade's P&L = lock_quote's locked P&L;
+    a sale's cash = bid x contracts - the taker fee on the sale."""
     for t in sample["paper"]["trades"]:
         fees = kalshi_fee_model("quadratic" if "CHALLENGER" in t["series"] else "quadratic_with_maker_fees")
         assert t["entry_cost"] == pytest.approx(buy_cost(t["entry_ask"], t["contracts"], fees), abs=1e-6)
+        if t["exit_bid"] is not None:
+            want = t["contracts"] * t["exit_bid"] - fees.fee(t["exit_bid"], t["contracts"])
+            assert t["exit_value"] == pytest.approx(want, abs=1e-6)
         if t["lock_ask"] is not None:
             n, c = t["contracts"], t["entry_cost"]
             h = Holding(n, c, 0, 0) if t["side"] == "A" else Holding(0, 0, n, c)
@@ -173,10 +200,11 @@ def test_sample_lookback_matches_contract():
     lb = json.loads(SAMPLE_LOOKBACK.read_text())
     assert set(lb) == LB_KEYS
     for r in lb["rules"]:
-        assert set(r) == RULE_KEYS
+        assert set(r) == _rule_keys(r, with_since=False)
     for b in lb["by_rule"]:
         assert set(b) == LB_RULE_KEYS and b["slippage"] in (0.0, 0.01)
     assert len(lb["by_rule"]) == 2 * len(lb["rules"])                 # one row per rule per slippage
+    assert {r["group"] for r in lb["rules"]} == {"swing", "cashout"}
     for d in lb["by_day"]:
         assert set(d) == {"day", "rule", "trades", "locked", "pnl"}
         datetime.strptime(d["day"], "%Y-%m-%d")
@@ -290,13 +318,19 @@ def test_page_in_browser(serve, tmp_path, fresh):
         assert res["breakEven"] == 1 and res["arbTile"] == "1"     # the $0.09 / 19.34 ct arb doesn't count
         assert res["tierLabels"] == ["ATP", "ATP Challenger", "WTA", "WTA 125"]
         p = res["paper"]
-        assert p["liveHidden"] and p["rules"] == 4 and p["trades"] == 7 and p["locked"] == 1
-        assert res["paperSettled"] == 4 and p["lookbackRows"] == 0 and not p["chart"]
+        assert p["liveHidden"] and p["rules"] == 4 and p["trades"] == 17 and p["locked"] == 1
+        assert res["paperSettled"] == 6 and res["paperExited"] == 4 and p["sold"] == 4
+        assert p["lookbackRows"] == 0 and not p["chart"]
+        # cash-out portfolio: C0 is the control; C1/C2 vs C0 on the 2 paired final entries; 3 start-up entries apart
+        assert p["cashHead"] == "Cash-out portfolio (pre-registered 2026-10-28)"
+        assert p["cashRules"] == 3 and p["cashStartup"] == 3
+        assert p["cashPerCt"] == ["+35.2¢", "+36.4¢", "+36.4¢"]
+        assert p["cashDelta"] == ["control", "+1.3¢2 paired entries", "+1.3¢2 paired entries"]
         assert any("No lookback yet" in n for n in p["notes"])
         assert p["hypo"] == "Hypothetical, no orders"
         # headline excludes the two start-up entries (entry_ts == paper.since); P4's other trade is still open
         assert p["perContract"] == ["+82.0¢", "+6.6¢", "+8.0¢", "—"] and p["total"] == "+35.9¢"
-        assert p["startup"] == 2 and p["startupBadges"] == 2
+        assert p["startup"] == 2 and p["startupBadges"] == 5        # 2 swing + 3 cash-out start-up entries
         assert p["intro"].startswith("Expected result (pre-registered): about −3 to −5¢ per contract.")
         assert res["firstMarket"] == "Jaime Faria vs Nicolas Brunold"   # sorted by combined + fees
         f = res["filters"]
@@ -362,11 +396,16 @@ def test_paper_tab_with_lookback(serve, tmp_path):
     lbf.write_text(json.dumps(lb))
     for res in _run_check(serve(state, lbf)):
         p = res["paper"]
-        assert p["lookbackRows"] == len(lb["rules"]) and p["days"] == 14 and p["notes"] == []
-        assert p["chart"] and p["chartLines"] == len(lb["rules"])
+        assert p["lookbackRows"] == sum(r["group"] == "swing" for r in lb["rules"]) and p["days"] == 14 and p["notes"] == []
+        assert p["chart"] and p["charts"] == 2 and p["chartLines"] == len(lb["rules"])   # swing + cash-out charts
+        cash = {b["rule"]: b for b in lb["by_rule"] if b["group"] == "cashout" and b["slippage"] == 0.0}
+        c0 = cash["C0-dog20-hold"]["pnl"] / cash["C0-dog20-hold"]["contracts"]
+        want = ["control"] + [f"{'+' if d > 0 else '−'}{abs(d * 100):.1f}¢" for d in
+                              (b["pnl"] / b["contracts"] - c0 for r, b in cash.items() if r != "C0-dog20-hold")]
+        assert p["lbCashRows"] == 3 and p["lbCashDelta"] == want
         assert "—" not in p["lbPerCt"] and not any("needs a `contracts` total" in m for m in p["metaLines"])
     want = [f"{'+' if b['pnl'] > 0 else '−'}{abs(b['pnl'] / b['contracts'] * 100):.1f}¢"
-            for b in lb["by_rule"] if b["slippage"] == 0.0]
+            for b in lb["by_rule"] if b["slippage"] == 0.0 and b["group"] == "swing"]
     for res in _run_check(serve(state, lbf)):
         assert res["paper"]["lbPerCt"] == want
     # an older lookback without `contracts`: dashes and a note
@@ -421,23 +460,39 @@ def _scanner_samples(tmp_path) -> tuple[dict, dict]:
     return json.loads(json.dumps(paper)), json.loads((tmp_path / "paper" / "lookback.json").read_text()) or lb
 
 
+def _keys_match(theirs, mine, what: str) -> None:
+    """Exact once Scanner's cash-out change is on main; until then its output may lack only CASH_NEW_KEYS."""
+    theirs, mine = set(theirs), set(mine)
+    assert theirs <= mine and mine - theirs <= CASH_NEW_KEYS, (what, theirs ^ mine)
+    if "group" in theirs or "matches_processed_cashout" in theirs:
+        assert theirs == mine, (what, theirs ^ mine)
+
+
 def test_contract_matches_scanner_output(sample, tmp_path):
     paper, lb = _scanner_samples(tmp_path)
     mine = sample["paper"]
+    swing = lambda rs: [r for r in rs if r.get("group", "swing") == "swing"]  # noqa: E731
     assert set(paper) == set(mine)
-    assert set(paper["rules"][0]) == set(mine["rules"][0]) == RULE_KEYS
-    assert set(paper["by_rule"][0]) == set(mine["by_rule"][0]) == BY_RULE_KEYS
-    assert set(paper["trades"][0]) == set(mine["trades"][0]) == TRADE_KEYS
-    assert [r["id"] for r in paper["rules"]] == [r["id"] for r in mine["rules"]]   # same frozen rules
+    _keys_match(swing(paper["rules"])[0], swing(mine["rules"])[0], "rules")
+    _keys_match(paper["by_rule"][0], mine["by_rule"][0], "by_rule")
+    _keys_match(paper["trades"][0], mine["trades"][0], "trades")
+    assert [r["id"] for r in swing(paper["rules"])] == [r["id"] for r in swing(mine["rules"])]   # same frozen rules
     mine_lb = json.loads(SAMPLE_LOOKBACK.read_text())
-    assert set(lb) == set(mine_lb) == LB_KEYS
-    assert set(lb["by_rule"][0]) == set(mine_lb["by_rule"][0]) == LB_RULE_KEYS
+    _keys_match(lb, mine_lb, "lookback")
+    _keys_match(swing(lb["rules"])[0], swing(mine_lb["rules"])[0], "lookback rules")
+    _keys_match(lb["by_rule"][0], mine_lb["by_rule"][0], "lookback by_rule")
     assert set(lb["by_day"][0]) == set(mine_lb["by_day"][0])
+
+
+def _startups(paper: dict) -> int:
+    since = {r["id"]: r.get("since") or paper["since"] for r in paper["rules"]}
+    return sum(t["entry_ts"] == since[t["rule"]] for t in paper["trades"] if t.get("group", "swing") == "swing")
 
 
 @pytest.mark.skipif(not _node_playwright(), reason="needs node + playwright")
 def test_paper_tab_on_scanner_output(serve, tmp_path):
-    """The page on Scanner's real code output: P2's only trade is a start-up entry, so it's split out."""
+    """The page on Scanner's real code output. Start-up entries follow each rule's `since` (paper.since for an
+    older scanner): with per-rule since, P2's 12:00:10 entry is no longer one."""
     paper, lb = _scanner_samples(tmp_path)
     s = json.loads(SAMPLE_STATE.read_text())
     s["generated_at"] = _now()
@@ -448,6 +503,61 @@ def test_paper_tab_on_scanner_output(serve, tmp_path):
     lbf.write_text(json.dumps(lb))
     for res in _run_check(serve(state, lbf)):
         p = res["paper"]
-        assert p["rules"] == 4 and p["trades"] == len(paper["trades"]) and p["startup"] == 1
+        assert p["rules"] == 4 and p["trades"] == len(paper["trades"]) and p["startup"] == _startups(paper)
         assert p["perContract"] == ["+21.2¢", "—", "+15.0¢", "+11.9¢"] and p["total"] == "+16.0¢"
-        assert p["lookbackRows"] == 4 and p["chart"]
+        assert p["lookbackRows"] == 4 and p["chart"]          # swing rules; cash-out rules have their own table
+
+
+def _scanner_cash_samples(tmp_path) -> tuple[dict, dict]:
+    """Scanner's cash-out code on its synthetic fixtures (tests/test_scanner_paper_cashout.py)."""
+    import sys
+    from datetime import timedelta
+
+    import pandas as pd
+
+    from swinglock.scanner import lookback
+
+    here = Path(__file__).parent
+    if not (here / "test_scanner_paper_cashout.py").exists():
+        pytest.skip("Scanner's cash-out change isn't on this branch yet")
+    sys.path.insert(0, str(here))
+    import test_scanner_paper_cashout as tsc
+
+    paper = tsc.live_book().summary()
+    rec = tmp_path / "recorded"
+    (rec / "quotes").mkdir(parents=True)
+    tsc.quotes_frame().to_parquet(rec / "quotes" / "2026-10-27.parquet", index=False)
+    tsc.matches_frame().assign(winner=pd.NA, settle_a=float("nan"), settle_b=float("nan")).to_parquet(
+        rec / "matches.parquet", index=False)
+    lookback.run(tsc.CFG, rec, tmp_path / "paper", tsc.FakeClient(), now=tsc.T0 + timedelta(hours=8))
+    return json.loads(json.dumps(paper)), json.loads((tmp_path / "paper" / "lookback.json").read_text())
+
+
+def test_cash_contract_matches_scanner_output(sample, tmp_path):
+    paper, lb = _scanner_cash_samples(tmp_path)
+    cash = lambda rs: [r for r in rs if r.get("group") == "cashout"]  # noqa: E731
+    mine, mine_lb = sample["paper"], json.loads(SAMPLE_LOOKBACK.read_text())
+    assert set(cash(paper["rules"])[0]) == set(cash(mine["rules"])[0])
+    assert set(cash(paper["by_rule"])[0]) == set(cash(mine["by_rule"])[0])
+    assert set(cash(paper["trades"])[0]) == set(cash(mine["trades"])[0])
+    assert [r["id"] for r in cash(paper["rules"])] == [r["id"] for r in cash(mine["rules"])]
+    assert set(cash(lb["rules"])[0]) == set(cash(mine_lb["rules"])[0])
+    assert set(cash(lb["by_rule"])[0]) == set(cash(mine_lb["by_rule"])[0])
+
+
+@pytest.mark.skipif(not _node_playwright(), reason="needs node + playwright")
+def test_cash_section_on_scanner_output(serve, tmp_path):
+    """Scanner's cash-out output: three C rows, sales shown as "sold @ bid", the lookback's C table."""
+    paper, lb = _scanner_cash_samples(tmp_path)
+    s = json.loads(SAMPLE_STATE.read_text())
+    s["generated_at"] = _now()
+    s["paper"] = paper
+    state = tmp_path / "state.json"
+    state.write_text(json.dumps(s))
+    lbf = tmp_path / "lb.json"
+    lbf.write_text(json.dumps(lb))
+    exited = sum(t["status"] == "exited" for t in paper["trades"])
+    for res in _run_check(serve(state, lbf)):
+        p = res["paper"]
+        assert p["cashRules"] == 3 and p["sold"] == exited and res["paperExited"] == exited
+        assert p["lbCashRows"] == 3 and p["lbCashDelta"][0] == "control"

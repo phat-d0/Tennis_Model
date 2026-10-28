@@ -19,7 +19,8 @@
    "min_minutes_from_start": null,
    "max_minutes_from_start": null,
    "contracts": 100.0,
-   "mode": "first"
+   "mode": "first",
+   "group": "swing"
   },
   {
    "id": "P2-x40-y95",
@@ -30,7 +31,8 @@
    "min_minutes_from_start": null,
    "max_minutes_from_start": null,
    "contracts": 100.0,
-   "mode": "first"
+   "mode": "first",
+   "group": "swing"
   },
   {
    "id": "P3-x30-y94-live",
@@ -41,7 +43,8 @@
    "min_minutes_from_start": null,
    "max_minutes_from_start": null,
    "contracts": 100.0,
-   "mode": "first"
+   "mode": "first",
+   "group": "swing"
   },
   {
    "id": "P4-x30-y94-pre",
@@ -52,7 +55,41 @@
    "min_minutes_from_start": null,
    "max_minutes_from_start": null,
    "contracts": 100.0,
-   "mode": "first"
+   "mode": "first",
+   "group": "swing"
+  },
+  {
+   "id": "C0-dog20-hold",
+   "max_ask": 0.2,
+   "level": null,
+   "contracts": 100.0,
+   "entries": [
+    "E1",
+    "E2"
+   ],
+   "group": "cashout"
+  },
+  {
+   "id": "C1-dog20-sell50",
+   "max_ask": 0.2,
+   "level": 0.5,
+   "contracts": 100.0,
+   "entries": [
+    "E1",
+    "E2"
+   ],
+   "group": "cashout"
+  },
+  {
+   "id": "C2-dog30-sell50",
+   "max_ask": 0.3,
+   "level": 0.5,
+   "contracts": 100.0,
+   "entries": [
+    "E1",
+    "E2"
+   ],
+   "group": "cashout"
   }
  ],
  "by_rule": [
@@ -68,7 +105,8 @@
    "pnl_locked": 57.75,
    "pnl_unlocked": -117.67,
    "capital": 6741.0,
-   "contracts": 15515.0
+   "contracts": 15515.0,
+   "group": "swing"
   },
   {
    "rule": "P1-x20-y90",
@@ -82,7 +120,8 @@
    "pnl_locked": -43.2,
    "pnl_unlocked": -209.32,
    "capital": 6741.0,
-   "contracts": 15515.0
+   "contracts": 15515.0,
+   "group": "swing"
   },
   {
    "rule": "P2-x40-y95",
@@ -96,7 +135,8 @@
    "pnl_locked": 123.75,
    "pnl_unlocked": -360.43,
    "capital": 12222.0,
-   "contracts": 28130.0
+   "contracts": 28130.0,
+   "group": "swing"
   },
   {
    "rule": "P2-x40-y95",
@@ -110,7 +150,8 @@
    "pnl_locked": -94.5,
    "pnl_unlocked": -491.38,
    "capital": 12222.0,
-   "contracts": 28130.0
+   "contracts": 28130.0,
+   "group": "swing"
   },
   {
    "rule": "P3-x30-y94-live",
@@ -124,7 +165,8 @@
    "pnl_locked": 50.6,
    "pnl_unlocked": -108.68,
    "capital": 5544.0,
-   "contracts": 12760.0
+   "contracts": 12760.0,
+   "group": "swing"
   },
   {
    "rule": "P3-x30-y94-live",
@@ -138,7 +180,8 @@
    "pnl_locked": -37.8,
    "pnl_unlocked": -178.68,
    "capital": 5544.0,
-   "contracts": 12760.0
+   "contracts": 12760.0,
+   "group": "swing"
   },
   {
    "rule": "P4-x30-y94-pre",
@@ -152,7 +195,8 @@
    "pnl_locked": 31.35,
    "pnl_unlocked": -95.7,
    "capital": 4504.5,
-   "contracts": 10367.5
+   "contracts": 10367.5,
+   "group": "swing"
   },
   {
    "rule": "P4-x30-y94-pre",
@@ -166,7 +210,98 @@
    "pnl_locked": -22.95,
    "pnl_unlocked": -170.1,
    "capital": 4504.5,
-   "contracts": 10367.5
+   "contracts": 10367.5,
+   "group": "swing"
+  },
+  {
+   "rule": "C0-dog20-hold",
+   "slippage": 0.0,
+   "trades": 310,
+   "locked": 0,
+   "lock_rate": 0.0,
+   "pnl": -589.0,
+   "pnl_per_trade": -1.9,
+   "win_rate": 0.12,
+   "pnl_locked": 0.0,
+   "pnl_unlocked": -589.0,
+   "contracts": 28520.0,
+   "capital": 4712.0,
+   "group": "cashout"
+  },
+  {
+   "rule": "C0-dog20-hold",
+   "slippage": 0.01,
+   "trades": 310,
+   "locked": 0,
+   "lock_rate": 0.0,
+   "pnl": -930.0,
+   "pnl_per_trade": -3.0,
+   "win_rate": 0.12,
+   "pnl_locked": 0.0,
+   "pnl_unlocked": -930.0,
+   "contracts": 28520.0,
+   "capital": 4712.0,
+   "group": "cashout"
+  },
+  {
+   "rule": "C1-dog20-sell50",
+   "slippage": 0.0,
+   "trades": 310,
+   "locked": 96,
+   "lock_rate": 0.3097,
+   "pnl": -806.0,
+   "pnl_per_trade": -2.6,
+   "win_rate": 0.2233,
+   "pnl_locked": 201.6,
+   "pnl_unlocked": -1007.6,
+   "contracts": 28520.0,
+   "capital": 4712.0,
+   "group": "cashout"
+  },
+  {
+   "rule": "C1-dog20-sell50",
+   "slippage": 0.01,
+   "trades": 310,
+   "locked": 96,
+   "lock_rate": 0.3097,
+   "pnl": -1147.0,
+   "pnl_per_trade": -3.7,
+   "win_rate": 0.2233,
+   "pnl_locked": 201.6,
+   "pnl_unlocked": -1348.6,
+   "contracts": 28520.0,
+   "capital": 4712.0,
+   "group": "cashout"
+  },
+  {
+   "rule": "C2-dog30-sell50",
+   "slippage": 0.0,
+   "trades": 520,
+   "locked": 187,
+   "lock_rate": 0.3596,
+   "pnl": -1768.0,
+   "pnl_per_trade": -3.4,
+   "win_rate": 0.24,
+   "pnl_locked": 392.7,
+   "pnl_unlocked": -2160.7,
+   "contracts": 47840.0,
+   "capital": 7904.0,
+   "group": "cashout"
+  },
+  {
+   "rule": "C2-dog30-sell50",
+   "slippage": 0.01,
+   "trades": 520,
+   "locked": 187,
+   "lock_rate": 0.3596,
+   "pnl": -2340.0,
+   "pnl_per_trade": -4.5,
+   "win_rate": 0.24,
+   "pnl_locked": 392.7,
+   "pnl_unlocked": -2732.7,
+   "contracts": 47840.0,
+   "capital": 7904.0,
+   "group": "cashout"
   }
  ],
  "by_day": [
@@ -645,6 +780,364 @@
    "trades": 12,
    "locked": 5,
    "pnl": -5.78
+  },
+  {
+   "day": "2026-10-10",
+   "rule": "C0-dog20-hold",
+   "trades": 24,
+   "locked": 8,
+   "pnl": -18.49
+  },
+  {
+   "day": "2026-10-10",
+   "rule": "C1-dog20-sell50",
+   "trades": 24,
+   "locked": 8,
+   "pnl": -96.52
+  },
+  {
+   "day": "2026-10-10",
+   "rule": "C2-dog30-sell50",
+   "trades": 28,
+   "locked": 3,
+   "pnl": -83.25
+  },
+  {
+   "day": "2026-10-11",
+   "rule": "C0-dog20-hold",
+   "trades": 30,
+   "locked": 9,
+   "pnl": -29.55
+  },
+  {
+   "day": "2026-10-11",
+   "rule": "C1-dog20-sell50",
+   "trades": 15,
+   "locked": 0,
+   "pnl": -52.05
+  },
+  {
+   "day": "2026-10-11",
+   "rule": "C2-dog30-sell50",
+   "trades": 27,
+   "locked": 0,
+   "pnl": -87.25
+  },
+  {
+   "day": "2026-10-12",
+   "rule": "C0-dog20-hold",
+   "trades": 29,
+   "locked": 6,
+   "pnl": -19.57
+  },
+  {
+   "day": "2026-10-12",
+   "rule": "C1-dog20-sell50",
+   "trades": 29,
+   "locked": 2,
+   "pnl": -83.4
+  },
+  {
+   "day": "2026-10-12",
+   "rule": "C2-dog30-sell50",
+   "trades": 29,
+   "locked": 0,
+   "pnl": -94.16
+  },
+  {
+   "day": "2026-10-13",
+   "rule": "C0-dog20-hold",
+   "trades": 11,
+   "locked": 1,
+   "pnl": -28.77
+  },
+  {
+   "day": "2026-10-13",
+   "rule": "C1-dog20-sell50",
+   "trades": 17,
+   "locked": 4,
+   "pnl": -16.78
+  },
+  {
+   "day": "2026-10-13",
+   "rule": "C2-dog30-sell50",
+   "trades": 24,
+   "locked": 3,
+   "pnl": -76.35
+  },
+  {
+   "day": "2026-10-14",
+   "rule": "C0-dog20-hold",
+   "trades": 26,
+   "locked": 3,
+   "pnl": -68.12
+  },
+  {
+   "day": "2026-10-14",
+   "rule": "C1-dog20-sell50",
+   "trades": 12,
+   "locked": 3,
+   "pnl": -53.91
+  },
+  {
+   "day": "2026-10-14",
+   "rule": "C2-dog30-sell50",
+   "trades": 30,
+   "locked": 4,
+   "pnl": -128.37
+  },
+  {
+   "day": "2026-10-15",
+   "rule": "C0-dog20-hold",
+   "trades": 12,
+   "locked": 2,
+   "pnl": -5.3
+  },
+  {
+   "day": "2026-10-15",
+   "rule": "C1-dog20-sell50",
+   "trades": 20,
+   "locked": 6,
+   "pnl": -49.37
+  },
+  {
+   "day": "2026-10-15",
+   "rule": "C2-dog30-sell50",
+   "trades": 12,
+   "locked": 4,
+   "pnl": -20.32
+  },
+  {
+   "day": "2026-10-16",
+   "rule": "C0-dog20-hold",
+   "trades": 13,
+   "locked": 3,
+   "pnl": -8.55
+  },
+  {
+   "day": "2026-10-16",
+   "rule": "C1-dog20-sell50",
+   "trades": 12,
+   "locked": 0,
+   "pnl": -18.21
+  },
+  {
+   "day": "2026-10-16",
+   "rule": "C2-dog30-sell50",
+   "trades": 10,
+   "locked": 1,
+   "pnl": -20.25
+  },
+  {
+   "day": "2026-10-17",
+   "rule": "C0-dog20-hold",
+   "trades": 25,
+   "locked": 6,
+   "pnl": 5.65
+  },
+  {
+   "day": "2026-10-17",
+   "rule": "C1-dog20-sell50",
+   "trades": 22,
+   "locked": 6,
+   "pnl": -25.62
+  },
+  {
+   "day": "2026-10-17",
+   "rule": "C2-dog30-sell50",
+   "trades": 18,
+   "locked": 2,
+   "pnl": -45.6
+  },
+  {
+   "day": "2026-10-18",
+   "rule": "C0-dog20-hold",
+   "trades": 12,
+   "locked": 2,
+   "pnl": -54.78
+  },
+  {
+   "day": "2026-10-18",
+   "rule": "C1-dog20-sell50",
+   "trades": 13,
+   "locked": 1,
+   "pnl": 22.19
+  },
+  {
+   "day": "2026-10-18",
+   "rule": "C2-dog30-sell50",
+   "trades": 17,
+   "locked": 5,
+   "pnl": -50.73
+  },
+  {
+   "day": "2026-10-19",
+   "rule": "C0-dog20-hold",
+   "trades": 25,
+   "locked": 2,
+   "pnl": -42.29
+  },
+  {
+   "day": "2026-10-19",
+   "rule": "C1-dog20-sell50",
+   "trades": 27,
+   "locked": 3,
+   "pnl": -85.58
+  },
+  {
+   "day": "2026-10-19",
+   "rule": "C2-dog30-sell50",
+   "trades": 14,
+   "locked": 3,
+   "pnl": -42.33
+  },
+  {
+   "day": "2026-10-20",
+   "rule": "C0-dog20-hold",
+   "trades": 30,
+   "locked": 6,
+   "pnl": -37.57
+  },
+  {
+   "day": "2026-10-20",
+   "rule": "C1-dog20-sell50",
+   "trades": 16,
+   "locked": 0,
+   "pnl": -24.14
+  },
+  {
+   "day": "2026-10-20",
+   "rule": "C2-dog30-sell50",
+   "trades": 18,
+   "locked": 6,
+   "pnl": -16.86
+  },
+  {
+   "day": "2026-10-21",
+   "rule": "C0-dog20-hold",
+   "trades": 19,
+   "locked": 0,
+   "pnl": -44.29
+  },
+  {
+   "day": "2026-10-21",
+   "rule": "C1-dog20-sell50",
+   "trades": 16,
+   "locked": 1,
+   "pnl": -80.24
+  },
+  {
+   "day": "2026-10-21",
+   "rule": "C2-dog30-sell50",
+   "trades": 30,
+   "locked": 9,
+   "pnl": -71.74
+  },
+  {
+   "day": "2026-10-22",
+   "rule": "C0-dog20-hold",
+   "trades": 13,
+   "locked": 0,
+   "pnl": -7.42
+  },
+  {
+   "day": "2026-10-22",
+   "rule": "C1-dog20-sell50",
+   "trades": 18,
+   "locked": 0,
+   "pnl": -47.96
+  },
+  {
+   "day": "2026-10-22",
+   "rule": "C2-dog30-sell50",
+   "trades": 29,
+   "locked": 5,
+   "pnl": -86.66
+  },
+  {
+   "day": "2026-10-23",
+   "rule": "C0-dog20-hold",
+   "trades": 12,
+   "locked": 0,
+   "pnl": -44.42
+  },
+  {
+   "day": "2026-10-23",
+   "rule": "C1-dog20-sell50",
+   "trades": 16,
+   "locked": 4,
+   "pnl": -44.49
+  },
+  {
+   "day": "2026-10-23",
+   "rule": "C2-dog30-sell50",
+   "trades": 21,
+   "locked": 5,
+   "pnl": -74.74
+  },
+  {
+   "day": "2026-10-24",
+   "rule": "C0-dog20-hold",
+   "trades": 29,
+   "locked": 7,
+   "pnl": -31.91
+  },
+  {
+   "day": "2026-10-24",
+   "rule": "C1-dog20-sell50",
+   "trades": 28,
+   "locked": 2,
+   "pnl": -48.96
+  },
+  {
+   "day": "2026-10-24",
+   "rule": "C2-dog30-sell50",
+   "trades": 22,
+   "locked": 2,
+   "pnl": -89.84
+  },
+  {
+   "day": "2026-10-25",
+   "rule": "C0-dog20-hold",
+   "trades": 17,
+   "locked": 4,
+   "pnl": -47.77
+  },
+  {
+   "day": "2026-10-25",
+   "rule": "C1-dog20-sell50",
+   "trades": 17,
+   "locked": 5,
+   "pnl": -29.06
+  },
+  {
+   "day": "2026-10-25",
+   "rule": "C2-dog30-sell50",
+   "trades": 27,
+   "locked": 3,
+   "pnl": -53.7
+  },
+  {
+   "day": "2026-10-26",
+   "rule": "C0-dog20-hold",
+   "trades": 22,
+   "locked": 7,
+   "pnl": -62.61
+  },
+  {
+   "day": "2026-10-26",
+   "rule": "C1-dog20-sell50",
+   "trades": 13,
+   "locked": 0,
+   "pnl": -49.64
+  },
+  {
+   "day": "2026-10-26",
+   "rule": "C2-dog30-sell50",
+   "trades": 11,
+   "locked": 2,
+   "pnl": -34.56
   }
- ]
+ ],
+ "matches_processed_cashout": 1240
 }

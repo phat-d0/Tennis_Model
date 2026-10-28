@@ -467,6 +467,11 @@ Since phat-d0/Tennis_Model#116 also: `min_arb_profit_per_contract` (the alert th
   g0 (4,695 ATP/WTA) and g12 (8,349 Challenger/WTA 125): every gate FAILs. DOG50 at 1¢: g0 −$226.07 (ROI −18.8%, 2/7 months +),
   g12 −$641.46 (−28.7%, 0/7); DOGL g0 1/6, g12 0/6 folds +; E1/E2 FAIL on both. bid(A) = 1 − ask(B) exactly (max gap 0).
   Aggregates sent to Backtest verbatim with sha256 per section; outputs stay in gitignored `data/reports/`.
+- 2026-10-28 (Dashboard): Paper tab shows the cash-out portfolio (owner request): its own section "Cash-out portfolio
+  (pre-registered 2026-10-28)" with open/exited/final, exit rate, final P&L (settled + sold), P&L per contract and **Δ vs C0
+  per contract on paired entries** (same match, side and E1/E2, both final); exits show as "sold @ bid"; start-up entries
+  use each rule's own `since`; the lookback gets a cash-out table (Δ vs C0 at 0¢/1¢) and its own chart. Contract tests run
+  Scanner's swing and cash-out code; they pass on main and on Scanner's cash-out branch (42fce04). PR in this change.
 - 2026-10-27: Paper trading live on the server from 17:34 UTC. Owner deleted `team/scanner`; no ref holds ae08bf5 now (an orphaned
   commit can still be fetched by full SHA until GitHub's GC; GitHub Support can purge it).
 - 2026-10-26: **Tennis Odds page live** at https://phat-d0.github.io/Tennis_Model/ (GitHub Pages, `.github/workflows/publish.yml`,
