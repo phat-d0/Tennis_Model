@@ -322,6 +322,7 @@ class FixedGate:
 
 def fixed_rule_gate(by_slip: dict[float, pd.DataFrame], months: pd.Series, st: dict[str, Any]) -> FixedGate:
     """Gate a fixed rule (no selection, every month out of sample) on absolute P&L (`rule_pnl`)."""
+    months = months.astype("period[M]")   # keeps .map() Period-typed under pandas 3
     tagged = {s: d.assign(period=d["match_id"].map(months)) for s, d in by_slip.items()}
     periods = sorted({p for d in tagged.values() for p in d["period"].dropna()})
     folds = pd.DataFrame({"month": [str(p) for p in periods]})

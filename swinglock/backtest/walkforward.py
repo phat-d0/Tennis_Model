@@ -131,6 +131,7 @@ def evaluate(trades_by_slip: dict[float, pd.DataFrame], months: pd.Series,
     """Walk-forward over precomputed trades (one table per slippage, tagged mode/x/y; needs match_id,
     settle_ts, pnl and locked). Any other columns are carried into the OOS trades table."""
     report = [float(s) for s in st["slippages"]]
+    months = months.astype("period[M]")   # keeps .map() Period-typed (pandas 3 infers str from str keys)
     periods = sorted(set(months.dropna()))
     tagged = {s: t.assign(period=t["match_id"].map(months)) for s, t in trades_by_slip.items()}
     sel_all = tagged[float(st["select_slippage"])]
