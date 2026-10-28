@@ -15,7 +15,7 @@ from swinglock.config import kalshi_fees, load_config
 from swinglock.scanner import lookback
 from swinglock.scanner.market import MatchPair, MatchQuote, SideQuote
 from swinglock.scanner.output import AlertSink, StateWriter
-from swinglock.scanner.paper import RULES, PaperBook, PaperRule
+from swinglock.scanner.paper import CASH_RULES, RULES, PaperBook, PaperRule
 from swinglock.scanner.run import Scanner
 
 ROOT = Path(__file__).resolve().parent.parent
@@ -46,8 +46,8 @@ def quote(ask_a, size_a, ask_b, size_b):
     return MatchQuote(side(ask_a, size_a, PAIR.ticker_a), side(ask_b, size_b, PAIR.ticker_b))
 
 
-def live_book(ledger=None):
-    book = PaperBook(ledger_path=ledger)
+def live_book(ledger=None, cash_rules=()):
+    book = PaperBook(ledger_path=ledger, cash_rules=cash_rules)
     for sec, *q in PATH:
         book.step([PAIR], {MID: quote(*q)}, {"KXATPMATCH": FEES}, T0 + timedelta(seconds=sec))
     return book
@@ -112,7 +112,7 @@ def test_ledger_replay_restores_state_and_blocks_reentry(tmp_path):
     book = live_book(ledger)
     lines = [json.loads(x) for x in ledger.read_text().splitlines()]
     assert [x["event"] for x in lines].count("open") == 4 and [x["event"] for x in lines].count("lock") == 3
-    again = PaperBook(ledger_path=ledger)
+    again = PaperBook(ledger_path=ledger, cash_rules=())
     assert {k: v.status for k, v in again.trades.items()} == {k: v.status for k, v in book.trades.items()}
     events = again.step([PAIR], {MID: quote(0.10, 500, 0.40, 500)}, {"KXATPMATCH": FEES}, T0 + timedelta(hours=1))
     assert [e["event"] for e in events] == ["lock"]                   # P2 locks; nobody re-enters
@@ -205,7 +205,10 @@ def test_lookback_runs_rules_over_recorded_books_incrementally(tmp_path):
     assert s["matches_new_this_run"] == 1 and s["settlement_requests"] == 0   # fake doesn't count
     assert client.calls == [(PAIR.ticker_a, PAIR.ticker_b)]
     by = {(r["rule"], r["slippage"]): r for r in s["by_rule"]}
-    assert set(by) == {(r.id, sl) for r in RULES for sl in (0.0, 0.01)}
+    assert set(by) == {(r.id, sl) for r in (*RULES, *CASH_RULES) for sl in (0.0, 0.01)}
+    assert {by[(r.id, 0.0)]["group"] for r in CASH_RULES} == {"cashout"}
+    # this path's only dog entry is E2 (first live row, A at 25c): C2 takes it, C0/C1 (< 20c) don't
+    assert [by[(r.id, 0.0)]["trades"] for r in CASH_RULES] == [0, 0, 1]
     assert by[(RULES[0].id, 0.0)]["trades"] == 1 and by[(RULES[0].id, 0.0)]["locked"] == 1
     assert by[(RULES[1].id, 0.0)]["locked"] == 0 and by[(RULES[1].id, 0.0)]["pnl"] < 0
     assert by[(RULES[0].id, 0.0)]["contracts"] == 100 and by[(RULES[1].id, 0.0)]["contracts"] == 60
@@ -219,7 +222,7 @@ def test_lookback_runs_rules_over_recorded_books_incrementally(tmp_path):
     s2 = lookback.run(CFG, rec, out, client, now=now)
     assert s2["matches_new_this_run"] == 0 and len(client.calls) == 1
     assert s2["by_rule"] == s["by_rule"]
-    assert len(pd.read_parquet(out / "lookback_trades.parquet")) == 8   # 4 rules x 2 slippages
+    assert len(pd.read_parquet(out / "lookback_trades.parquet")) == 10  # (4 swing + C2) x 2 slippages
 
 
 def test_lookback_waits_for_results_before_processing(tmp_path):

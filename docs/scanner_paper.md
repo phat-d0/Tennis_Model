@@ -53,6 +53,46 @@ its results exist. Never re-tune on paper results. The definitions live in one p
 `swinglock/scanner/paper.py` (`RULES`); `tests/test_scanner_paper.py` fails if this table and the
 code disagree.
 
+### Cash-out group (owner request 2026-10-28)
+**Pre-registered 2026-10-28, before any cash-out backtest result existed** (Backtest's study,
+`swinglock/backtest/cashout.py` + docs/edge_cashout.md, had not run on data yet). The owner asked to
+track cash-outs as a live paper portfolio. P1–P4 above stay frozen and unchanged.
+
+| Rule | Entry: ask < | Exit: sell all at the bid when net bid ≥ | Role |
+|---|---|---|---|
+| `C0-dog20-hold` | 0.20 | hold | Control: C1's entries, never sold, held to settlement |
+| `C1-dog20-sell50` | 0.20 | 0.50 | The owner's DOG50 |
+| `C2-dog30-sell50` | 0.30 | 0.50 | DOG50 with a wider entry band |
+
+Semantics are exactly `cashout.py`'s (`_positions`, level rule L = 50¢, `DOG_RULE`):
+- **Entries E1 and E2.** At a match's **first observation before the scheduled start (E1)** and its
+  **first observation after it (E2)**, each player whose ask is below the rule's limit is bought. Both
+  asks must be present. Size is min(100, size at the ask), filled at the ask + slippage with the taker
+  fee. A match can give one E1 and one E2 trade per rule. This follows cashout.py ("E1/E2: both players
+  at the first pre / live observation"). It is **not** "the first moment any side drops under 20¢":
+  this way the forward test measures exactly what the study gates, and the parity test can compare
+  the two engines directly.
+- **Exit (C1, C2):** at the first later observation where
+  `net bid = (bid − slippage) − fee(bid − slippage, n) / n ≥ 0.50` and the bid size covers all n
+  contracts, the position is sold whole at the bid (the sell fee is rounded up per order). It only
+  applies while the entry all-in is under 50¢, which is always true here.
+- **Otherwise held to settlement:** 1/0, or the fair price for a match that never started.
+- **The measured quantity is Δ = C1 − C0 per contract, on the same entries,** plus C1's and C2's own P&L.
+
+**Expected result, pre-registered so the test can fail.** Under a martingale, a dog bought at p0
+reaches 50¢ with probability ≈ 2·p0, so the take-profit is break-even before costs. Costs make it
+negative:
+- a spread and a taker fee on both the buy and the sale;
+- the dog overpricing already measured (Kalshi early-round dogs lost 15.7%).
+
+So C1 and C2 should be negative, and **Δ (C1 vs C0) should be about −1 to −3¢ per contract**. A clearly
+positive Δ over ≥ 30 settled C1 trades would be the surprise worth reporting. Changing anything here
+needs a new dated entry, written before the results exist.
+
+**Start-up entries.** The C rules have their own start-up moment: the first poll after the deploy
+that adds them. It is recorded as that rule's `since` (in `paper.rules`). Their start-up entries
+(entry_ts == the rule's `since`) are reported apart, under the same reading rule as P1–P4.
+
 ## How it runs
 **Live forward test:** `swinglock/scanner/paper.py`, called by the scanner loop every poll.
 - At each poll, each rule either opens a trade on a match (once per rule and match, ever) or checks
@@ -60,14 +100,22 @@ code disagree.
 - An observation needs both sides to have an ask, like the backtest's aligned rows.
 - When a match leaves the open list, its trades are settled from `GET /markets` (one request per 50
   matches, at most once per discovery cycle of 5 min).
-- **Ledger:** `data/paper/ledger.jsonl`, append-only. Each line is one event (`open`, `lock` or
+- **Ledger:** `data/paper/ledger.jsonl`, append-only. Each line is one event (`open`, `lock`, `exit` or
   `settle`) with the full trade snapshot. On restart the scanner replays it, so it never re-enters.
+  `exit` (cash-out rules, sold at the bid) is final; exited trades aren't settled again.
+- `data/paper/paper_state.json` holds each rule's `since` and the matches whose E1/E2 observation has
+  passed, so a restart never takes an E1 or E2 again. P1–P4 trades that predate the file keep the
+  book's first poll as their `since`.
 - **Independent of `positions.json`.**
 
 **Nightly lookback:** `python -m swinglock.scanner.lookback`, run by a systemd timer at about 04:00 UTC.
 - Runs the **same `RULES`** through the **backtest's simulator** (`swing.simulate`, via
   `PaperRule.backtest_cfg`) over the recorder's order books (`data/recorded/kalshi/quotes`, 10 s
   snapshots with real best-level size), at 0¢ and 1¢ slippage.
+- Runs the **same `CASH_RULES`** through `cashout.cash_paths` + `simulate_cashout` (rule `L=50c`; the
+  control takes the same rows' hold P&L). Matches are tracked as processed per group
+  (`processed`, `processed_cashout` in `lookback_state.json`). So the first run after the deploy also
+  simulates the C rules on matches the swing lookback had already done.
 - It's incremental: each night it adds only the matches settled since the last run, and reads only
   the day files around them. Per-match trades are kept in `data/paper/lookback_trades.parquet`, and
   the aggregates go to `data/paper/lookback.json`.
@@ -77,7 +125,8 @@ code disagree.
 
 **The two runs see different data.** Live sees scanner polls (about 6 s apart at 100 matches); the
 lookback sees recorder snapshots (10 s), so their trade lists won't match one for one. The decision
-code is shared, and `test_live_engine_matches_backtest_swing_sim` shows that on the same observations
+code is shared, and `test_live_engine_matches_backtest_swing_sim` (swing) and
+`test_live_cash_engine_matches_backtest_cashout_sim` (cash-out) show that on the same observations
 both give identical trades. The recorder labels A as the player listed first in the event ticker,
 and the scanner as the ticker that sorts first. That only renames sides; it can't change a rule's
 result.
@@ -110,6 +159,18 @@ result.
 - `lock_rate` counts locked trades (settled or not) over all trades.
 - `contracts` (in `by_rule`, here and in lookback.json) is the total entered, before lock buys. P&L per
   contract = `pnl` / `contracts`, which is the pre-registered comparison. Added 2026-10-27 at Dashboard's request.
+
+**Cash-out additions (2026-10-28, additive; nothing renamed or removed):**
+- Every `rules` entry has `group` (`"swing"` or `"cashout"`) and `since` (that rule's first poll; its
+  start-up entries have entry_ts == since). Cash-out rules describe themselves as
+  `{"id", "max_ask", "level" (null = hold), "contracts", "entries": ["E1", "E2"], "group", "since"}`.
+- Every `by_rule` row (state.json and lookback.json) has `group`. For cash-out rows, `locked` counts
+  **exits**, and `settled` counts trades with a final P&L (settled or exited). `pnl_settled` includes the
+  exited trades' sale P&L; `pnl_locked_unsettled` is 0.
+- Trades gain `group`, `entry_type` (`"E1"|"E2"`, null for swing), `exit_ts`, `exit_bid` and `exit_value`
+  (cash after the sell fee). `status` gains `"exited"`, which is final: `pnl` = exit_value − entry_cost,
+  and `pnl_if_a` = `pnl_if_b` = `pnl`.
+- lookback.json gains `matches_processed_cashout`.
 
 **`data/paper/lookback.json`** (the dashboard reads it next to state.json):
 ```json

@@ -19,6 +19,7 @@ Everything stays under data/ on the server (gitignored). Read-only; no order cod
 from __future__ import annotations
 
 import argparse
+import copy
 import json
 import logging
 from datetime import datetime, timedelta, timezone
@@ -28,12 +29,14 @@ from typing import Any
 import pandas as pd
 
 from ..backtest.align import align, staleness_s
+from ..backtest.cashout import LEVEL, LEVEL_L, cash_paths, rule_label, simulate_cashout
 from ..backtest.swing import TRADE_COLUMNS, match_paths, simulate
 from ..config import ROOT, load_config
 from ..schema import MATCH_COLUMNS, conform
 from .client import KalshiReadClient
 from .engine import iso
-from .paper import RULES, PaperRule, load_settlements, save_settlements, settlement_from_markets
+from .paper import (CASH_RULES, RULES, CashRule, PaperRule, load_settlements, save_settlements,
+                    settlement_from_markets)
 
 log = logging.getLogger("swinglock.lookback")
 
@@ -99,20 +102,55 @@ def simulate_rules(aligned: pd.DataFrame, matches: pd.DataFrame, cfg: dict[str, 
     return pd.concat(frames, ignore_index=True)[cols] if frames else pd.DataFrame(columns=cols)
 
 
-def aggregate(trades: pd.DataFrame, rules: tuple[PaperRule, ...] = RULES) -> list[dict]:
+CASH_COLUMNS = ["match_id", "side", "entry_type", "entry_ts", "entry_phase", "entry_ask", "contracts", "locked",
+                "exit_ts", "settle_ts", "pnl", "capital", "rule", "slippage", "group"]
+
+
+def simulate_cash_rules(aligned: pd.DataFrame, matches: pd.DataFrame, cfg: dict[str, Any],
+                        rules: tuple[CashRule, ...] = CASH_RULES) -> pd.DataFrame:
+    """Cash-out rules through `backtest.cashout.simulate_cashout`: one row per (rule, slippage, match,
+    entry type, side) bought under the rule's max_ask. `locked` = exited; `pnl` = the rule's P&L (the
+    level rule's sale, or the hold P&L for the control)."""
+    frames = []
+    for contracts in sorted({r.contracts for r in rules}):
+        c = copy.deepcopy(cfg)
+        c.setdefault("backtest", {})["contracts_per_entry"] = contracts
+        paths = cash_paths(aligned, matches, c)
+        for slip in SLIPPAGES:
+            pos = simulate_cashout(paths, c, slip)
+            for r in (r for r in rules if r.contracts == contracts):
+                level = r.level if r.level is not None else LEVEL_L[0]   # control: any rule's entries
+                if level not in LEVEL_L:
+                    raise ValueError(f"{r.id}: level {level} is not one of cashout.LEVEL_L {LEVEL_L}")
+                d = pos[(pos["rule"] == rule_label(LEVEL, level)) & (pos["entry_ask"] < r.max_ask)
+                        & pos["mode"].isin(r.entries)]
+                if not len(d):
+                    continue
+                hold = r.level is None
+                frames.append(pd.DataFrame({
+                    "match_id": d["match_id"], "side": d["side"], "entry_type": d["mode"],
+                    "entry_ts": d["entry_ts"], "entry_phase": d["entry_phase"], "entry_ask": d["entry_ask"],
+                    "contracts": d["contracts"], "locked": False if hold else d["locked"].astype(bool),
+                    "exit_ts": pd.NaT if hold else d["exit_ts"], "settle_ts": d["settle_ts"],
+                    "pnl": d["hold_pnl"] if hold else d["rule_pnl"], "capital": d["entry_cost"],
+                    "rule": r.id, "slippage": slip, "group": r.group}))
+    return pd.concat(frames, ignore_index=True)[CASH_COLUMNS] if frames else pd.DataFrame(columns=CASH_COLUMNS)
+
+
+def aggregate(trades: pd.DataFrame, rules: tuple = (*RULES, *CASH_RULES)) -> list[dict]:
     rows = []
     for r in rules:
         for slip in SLIPPAGES:
             t = trades[(trades["rule"] == r.id) & (trades["slippage"] == slip)] if len(trades) else trades
             n = len(t)
-            locked = int(t["locked"].sum()) if n else 0
+            locked = int(t["locked"].astype(bool).sum()) if n else 0
             pnl = float(t["pnl"].sum()) if n else 0.0
             rows.append({
-                "rule": r.id, "slippage": slip, "trades": n, "locked": locked,
+                "rule": r.id, "group": r.group, "slippage": slip, "trades": n, "locked": locked,
                 "lock_rate": round(locked / n, 4) if n else None,
                 "pnl": round(pnl, 4), "pnl_per_trade": round(pnl / n, 4) if n else None,
                 "win_rate": round(float((t["pnl"] > 0).mean()), 4) if n else None,
-                "pnl_locked": round(float(t.loc[t["locked"], "pnl"].sum()), 4) if n else 0.0,
+                "pnl_locked": round(float(t.loc[t["locked"].astype(bool), "pnl"].sum()), 4) if n else 0.0,
                 "pnl_unlocked": round(float(t.loc[~t["locked"].astype(bool), "pnl"].sum()), 4) if n else 0.0,
                 "contracts": round(float(t["contracts"].sum()), 4) if n else 0.0,   # entered
                 "capital": round(float(t["capital"].sum()), 4) if n else 0.0,
@@ -126,7 +164,7 @@ def by_day(trades: pd.DataFrame) -> list[dict]:
     if not len(t):
         return []
     day = pd.to_datetime(t["settle_ts"], utc=True).dt.strftime("%Y-%m-%d")
-    g = t.assign(day=day).groupby(["day", "rule"])
+    g = t.assign(day=day, locked=t["locked"].astype(bool)).groupby(["day", "rule"])
     out = g.agg(trades=("pnl", "size"), locked=("locked", "sum"), pnl=("pnl", "sum")).reset_index()
     return [{"day": d, "rule": r, "trades": int(n), "locked": int(k), "pnl": round(float(v), 4)}
             for d, r, n, k, v in out[["day", "rule", "trades", "locked", "pnl"]].itertuples(index=False)]
@@ -139,9 +177,11 @@ def run(cfg: dict[str, Any], recorded: Path, out_dir: Path, client: KalshiReadCl
     state_p, trades_p = out_dir / "lookback_state.json", out_dir / "lookback_trades.parquet"
     settle_p = out_dir / "settlements.json"
     try:
-        processed = set(json.loads(state_p.read_text()).get("processed", []))
+        st = json.loads(state_p.read_text())
     except (OSError, ValueError):
-        processed = set()
+        st = {}
+    processed = set(st.get("processed", []))                # swing rules
+    processed_cash = set(st.get("processed_cashout", []))   # cash-out rules (added 2026-10-28)
 
     mp = recorded / "matches.parquet"
     matches = conform(pd.read_parquet(mp), MATCH_COLUMNS) if mp.exists() else conform(pd.DataFrame(), MATCH_COLUMNS)
@@ -151,7 +191,7 @@ def run(cfg: dict[str, Any], recorded: Path, out_dir: Path, client: KalshiReadCl
     for mid, a, b in zip(matches["match_id"], matches["settle_a"], matches["settle_b"]):
         if pd.notna(a) and pd.notna(b):
             cache.setdefault(str(mid), [float(a), float(b)])
-    todo = matches[~matches["match_id"].isin(processed)]
+    todo = matches[~matches["match_id"].isin(processed) | ~matches["match_id"].isin(processed_cash)]
     anchor = todo["scheduled_start"].fillna(todo["open_time"])
     due = todo[anchor.notna() & (anchor < pd.Timestamp(now) - pd.Timedelta(hours=settle_after_h))]
     missing = due[~due["match_id"].isin(cache)]
@@ -173,8 +213,21 @@ def run(cfg: dict[str, Any], recorded: Path, out_dir: Path, client: KalshiReadCl
         ids = ready["match_id"].astype(str).tolist()
         q = read_quotes(recorded, ids, _days_for(ready))
         if len(q):
-            new = simulate_rules(align(q, ready, staleness_s(cfg)), ready, cfg)
+            aligned = align(q, ready, staleness_s(cfg))
+            sw = ready["match_id"].isin(set(ids) - processed)
+            ca = ready["match_id"].isin(set(ids) - processed_cash)
+            parts = []
+            if sw.any():
+                parts.append(simulate_rules(aligned[aligned["match_id"].isin(ready.loc[sw, "match_id"])],
+                                            ready[sw], cfg).assign(group="swing"))
+            if ca.any():
+                parts.append(simulate_cash_rules(aligned[aligned["match_id"].isin(ready.loc[ca, "match_id"])],
+                                                 ready[ca], cfg))
+            parts = [x for x in parts if len(x)]
+            if parts:
+                new = pd.concat(parts, ignore_index=True)
         processed |= set(ids)
+        processed_cash |= set(ids)
 
     old = pd.read_parquet(trades_p) if trades_p.exists() else new.iloc[:0]
     trades = pd.concat([old, new], ignore_index=True) if len(new) else old
@@ -182,21 +235,22 @@ def run(cfg: dict[str, Any], recorded: Path, out_dir: Path, client: KalshiReadCl
         tmp = trades_p.with_name(trades_p.name + ".tmp")
         trades.to_parquet(tmp, index=False)
         tmp.replace(trades_p)
-    state_p.write_text(json.dumps({"processed": sorted(processed)}))
+    state_p.write_text(json.dumps({"processed": sorted(processed), "processed_cashout": sorted(processed_cash)}))
 
     settled_ids = set(trades["match_id"]) if len(trades) else set()
     summary = {
         "generated_at": iso(now),
-        "source": "recorded order books (swinglock.collectors.recorder), backtest swing sim",
+        "source": "recorded order books (swinglock.collectors.recorder); swing sim + cashout sim",
         "data_from": iso(pd.to_datetime(trades["entry_ts"], utc=True).min()) if len(trades) else None,
         "data_to": iso(pd.to_datetime(trades["settle_ts"], utc=True).max()) if len(trades) else None,
         "matches_recorded": int(len(matches)),
         "matches_processed": int(len(processed)),
+        "matches_processed_cashout": int(len(processed_cash)),
         "matches_with_trades": int(len(settled_ids)),
         "matches_new_this_run": int(len(ready)),
         "matches_awaiting_result": int(len(due) - len(ready)),
         "settlement_requests": int(requests),
-        "rules": [r.describe() for r in RULES],
+        "rules": [r.describe() for r in (*RULES, *CASH_RULES)],
         "by_rule": aggregate(trades),
         "by_day": by_day(trades),
     }
