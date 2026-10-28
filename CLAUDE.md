@@ -468,7 +468,7 @@ Since phat-d0/Tennis_Model#116 also: `min_arb_profit_per_contract` (the alert th
   parse is strict (4/8/16/32 linked seeds, else skipped and logged). Rounds 1–2 use a proxy: the seed's first or second
   listed match in that event. Backtest rows from Sackmann seeds: seed 3,100 bets −10.4%, seed_q 535 −9.7%. The parser is
   tested on a **synthetic** fixture, since en.wikipedia.org isn't reachable from cloud sessions. 0 credits. 320 tests.
-- 2026-10-28: Pre-match Elo rank export for MISMATCH50 (phat-d0/Tennis_Model#—, `upsets/elo_ranks.py`, CLI
+- 2026-10-28: Pre-match Elo rank export for MISMATCH50 (phat-d0/Tennis_Model#141, `upsets/elo_ranks.py`, CLI
   `python -m upsets.elo_ranks --data <dir> [--data <dir>] --sackmann <archive> --out <parquet>`): match_id, rank_a, rank_b
   (+ elo, n, matched, pool) for Kalshi ATP/WTA tour + Challenger/WTA 125 matches. It uses phase B's timeline (guards
   intact), ranks among each tour's active players (≥ 10 rated matches, played in the last 365 days) at the start of the
