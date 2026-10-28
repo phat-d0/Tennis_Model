@@ -45,7 +45,7 @@ conflict (git merges edits that touch different blocks).
   Live strategy built (#137): Wikipedia seeds + round proxy, rows "seed" and "seed_q"; trades only in /scores
   tournaments, so empty until about Jan 2027. Real-draw parser test pending en.wikipedia.org on the allowlist. Now (owner
   2026-10-28, MISMATCH50): pre-match Elo rank export for Backtest (`upsets/elo_ranks.py`, #141; Data runs it), plus a
-  live-rank plan for the VPS (sent to the Lead, not built). Later: the line-shopping forward-test readout in Jan 2027.
+  live-rank table `current()` (PR #—, for Scanner's nightly job once the Lead decides after the MISMATCH50 backtest). Later: the line-shopping forward-test readout in Jan 2027.
   Waiting on: owner to allow en.wikipedia.org in this environment (real-draw parser fixture).
 
 
