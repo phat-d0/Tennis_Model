@@ -24,6 +24,7 @@ from pathlib import Path
 
 import numpy as np
 import pandas as pd
+import requests
 
 from .names import name_key
 
@@ -195,11 +196,16 @@ def pilot_stats(m: pd.DataFrame, snaps: list[dict], planned: int, spent: float) 
     return "\n".join(L)
 
 
+RETRY_WAITS_S = (10, 30)   # a 5xx or a network error is retried after these pauses, then the stage stops
+
+
 def make_fetch(api, log: Path, cap: float, stage_budget: float | None = None, keep: list | None = None,
-               pause_s: float = 0.2):
+               pause_s: float = 0.2, retry_waits_s=RETRY_WAITS_S):
     """fetch(key, when) for walk(): cached snapshots first (in-play cache, then the close studies' cache, read
     only); else one paid call, unless it would take this job's spend log past `cap`, or this stage's spend past
-    `stage_budget` (the per-match drift stop), in which case it returns None (walk stops). fetch.why says which."""
+    `stage_budget` (the per-match drift stop), in which case it returns None (walk stops). fetch.why says which.
+    A server error (5xx) or a network error is retried after each of `retry_waits_s`; if it persists the stage
+    stops the same way (cached snapshots make a re-run free up to that point). A 4xx is never retried."""
     from . import dk_history as dh
     start = dh.logged_total(log)
 
@@ -216,7 +222,17 @@ def make_fetch(api, log: Path, cap: float, stage_budget: float | None = None, ke
             if stage_budget is not None and total - start + CREDITS_PER_SNAPSHOT > stage_budget:
                 fetch.why = "per-match drift budget"
                 return None
-            body = api.historical_odds(key, when, bookmakers=BOOKS)
+            body = None
+            for wait in (*retry_waits_s, None):
+                try:
+                    body = api.historical_odds(key, when, bookmakers=BOOKS)
+                    break
+                except requests.RequestException as e:
+                    code = getattr(getattr(e, "response", None), "status_code", None)
+                    if (code is not None and code < 500) or wait is None:
+                        fetch.why = f"API error ({type(e).__name__}{f' {code}' if code else ''})"
+                        return None
+                    time.sleep(wait)
             dh.write_cache(p, body)
             time.sleep(pause_s)
         if keep is not None:

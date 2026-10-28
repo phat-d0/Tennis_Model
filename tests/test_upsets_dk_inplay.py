@@ -1,6 +1,7 @@
 """DK in-play credit dry run (upsets/dk_inplay.py), synthetic frames only."""
 
 import pandas as pd
+import pytest
 
 from upsets import dk_inplay as di
 
@@ -123,3 +124,54 @@ def test_make_fetch_stops_at_the_job_cap_and_the_drift_budget(tmp_path, monkeypa
     assert f("k", "2024-01-15T10:00:00Z") is not None and Api.calls == 2         # cached: free, still allowed
     g = di.make_fetch(Api(), log, cap=125, pause_s=0)                            # job total is 120 now
     assert g("k", "2024-01-15T11:00:00Z") is None and g.why == "job cap" and Api.calls == 2
+
+
+def test_api_errors_never_carry_the_key_and_5xx_is_retried(tmp_path, monkeypatch):
+    import requests
+    from upsets import dk_history as dh
+    from upsets.odds_api import OddsApi
+    monkeypatch.setattr(di, "INPLAY_CACHE", tmp_path / "inplay")
+    monkeypatch.setattr(dh, "CACHE", tmp_path / "close")
+
+    class R:
+        def __init__(self, code):
+            self.status_code, self.headers = code, {"x-requests-remaining": "1000000", "x-requests-last": "0"}
+            self.url = "https://api.the-odds-api.com/v4/x?apiKey=SECRETKEY"
+
+        def raise_for_status(self):
+            if self.status_code >= 400:
+                raise requests.HTTPError(f"{self.status_code} Server Error for url: {self.url}", response=self)
+
+        def json(self):
+            return {"timestamp": "t", "data": []}
+
+    class S:
+        def __init__(self, codes):
+            self.codes = list(codes)
+
+        def get(self, url, params=None, timeout=None):
+            if url.endswith("/sports"):
+                return R(200)
+            code = self.codes.pop(0)
+            if code == 0:
+                raise requests.ConnectionError(f"Max retries exceeded with url: /v4/x?apiKey={params['apiKey']}")
+            return R(code)
+
+    api = OddsApi(floor=0, key="SECRETKEY", session=S([502]), spend_log=tmp_path / "spend.log")
+    with pytest.raises(requests.HTTPError) as e:
+        api.historical_odds("k", "2024-01-15T10:00:00Z")
+    assert "SECRETKEY" not in str(e.value) and "502" in str(e.value) and e.value.response.status_code == 502
+    api = OddsApi(floor=0, key="SECRETKEY", session=S([0]), spend_log=tmp_path / "spend.log")
+    with pytest.raises(requests.ConnectionError) as e:
+        api.historical_odds("k", "2024-01-15T10:00:00Z")
+    assert "SECRETKEY" not in str(e.value) and e.value.__cause__ is None and e.value.__suppress_context__
+    # make_fetch: 502 then 0 (network) then OK -> retried twice, succeeds; a 4xx stops at once
+    ok = di.make_fetch(OddsApi(floor=0, key="K", session=S([502, 0, 200]), spend_log=tmp_path / "s1.log"),
+                       tmp_path / "s1.log", cap=1e9, pause_s=0, retry_waits_s=(0, 0))
+    assert ok("k", "2024-01-15T10:00:00Z") is not None and ok.why is None
+    bad = di.make_fetch(OddsApi(floor=0, key="K", session=S([404]), spend_log=tmp_path / "s2.log"),
+                        tmp_path / "s2.log", cap=1e9, pause_s=0, retry_waits_s=(0, 0))
+    assert bad("k", "2024-01-15T11:00:00Z") is None and bad.why == "API error (HTTPError 404)"
+    gone = di.make_fetch(OddsApi(floor=0, key="K", session=S([502, 503, 502]), spend_log=tmp_path / "s3.log"),
+                         tmp_path / "s3.log", cap=1e9, pause_s=0, retry_waits_s=(0, 0))
+    assert gone("k", "2024-01-15T12:00:00Z") is None and gone.why == "API error (HTTPError 502)"
