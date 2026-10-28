@@ -65,7 +65,7 @@ Each role also owns its own `tests/test_<area>*.py`.
    - **In the same PR as the work,** add your own lines to `CLAUDE.md`:
      - a Changelog entry: date, what changed, PR number, the key numbers and tests passing;
      - any new *verified* Key fact or Decision. Mark owner decisions "(owner)".
-   - **Update your role's row** in the Master plan at the top of `docs/WORK_PLAN.md`, and your own status
+   - **Update your role's block** in the Master plan at the top of `docs/WORK_PLAN.md`, and your own status
      lines further down.
    - **Append or edit your own lines only;** never rewrite another role's.
    - **Owner rules, team rules and plan order stay with the Lead.** The Owner's standing rules, these Team

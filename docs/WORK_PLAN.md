@@ -1,6 +1,6 @@
 # Work plan
 
-Status for every project. Each role updates its own row of the Master plan and its own status lines, in
+Status for every project. Each role updates its own block of the Master plan and its own status lines, in
 the same PR as the work (CLAUDE.md, Team rule 7). The Lead keeps the priority order and merges. Durable rules
 and facts are in `CLAUDE.md`.
 
@@ -18,14 +18,27 @@ answers to the owner's open questions.
 4. **Open on the owner:** `ODDSPAPI_KEY` + allow oddspapi.io / api.oddspapi.io (DK Challenger lines test). Optional:
    ask GitHub Support to purge the orphaned commit ae08bf5.
 
-| Role | Now | Next | Waiting on |
-|---|---|---|---|
-| Lead | Review/merge; Odds API budget; owner reports; read the first paper lookback (owner screenshot) | Consolidate the scanner and collector clients; README | Owner screenshot |
-| Data | Inputs ready for the cash-out run (kalshi_g0 + sets, kalshi_g12) | Run cashout locally → aggregates to Backtest; OddsPapi test | Backtest's cashout PR; owner's OddsPapi key |
-| Backtest | `swinglock/backtest/cashout.py` + CLI + tests, with the Level/DOG50 amendment | `reports/backtest_cashout.md` from Data's aggregates | — |
-| Scanner | Paper trading live on the VPS since 2026-10-27 17:34 UTC | Watch 429s and the 04:00 UTC lookback; fixes only | — |
-| Dashboard | Paper tab live (#118) | Check it against the owner's screenshots | Owner screenshots |
-| Upsets | Page builder + Portfolio upkeep (Polymarket Challengers #111, power de-vig #112 live) | Propose a durable home for the Portfolio ledger (Actions cache can be evicted) before it fills; line-shopping forward-test readout Jan 2027. New research ideas need the owner | — |
+**Roles.** Each role edits only its own block. The blocks are kept apart by blank lines so that two PRs don't
+conflict (git merges edits that touch different blocks).
+
+- **Lead.** Now: review and merge; the Odds API budget; owner reports; reading the first paper lookback (owner screenshot).
+  Next: consolidate the scanner and collector clients; the README. Waiting on: the owner's health-check paste and screenshot.
+
+- **Data.** Now: inputs ready for the cash-out run (kalshi_g0 + sets, kalshi_g12). Next: run cashout locally and send
+  aggregates to Backtest; the OddsPapi test. Waiting on: Backtest's cashout PR (#125); the owner's OddsPapi key.
+
+- **Backtest.** Now: `swinglock/backtest/cashout.py` + CLI + tests (#125), with the Level/DOG50/set-end amendment.
+  Next: `reports/backtest_cashout.md` from Data's aggregates. Waiting on: —
+
+- **Scanner.** Now: paper trading live on the VPS since 2026-10-27 17:34 UTC. Next: watch 429s and the 04:00 UTC lookback;
+  fixes only. Waiting on: the owner's health-check paste.
+
+- **Dashboard.** Now: Paper tab live (#118, #121); first live screenshot checked 2026-10-27 (renders as designed).
+  Next: check the lookback panel after the first 04:00 UTC run. Waiting on: an owner screenshot of the lookback.
+
+- **Upsets.** Now: page builder + Portfolio upkeep (Polymarket Challengers #111, power de-vig #112 live). Next: a durable
+  Portfolio ledger (restore from the published page, approved 2026-10-28); the line-shopping forward-test readout in Jan 2027.
+  New research ideas need the owner. Waiting on: —
 
 
 ## Done
