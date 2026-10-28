@@ -493,6 +493,9 @@ Since phat-d0/Tennis_Model#116 also: `min_arb_profit_per_contract` (the alert th
   the **spread of outcomes** (SD of P&L per contract, with the range); exits show as "sold @ bid"; start-up entries use each
   rule's own `since`; the lookback gets a cash-out table (Δ vs C0 at 0¢/1¢) and its own chart. Contract tests run Scanner's
   swing and cash-out code: 20/20 dashboard tests pass on #132's head (74528a3); 311 passed + 2 skipped on main.
+- 2026-10-28 (Dashboard): public page labels Upsets' new Portfolio strategies ("Seed loses early", "Seed loses early
+  (qualifiers)", phat-d0/Tennis_Model#137) and credits their seed source in the footer: "Seeds and qualifiers for the 'Seed
+  loses early' strategies: Wikipedia (CC BY-SA)". Service-worker cache v5. 14 site tests passing.
 - 2026-10-27: Paper trading live on the server from 17:34 UTC. Owner deleted `team/scanner`; no ref holds ae08bf5 now (an orphaned
   commit can still be fetched by full SHA until GitHub's GC; GitHub Support can purge it).
 - 2026-10-26: **Tennis Odds page live** at https://phat-d0.github.io/Tennis_Model/ (GitHub Pages, `.github/workflows/publish.yml`,

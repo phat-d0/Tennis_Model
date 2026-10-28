@@ -355,7 +355,8 @@ const money = (x, dp = 0) => {
 };
 const signed = (x, dp = 1) => (isNum(x) ? (x > 0 ? "+" : x < 0 ? "−" : "") + Math.abs(x * 100).toFixed(dp) + "%" : "—");
 const sgnCls = (x) => (isNum(x) ? (x > 0 ? "pos" : x < 0 ? "neg" : "") : "");
-const PF_SHORT = { model: "Elo model", line: "DK vs Pinnacle", dogs: "Underdogs" };
+const PF_SHORT = { model: "Elo model", line: "DK vs Pinnacle", dogs: "Underdogs",
+  seed: "Seed loses early", seed_q: "Seed loses early (qualifiers)" };
 
 function tile(label, value, sub, cls) {
   return el("div", { class: "tile" }, el("div", { class: "t-label" }, label),
@@ -543,6 +544,9 @@ function footer() {
     ", licensed ", el("a", { href: "https://creativecommons.org/licenses/by-nc-sa/4.0/", rel: "noopener" }, "CC BY-NC-SA 4.0"),
     ". This page is non-commercial."));
   lines.push(p("Odds from DraftKings Sportsbook and Pinnacle via The Odds API. Not betting advice."));
+  lines.push(p("Seeds and qualifiers for the \u2018Seed loses early\u2019 strategies: ",
+    el("a", { href: "https://en.wikipedia.org", rel: "noopener" }, "Wikipedia"),
+    " (", el("a", { href: "https://creativecommons.org/licenses/by-sa/4.0/", rel: "noopener" }, "CC BY-SA"), ")."));
   if (odds && odds.challengers && typeof odds.challengers === "object") {
     lines.push(p("Challenger and WTA 125 prices: Polymarket (international) public order books, indicative only, not tradable from the US."));
   }
