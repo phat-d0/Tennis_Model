@@ -385,6 +385,9 @@ def test_cli_unranked_section(tmp_path):
         assert (out / f).exists()
     md = (out / "cashout_summary.md").read_text()
     assert "MISMATCH50-U" in md and "ASSUMPTION" in md
+    assert "`inactive` (no match in 365 days): **not observed** (by construction" in md      # only `unmatched` here
+    assert "`few_matches` (fewer than 10 rated matches): **not observed**" in md
+    assert "MISMATCH50-U at E1r (post hoc, not counted)" in md
     assert pd.read_csv(out / "cashout_mm50.csv").empty                   # no fully ranked matches here
 
 
@@ -420,4 +423,6 @@ def test_cli_e1r_section(tmp_path):
         assert (out / f).exists()
     assert not (out / "cashout_e1r_mm50.csv").exists()                  # no --ranks
     md = (out / "cashout_summary.md").read_text()
-    assert "E1r robustness check" in md and "POST HOC" in md
+    assert "E1r robustness check" in md and "POST HOC, not counted" in md
+    assert "DOG50 at E1r (post hoc, not counted)" in md and "E1r take-profit walk-forward (post hoc" in md
+    assert (out / "cashout_e1r_gate_dog50.csv").exists() and (out / "cashout_e1r_gate_e1r.csv").exists()

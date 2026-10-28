@@ -583,7 +583,22 @@ def unranked_md(u: dict[str, pd.DataFrame], gate: FixedGate) -> list[str]:
             "Overall, by unranked reason, by entry type and by tour level:", "", fmt(u["u50"]), "",
             fmt(u["u50_reason"]), "", fmt(u["u50_mode"]), "", fmt(u["u50_tier"]), "",
             "Entry-price distribution by unranked reason (0c; are they priced as heavy dogs?):", "",
-            fmt(u["u50_price"]), ""]
+            fmt(u["u50_price"]), "",
+            *_missing_reason_notes(u["u50_reason"])]
+
+
+# reasons the rank export can write; "inactive" is not observed by construction (a player's own activity
+# isn't required to hold a rank, Upsets #145), so its absence is not an empty test
+UNRANKED_REASONS = {"unmatched": "name not matched", "few_matches": "fewer than 10 rated matches",
+                    "inactive": "no match in 365 days"}
+
+
+def _missing_reason_notes(by_reason: pd.DataFrame) -> list[str]:
+    seen = set(by_reason["reason"]) if len(by_reason) else set()
+    notes = [f"- reason `{r}` ({label}): **not observed**"
+             + (" (by construction: the rank export never writes it)" if r == "inactive" else "")
+             for r, label in UNRANKED_REASONS.items() if r not in seen]
+    return [*notes, ""] if notes else []
 
 
 # ---- walk-forward gate ---------------------------------------------------------
@@ -643,15 +658,22 @@ def report_md(data_dir, aligned, ident, summary, bands, gates: dict[str, WalkFor
     return "\n".join(lines)
 
 
-def e1r_md(t: dict[str, pd.DataFrame], cov: dict[str, float]) -> list[str]:
+def e1r_md(t: dict[str, pd.DataFrame], cov: dict[str, float], gates: dict[str, Any]) -> list[str]:
+    """E1r section; every verdict here is labelled post hoc and not counted (the registered ones stand)."""
     fmt = lambda df: md_table(df.round(4))                               # noqa: E731
-    lines = ["## E1r robustness check (addendum 5: POST HOC, descriptive only, never gated)",
+    lines = ["## E1r robustness check (addendum 5: POST HOC, not counted)",
              f"E1 buys at the first pre-match row, which is usually the listing-time placeholder book (median "
-             f"ask_a + ask_b there: ${cov['median_first_pre_combined']:.2f}), so E1 results above are an artefact. "
+             f"ask_a + ask_b there: ${cov['median_first_pre_combined']:.2f}): a listing-book artefact, superseded by "
              f"E1r = the first pre-match row with ask_a + ask_b <= ${E1R_MAX_COMBINED:.2f}. Matches with a pre-match "
              f"row: {cov['with_pre']}; with a formed pre-match book: {cov['with_formed_pre']} "
-             f"({cov['frac_formed']:.1%}). Gate verdicts above are unchanged.", "",
-             "DOG50 at E1r:", "", fmt(t["e1r_dog50"]), "", "All rules at E1r:", "", fmt(t["e1r_summary"]), ""]
+             f"({cov['frac_formed']:.1%}); never formed: {cov['with_pre'] - cov['with_formed_pre']}. E1r was defined "
+             "after the E1 results were seen, so its gate verdicts are reported but NOT counted; the registered "
+             "verdicts above stand.", ""]
+    for name, g in gates.items():                                        # WalkForward or FixedGate
+        verdict = "PASS" if g.passed else "FAIL: " + "; ".join(g.reasons)
+        lines += [f"- {name} (post hoc, not counted): **{verdict}**", "",
+                  fmt(g.gate.assign(slippage=g.gate["slippage"].map(slip_label))), ""]
+    lines += ["DOG50 at E1r:", "", fmt(t["e1r_dog50"]), "", "All rules at E1r:", "", fmt(t["e1r_summary"]), ""]
     for k, title in (("e1r_mm50", "MISMATCH50 at E1r"), ("e1r_u50", "MISMATCH50-U at E1r")):
         if k in t:
             lines += [f"{title}:", "", fmt(t[k]), ""]
@@ -742,27 +764,33 @@ def main(argv: list[str] | None = None) -> int:
     for e, wf in gates.items():
         wf.folds.to_csv(args.out / f"cashout_wf_folds_{e}.csv", index=False)
         wf.gate.to_csv(args.out / f"cashout_wf_gate_{e}.csv", index=False)
-    # addendum 5: E1r robustness check (post hoc, descriptive only, never gated)
+    # addendum 5: E1r robustness check (post hoc: verdicts reported, not counted)
     cov = formed_book_coverage(paths)
     e1r = {s: simulate_cashout(paths, cfg, s, entries=(E1R,)).assign(slippage=s) for s in SLIPPAGES}
     e1r_all = pd.concat(e1r.values(), ignore_index=True)
-    e1r_tables = {"e1r_dog50": dog_summary(dog_positions(e1r_all), ("slippage",), st),
+    e1r_dog = {s: dog_positions(d) for s, d in e1r.items()}
+    e1r_tables = {"e1r_dog50": dog_summary(pd.concat(e1r_dog.values(), ignore_index=True), ("slippage",), st),
                   "e1r_summary": summarize(e1r_all, ("rule", "slippage"), st)}
+    e1r_gates: dict[str, Any] = {"E1r take-profit walk-forward": walk_forward_cashout(e1r, months, E1R, cfg),
+                                 "DOG50 at E1r": fixed_rule_gate(e1r_dog, months, st)}
     if ranks is not None:
-        e1r_tables["e1r_mm50"] = mismatch_summary(mismatch_positions(ranked_positions(e1r_all, ranks)),
-                                                  ("slippage",), fm, st)
-        e1r_tables["e1r_u50"] = mismatch_summary(
-            pd.concat([unranked_positions(d, ranks).assign(slippage=s) for s, d in e1r.items()], ignore_index=True),
-            ("slippage",), fm, st)
+        e1r_mm = {s: mismatch_positions(ranked_positions(d, ranks)) for s, d in e1r.items()}
+        e1r_u = {s: unranked_positions(d, ranks).assign(slippage=s) for s, d in e1r.items()}
+        e1r_tables["e1r_mm50"] = mismatch_summary(pd.concat(e1r_mm.values(), ignore_index=True), ("slippage",), fm, st)
+        e1r_tables["e1r_u50"] = mismatch_summary(pd.concat(e1r_u.values(), ignore_index=True), ("slippage",), fm, st)
+        e1r_gates["MISMATCH50 at E1r"] = fixed_rule_gate(e1r_mm, months, st)
+        e1r_gates["MISMATCH50-U at E1r"] = fixed_rule_gate(e1r_u, months, st)
     for k, v in e1r_tables.items():
         v.to_csv(args.out / f"cashout_{k}.csv", index=False)
+    for k, g in e1r_gates.items():
+        g.gate.to_csv(args.out / f"cashout_e1r_gate_{k.split()[0].replace('-', '_').lower()}.csv", index=False)
     pd.DataFrame([cov]).to_csv(args.out / "cashout_e1r_coverage.csv", index=False)
 
     md = report_md(args.data, aligned, identity_check(aligned), summary, bands, gates, set_split, dog, dog_gate,
                    dogl)
     if ranks is not None:
         md += "\n" + "\n".join([*mismatch_md(mm, mm_gate), *unranked_md(u, u_gate)])
-    md += "\n" + "\n".join(e1r_md(e1r_tables, cov))
+    md += "\n" + "\n".join(e1r_md(e1r_tables, cov, e1r_gates))
     (args.out / "cashout_summary.md").write_text(md)
     print(md)
     return 0

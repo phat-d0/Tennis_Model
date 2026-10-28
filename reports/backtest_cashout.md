@@ -186,11 +186,12 @@ the range, with large variance reductions for small targets. No rule has a posit
 | E1, Challenger | 1 | −$305.38 / −$365.28 | 1,616 / 1,518 |
 | E2, Challenger | 3 | −$63.72 / −$292.00 | 2,082 / 1,756 |
 
-**E1 is invalid (a listing-book artefact).** At a match's first pre-match observation the book is mostly
+**E1 is invalid: a listing-book artefact, superseded by E1r.** At a match's first pre-match observation the book is mostly
 empty: the median ask_a + ask_b is **$1.84** (ATP/WTA) and **$1.88** (Challenger), so E1 buys placeholder
 offers on both players. That's why 87% (ATP/WTA) and 82% (Challenger) of E1 entries cost ≥ 80¢. The E1 rows
-measure the empty opening book, not cashing out. **E2 is the valid entry.** A formed-book version (E1r,
-amendment 5) is being re-run as a descriptive check; the registered verdicts above stand.
+measure the empty opening book, not cashing out. **E2 is the valid entry.** A formed-book version (E1r = the
+first pre-match row with ask_a + ask_b ≤ $1.05, amendment 5) is being re-run; its verdicts will be reported as
+post hoc and not counted. The registered verdicts above stand.
 
 ## 5. Set end vs mid-set (descriptive, ATP/WTA only, 1¢)
 A live exit counts as "set end" if it falls within ±3 min of a Kalshi set-winner close time. Kalshi has
@@ -256,7 +257,7 @@ Unranked opponents (MISMATCH50-U, amendment 4) will be added once Data's run wit
   unchanged for > 60 s, so stale-quote exits are not driving the results.
 - **Taker only.** Every fill pays the spread and the taker fee. Resting (maker) orders were not tested.
 - **E1 is invalid:** it buys listing-time placeholder offers (median combined ask $1.84 / $1.88); see §4.
-  Read E2. The E1r re-run (formed book, post hoc, descriptive) is pending.
+  Read E2. Superseded by E1r (formed book; post hoc, verdicts not counted), re-run pending.
 - **Dog samples are modest:** 817 ATP/WTA dog positions over 7 months. Every CI is shown.
 - **Rank** in §6 is a pre-match Elo rank (a proxy), not the official ATP/WTA ranking.
 - **Fee constants** (0.07) still await the owner's confirmation at kalshi.com/fee-schedule.
