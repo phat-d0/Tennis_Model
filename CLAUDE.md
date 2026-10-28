@@ -524,6 +524,14 @@ Since phat-d0/Tennis_Model#116 also: `min_arb_profit_per_contract` (the alert th
   g0 (4,695 ATP/WTA) and g12 (8,349 Challenger/WTA 125): every gate FAILs. DOG50 at 1¢: g0 −$226.07 (ROI −18.8%, 2/7 months +),
   g12 −$641.46 (−28.7%, 0/7); DOGL g0 1/6, g12 0/6 folds +; E1/E2 FAIL on both. bid(A) = 1 − ask(B) exactly (max gap 0).
   Aggregates sent to Backtest verbatim with sha256 per section; outputs stay in gitignored `data/reports/`.
+- 2026-10-28 (Data): MISMATCH50, MISMATCH50-U and E1r runs (main c018be0 then ad76187; ranks from `upsets.elo_ranks`, 13,042 matches,
+  both ranked 80.2–97.9% by series; unranked: few_matches 1,052, unmatched 705). Two earlier runs were stopped and deleted unread
+  (a rank lookahead fix #142, then #148). **All FAIL.** MISMATCH50 at 1¢: g0 −$6,522.58 (ROI −63.6%, 1,916 entries), g12 −$679.17
+  (−56.1%, 251); E2 only g0 −16.0%, g12 −9.4%; the worse-ranked player reaches 50¢ less often than the price implies (g0 34.1% vs 38.4%).
+  U: g0 73 entries / 8 triggers, ROI −54.7%; g12 28 / 1, −73.3%; unranked players are often priced as favourites (median ask 0.60–0.66).
+  **Found:** the first `pre` row is the listing-time placeholder book (median ask_a + ask_b $1.84 g0 / $1.88 g12), so E1 measured
+  the empty book; Backtest's post-hoc E1r (first pre row with combined ask ≤ $1.05, not counted) also FAILs everywhere.
+  346 tests passing; 0 Kalshi requests; aggregates sent verbatim with sha256.
 - 2026-10-28 (Dashboard): Paper tab shows the cash-out portfolio C0–C4 (owner request; phat-d0/Tennis_Model#136 with Scanner's
   #132): its own section "Cash-out portfolio (pre-registered 2026-10-28)" with open/exited/final, exit rate, final P&L
   (settled + sold), P&L per contract, **Δ vs C0 per contract on paired entries** (same match, side and E1/E2, both final) and

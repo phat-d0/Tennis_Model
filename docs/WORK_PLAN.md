@@ -24,8 +24,8 @@ conflict (git merges edits that touch different blocks).
 - **Lead.** Now: review and merge; the Odds API budget; owner reports; reading the first paper lookback (owner screenshot).
   Next: consolidate the scanner and collector clients; the README. Waiting on: the owner's health-check paste and screenshot.
 
-- **Data.** Now: cash-out study run done (2026-10-28; g0 + g12, all FAIL); aggregates sent to Backtest. Next: the OddsPapi
-  test; Kalshi work otherwise paused. Waiting on: the owner's OddsPapi key.
+- **Data.** Now: cash-out, MISMATCH50, MISMATCH50-U and E1r runs done (2026-10-28; all FAIL); aggregates sent to Backtest.
+  Next: the OddsPapi test; Kalshi work otherwise paused. Waiting on: the owner's OddsPapi key.
 
 - **Backtest.** Done: cash-out study + MISMATCH50 (all FAIL; `reports/backtest_cashout.md`). E1 is invalid (listing-book
   placeholders); E1r robustness check coded (amendment 5, post hoc: verdicts reported, not counted). Next: MISMATCH50-U + E1r read from Data's next
