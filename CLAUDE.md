@@ -502,6 +502,11 @@ Since phat-d0/Tennis_Model#116 also: `min_arb_profit_per_contract` (the alert th
   price-implied rate, P&L/ROI/Δ/SD/P10 by tier and rank-ratio bucket, and the DOG50 overlap; same fixed-rule gate.
   CLI `--ranks` (match_id, rank_a, rank_b). Expected FAIL. Not run yet (waits on Upsets' rank export). 335 tests passing
   (pandas 3.0.5 and 3.1.0).
+- 2026-10-28 (Backtest): cash-out amendment 4, MISMATCH50-U (owner: "include unranked players"). Buy the unranked player
+  (NaN pre-match Elo rank; assumed below the active pool, labelled) vs a player ranked ≤ 100, at E1/E2, sell at net bid
+  ≥ 50¢. Reported apart from MISMATCH50, by unranked reason (`reason_a`/`reason_b`: few matches / inactive / unmatched)
+  with an entry-price distribution per reason; same fixed-rule gate. Expected FAIL. Not run yet.
+  341 tests passing (pandas 3.0.5 and 3.1.0).
 - 2026-10-28 (Data): cash-out study run locally on main e41c055 (with #130); 0 Kalshi requests, 308 tests passing.
   g0 (4,695 ATP/WTA) and g12 (8,349 Challenger/WTA 125): every gate FAILs. DOG50 at 1¢: g0 −$226.07 (ROI −18.8%, 2/7 months +),
   g12 −$641.46 (−28.7%, 0/7); DOGL g0 1/6, g12 0/6 folds +; E1/E2 FAIL on both. bid(A) = 1 − ask(B) exactly (max gap 0).
