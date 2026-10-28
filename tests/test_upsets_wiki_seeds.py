@@ -40,15 +40,16 @@ def test_titles():
 
 
 class Wiki:
-    def __init__(self, pages=None, fail=False):
-        self.pages, self.fail, self.calls = pages or {}, fail, []
+    def __init__(self, pages=None, fail=False, retry_after=None):
+        self.pages, self.fail, self.calls, self.retry_after = pages or {}, fail, [], retry_after
 
     def get(self, url, params=None, headers=None, timeout=None):
         assert url == ws.API and headers["User-Agent"].startswith("tennis-odds-page")
         self.calls.append(params["page"])
 
         class R:
-            status_code = 503 if self.fail else 200
+            status_code = 429 if self.fail == 429 else 503 if self.fail else 200
+            headers = {} if self.retry_after is None else {"Retry-After": self.retry_after}
 
             def raise_for_status(s):
                 if s.status_code >= 400:
@@ -76,6 +77,34 @@ def test_seeds_for_failures_are_not_cached_and_never_leak_urls(tmp_path):
     got, note = ws.seeds_for(Wiki({"2031 US Open – Men's singles": "no seeds"}), tmp_path, USO, 2031)
     assert got is None and "no clean seed list" in note and not (tmp_path / "wiki_seeds.json").exists()
     assert ws.seeds_for(Wiki(), tmp_path, USO, 2031)[1] == "no article"
+
+
+def test_429_backs_off_for_retry_after_and_never_retries(tmp_path):
+    from datetime import datetime, timedelta, timezone
+    t0 = datetime(2031, 8, 25, 12, tzinfo=timezone.utc)
+    w = Wiki(fail=429, retry_after="3600")
+    got, note = ws.seeds_for(w, tmp_path, USO, 2031, now=t0)
+    assert got is None and note.startswith("rate-limited (429)") and "13:00Z" in note
+    assert w.calls == ["2031 US Open – Men's singles"]                     # no second title, no retry
+    ok = Wiki({"2031 US Open – Singles": FX})
+    got, note = ws.seeds_for(ok, tmp_path, USO, 2031, now=t0 + timedelta(minutes=30))
+    assert got is None and note.startswith("skipped") and ok.calls == []   # inside the back-off: no request
+    got, note = ws.seeds_for(ok, tmp_path, USO, 2031, now=t0 + timedelta(hours=2))
+    assert got is not None and "parsed" in note                            # after it: fetches again
+    # a short or missing Retry-After still backs off at least MIN_BACKOFF_S
+    (tmp_path / "wiki_backoff.json").unlink()
+    (tmp_path / "wiki_seeds.json").unlink()
+    ws.seeds_for(Wiki(fail=429, retry_after="1"), tmp_path, USO, 2031, now=t0)
+    assert ws._backoff_until(tmp_path) == t0 + timedelta(seconds=ws.MIN_BACKOFF_S)
+    assert ws._retry_after("Wed, 25 Aug 2031 12:05:00 GMT", t0) == 300
+    assert ws._retry_after("soon", t0) is None
+
+
+def test_seed_facts_stops_calling_after_a_429(tmp_path):
+    w = Wiki(fail=429, retry_after="20")
+    other = dict(match("m9", "A B", "C D"), sport_key="tennis_wta_us_open")
+    site.seed_facts(w, tmp_path, snaps([]), [match("m1", "Marco Alpha", "Sam Epsilon"), other], NOW)
+    assert len(w.calls) == 1                                               # the second event is skipped
 
 
 def match(eid, p1, p2, hours=5, dk=(1.3, 3.6), pin=(1.32, 3.5)):

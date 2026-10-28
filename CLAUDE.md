@@ -487,6 +487,11 @@ Since phat-d0/Tennis_Model#116 also: `min_arb_profit_per_contract` (the alert th
   null when ranked, else `unmatched` (name not found), `few_matches` (< min_n rated matches; elo/n keep the provisional
   rating) or `inactive` (empty active pool on the match day; a player's own activity isn't required for a rank, so this
   is rare). rank_a/rank_b unchanged. The CLI summary prints the reason counts. 7 rank tests; 344 tests (pandas 2 and 3.1).
+- 2026-10-28: Wikipedia seeds back off on HTTP 429 (phat-d0/Tennis_Model#PRNUM). en.wikipedia.org is now allowed, but the
+  MediaWiki API answers 429 "too many requests" to the cloud sessions' shared IP (4 calls from Upsets, 1 from the Lead), so
+  the real-draw fixture is still synthetic. `wiki_seeds` never retries a 429: it writes `wiki_backoff.json` (Retry-After,
+  at least 10 min, at most 1 day) and skips every Wikipedia call until then, the rest of that build included. The seeds
+  log says "no scored tournaments in view" when there is nothing to look up. 348 tests (pandas 2 and 3.1).
 - 2026-10-28 (Backtest): cash-out study code merged (phat-d0/Tennis_Model#125): `swinglock/backtest/cashout.py`, CLI
   `python -m swinglock.backtest.cashout --data <dir> [--sets <dir>/sets.parquet]`. Dated amendment (before any run):
   Level exits (12 gate rules), DOG50 fixed-rule gate on absolute P&L, DOG30 descriptive, set-end split (descriptive),

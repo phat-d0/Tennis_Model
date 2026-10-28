@@ -475,6 +475,8 @@ def seed_facts(session, cache: Path, snaps: pd.DataFrame, matches: list[dict], n
                               "qual": keys[2 - side] in set(sd["qualifiers"]), "round_ok": earlier <= 1}
     for n in notes:
         print(f"[seeds: {n}]")
+    if not notes:
+        print("[seeds: no scored tournaments in view]")
     return out
 
 
