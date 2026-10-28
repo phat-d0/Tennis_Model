@@ -519,7 +519,7 @@ Since phat-d0/Tennis_Model#116 also: `min_arb_profit_per_contract` (the alert th
   the job cap and the per-match drift stop; the CLI gains `--season` (one stage) and `--per-match-max`, plus a floor check
   before any call (phat-d0/Tennis_Model#162). Stage 1 (2026) ran from a local driver with the same checks, started before
   this rule. Code only, 0 credits. 365 tests (pandas 2 and 3.1).
-- 2026-10-28: Odds API errors never carry the key (phat-d0/Tennis_Model#PRNUM). Stage 1 (2026) of the DK in-play pull
+- 2026-10-28: Odds API errors never carry the key (phat-d0/Tennis_Model#163). Stage 1 (2026) of the DK in-play pull
   stopped on an HTTP 502, and requests' exception text included the request URL **with the API key**. It reached a local
   scratch log, since scrubbed; nothing was committed or published. `OddsApi._get` now re-raises HTTP and network errors as
   "HTTP 502 on /path" (no URL, no chained original); `make_fetch` retries a 5xx or network error after 10 s and 30 s, then
