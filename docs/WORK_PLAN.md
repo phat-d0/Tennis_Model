@@ -28,7 +28,7 @@ conflict (git merges edits that touch different blocks).
   test; Kalshi work otherwise paused. Waiting on: the owner's OddsPapi key.
 
 - **Backtest.** Done: cash-out study + MISMATCH50 (all FAIL; `reports/backtest_cashout.md`). E1 is invalid (listing-book
-  placeholders); E1r robustness check coded (amendment 5, descriptive). Next: MISMATCH50-U + E1r read from Data's next
+  placeholders); E1r robustness check coded (amendment 5, post hoc: verdicts reported, not counted). Next: MISMATCH50-U + E1r read from Data's next
   run; re-run on recorded order books later. Waiting on: Upsets' reason columns, then Data's single run.
 
 - **Scanner.** Now: paper trading live on the VPS since 2026-10-27 17:34 UTC; cash-out group C0–C4 (owner 2026-10-28)

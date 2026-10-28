@@ -512,7 +512,8 @@ Since phat-d0/Tennis_Model#116 also: `min_arb_profit_per_contract` (the alert th
   implies, in every rank-ratio bucket (ATP/WTA 34.1% vs 38.4% at 1¢). In-play ROI −16.0% (ATP/WTA, 946) / −9.4%
   (Challenger, 125) at 1¢. **E1 is invalid everywhere**: the first pre-match row is a listing-time placeholder book
   (median ask_a + ask_b $1.84 / $1.88), now said so in the report. Amendment 5 adds E1r (first pre row with
-  ask_a + ask_b ≤ $1.05), post hoc, descriptive only, never gated, re-run with MISMATCH50-U.
+  ask_a + ask_b ≤ $1.05) for every E1 use, post hoc: verdicts reported but not counted; re-run with MISMATCH50-U.
+  Unranked reason `inactive` is "not observed (by construction)" (Upsets #145).
   346 tests passing (pandas 3.0.5 and 3.1.0).
 - 2026-10-28 (Data): cash-out study run locally on main e41c055 (with #130); 0 Kalshi requests, 308 tests passing.
   g0 (4,695 ATP/WTA) and g12 (8,349 Challenger/WTA 125): every gate FAILs. DOG50 at 1¢: g0 −$226.07 (ROI −18.8%, 2/7 months +),

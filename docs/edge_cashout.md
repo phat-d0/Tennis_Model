@@ -259,5 +259,10 @@ and are unaffected.
 - **E1r** = the first pre-match row where ask_a + ask_b ≤ $1.05, i.e. a two-sided book within 5¢ of fair.
 - It is re-run for DOG50, MISMATCH50 and MISMATCH50-U, plus every rule's summary, in the same Data run as
   MISMATCH50-U. The run also reports how many matches ever show such a book before the start.
-- **Descriptive only, never gated:** the E1 results had already been seen when this was defined. The registered gate
-  verdicts stand unchanged (all FAIL), and the original E1 rows stay in the reports, marked as a listing-book artefact.
+- **Post hoc, not counted:** the E1 results had already been seen when this was defined. E1r gate verdicts (the
+  take-profit walk-forward, DOG50, MISMATCH50, MISMATCH50-U) are reported, but labelled "post hoc, not counted". The
+  registered verdicts stand unchanged (all FAIL), and the original E1 rows stay in the reports, marked "listing-book
+  artefact, superseded by E1r".
+- **Unranked reason `inactive`** (amendment 4, reason ii) is never written by the rank export: a player's own activity
+  isn't needed to hold a rank (Upsets #145; codes `unmatched` / `few_matches` / `inactive`). It is reported as
+  "not observed (by construction)", not as an empty test.
