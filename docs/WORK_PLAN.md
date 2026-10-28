@@ -61,7 +61,7 @@ conflict (git merges edits that touch different blocks).
   paid call, a pilot (one tournament, ≤ 2,000) reported to the Lead before the full pull, floor 5,000, every spend logged in
   docs/data_inventory.md, balance never in a public log. Live in-play tracking stays plan-only until the backtest is in. Later: the line-shopping forward-test
   readout in Jan 2027.
-  Pilot done (ATP Qatar 2025: 1,750 credits, DK + Pinnacle quoted in play, 2 bugs fixed; #PRNUM).
+  Pilot done (ATP Qatar 2025: 1,750 credits, DK + Pinnacle quoted in play, 2 bugs fixed; #160).
   Waiting on: the Lead's go for the full pull (projected ≈ 215k + refinement); a real draw fixture (Wikimedia 429s cloud
   IPs; the publish runner's log will show whether it gets through).
 
