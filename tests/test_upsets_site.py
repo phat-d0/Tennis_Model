@@ -275,3 +275,106 @@ def test_page_uses_elo_serve_model(dirs):
     assert abs(m["e1"]["model_p1"] - old) > 1e-3                        # not the old raw-Elo formula
     assert site.best_of("tennis_atp_wimbledon") == 5 and site.best_of("tennis_wta_wimbledon") == 3
     assert site.best_of(PARIS) == 3
+
+
+# ---------------------------------------------------------------- ledger restore from the live page
+
+def trade(tid, start="2026-10-20T10:00:00Z", status="open", **kw):
+    return {"id": tid, "strategy": tid.split(":")[0], "commence_time": start, "status": status, **kw}
+
+
+class PageResp:
+    def __init__(self, data=None, status=200, bad_json=False):
+        self.data, self.status_code, self.bad_json = data, status, bad_json
+
+    def json(self):
+        if self.bad_json:
+            raise ValueError("not json")
+        return self.data
+
+    def raise_for_status(self):
+        if self.status_code >= 400:
+            raise requests.HTTPError(f"{self.status_code} for url https://example/x", response=self)
+
+
+class Page:
+    """The live page: portfolio.json and odds.json, or a status / network error for each."""
+
+    def __init__(self, trades=None, used=None, generated="2026-10-27T09:00:00Z", status=200, network=False,
+                 bad_json=False):
+        self.trades, self.used, self.generated = trades, used, generated
+        self.status, self.network, self.bad_json, self.urls = status, network, bad_json, []
+
+    def get(self, url, timeout=None):
+        self.urls.append(url)
+        if self.network:
+            raise requests.ConnectionError("connection reset for https://example/x")
+        if self.status != 200:
+            return PageResp(status=self.status)
+        if url.endswith("/portfolio.json"):
+            return PageResp({"strategies": [{"id": "model", "trades": self.trades or []}]}, bad_json=self.bad_json)
+        return PageResp({"generated_at": self.generated,
+                         "credits": {"left": None, "used_this_month": self.used, "month_cap": 3000}})
+
+
+def cached(dirs):
+    return json.loads((dirs["cache"] / "portfolio.json").read_text())
+
+
+def test_restore_page_only_after_eviction(dirs):
+    page = Page(trades=[trade("model:e1"), trade("dogs:e1")], used=420)
+    msg = site.restore(dirs["cache"], NOW, page, "https://page")
+    assert page.urls == ["https://page/portfolio.json", "https://page/odds.json"]
+    assert sorted(t["id"] for t in cached(dirs)) == ["dogs:e1", "model:e1"]
+    assert json.loads((dirs["cache"] / "ledger.json").read_text())["used"] == 420   # the cap can't be overspent
+    assert "page" in msg and "2 trades" in msg
+
+
+def test_restore_cache_only_when_page_down(dirs):
+    dirs["cache"].mkdir(parents=True)
+    (dirs["cache"] / "portfolio.json").write_text(json.dumps([trade("model:e1")]))
+    msg = site.restore(dirs["cache"], NOW, Page(network=True), "https://page")   # warm cache: never fatal
+    assert [t["id"] for t in cached(dirs)] == ["model:e1"] and "cache only" in msg and "https" not in msg
+
+
+def test_restore_merges_by_id_cache_wins(dirs):
+    dirs["cache"].mkdir(parents=True)
+    (dirs["cache"] / "portfolio.json").write_text(json.dumps([trade("model:e1", status="won", profit=5.0)]))
+    (dirs["cache"] / "ledger.json").write_text(json.dumps({"month": "2026-10", "used": 900, "by_day": {}, "left": 1}))
+    page = Page(trades=[trade("model:e1", status="open"), trade("line:e2", start="2026-10-21T10:00:00Z")], used=300)
+    site.restore(dirs["cache"], NOW, page, "https://page")
+    by = {t["id"]: t for t in cached(dirs)}
+    assert set(by) == {"model:e1", "line:e2"} and by["model:e1"]["status"] == "won"       # the cache's copy wins
+    assert json.loads((dirs["cache"] / "ledger.json").read_text())["used"] == 900       # the larger spend is kept
+
+
+def test_restore_ignores_last_months_spend(dirs):
+    site.restore(dirs["cache"], NOW, Page(trades=[], used=2900, generated="2026-09-30T21:00:00Z"), "https://page")
+    assert site.load_ledger(dirs["cache"], NOW)["used"] == 0
+
+
+def test_restore_first_run_404_starts_empty_and_says_so(dirs):
+    msg = site.restore(dirs["cache"], NOW, Page(status=404), "https://page")
+    assert cached(dirs) == [] and "WARNING" in msg and "404" in msg
+
+
+@pytest.mark.parametrize("page", [Page(network=True), Page(status=503), Page(trades=[], bad_json=True)])
+def test_restore_cold_cache_unreadable_page_stops_the_build(dirs, page):
+    with pytest.raises(site.RestoreError) as e:
+        site.build(dirs["out"], dirs["cache"], dirs["archive"], now=NOW, key=KEY, session=FakeApi(),
+                   page_session=page, page_base="https://page")
+    assert "https" not in str(e.value) and KEY not in str(e.value)
+    assert not (dirs["out"] / "odds.json").exists()                    # nothing written, so nothing deploys
+
+
+def test_build_restores_then_trades_on(dirs):
+    old = trade("model:old", start="2026-10-01T10:00:00Z", status="won", profit=4.0, stake=10.0, odds=1.4, ev=0.02,
+                p_fair=0.73, clv=0.01, edge=0.06, event_id="old", sport_key="tennis_atp_us_open", side=1,
+                player="Ann", opponent="Bea", opened_at="2026-09-30T10:00:00Z", settled_at="2026-10-01T13:00:00Z",
+                close=None)
+    page = Page(trades=[old], used=12)
+    doc = run(dirs, FakeApi(), page_session=page, page_base="https://page")
+    pf = json.loads((dirs["out"] / "portfolio.json").read_text())
+    ids = {t["id"] for s in pf["strategies"] for t in s["trades"]}
+    assert "model:old" in ids
+    assert doc["credits"]["used_this_month"] == 12 + 2                   # restored spend + this build's odds calls
