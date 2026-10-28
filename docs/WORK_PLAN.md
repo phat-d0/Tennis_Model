@@ -24,7 +24,7 @@ answers to the owner's open questions.
 | Data | Inputs ready for the cash-out run (kalshi_g0 + sets, kalshi_g12) | Run cashout locally → aggregates to Backtest; OddsPapi test | Backtest's cashout PR; owner's OddsPapi key |
 | Backtest | `swinglock/backtest/cashout.py` + CLI + tests, with the Level/DOG50 amendment | `reports/backtest_cashout.md` from Data's aggregates | — |
 | Scanner | Paper trading live on the VPS since 2026-10-27 17:34 UTC | Watch 429s and the 04:00 UTC lookback; fixes only | — |
-| Dashboard | Paper tab live (#118) | Check it against the owner's screenshots | Owner screenshots |
+| Dashboard | Paper tab live (#118, #121); first live screenshot checked 2026-10-27 (renders as designed) | Check the lookback panel after the first 04:00 UTC run | Owner screenshot of the lookback |
 | Upsets | Page builder + Portfolio upkeep | Next idea needs the owner | — |
 
 
