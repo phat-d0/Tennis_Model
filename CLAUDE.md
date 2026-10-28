@@ -568,6 +568,8 @@ Since phat-d0/Tennis_Model#116 also: `min_arb_profit_per_contract` (the alert th
   worse-ranked player reached 50¢ less often than its price implied (34% vs 38% ATP/WTA). E1 (first pre-match look) found to be
   Kalshi's placeholder listing book (combined ask ≈ $1.84); E1r robustness (post hoc) changes nothing. Owner's soccer-style folder
   layout for the dashboard Paper tab (#149) and the page Portfolio (#150). Live MISMATCH50 not built (Lead, after the FAIL).
+- 2026-10-28 (owner): DK in-play studies approved with a **300,000-credit cap** (Odds API historical snapshots; pilot ≤ 2,000 first;
+  floor 5,000). Fallen-favourite study requested (Kalshi now, DK after). Owner allowed en.wikipedia.org (Wikimedia answers 429 to cloud IPs).
 - 2026-10-27: Paper trading live on the server from 17:34 UTC. Owner deleted `team/scanner`; no ref holds ae08bf5 now (an orphaned
   commit can still be fetched by full SHA until GitHub's GC; GitHub Support can purge it).
 - 2026-10-26: **Tennis Odds page live** at https://phat-d0.github.io/Tennis_Model/ (GitHub Pages, `.github/workflows/publish.yml`,
