@@ -24,8 +24,8 @@ conflict (git merges edits that touch different blocks).
 - **Lead.** Now: review and merge; the Odds API budget; owner reports; reading the first paper lookback (owner screenshot).
   Next: consolidate the scanner and collector clients; the README. Waiting on: the owner's health-check paste and screenshot.
 
-- **Data.** Now: inputs ready for the cash-out run (kalshi_g0 + sets, kalshi_g12). Next: run cashout locally and send
-  aggregates to Backtest; the OddsPapi test. Waiting on: Backtest's cashout PR (#125); the owner's OddsPapi key.
+- **Data.** Now: cash-out study run done (2026-10-28; g0 + g12, all FAIL); aggregates sent to Backtest. Next: the OddsPapi
+  test; Kalshi work otherwise paused. Waiting on: the owner's OddsPapi key.
 
 - **Backtest.** Now: cash-out amendment 2 (dog exit-level curve + DOGL gate) PR; #125 (cash-out code) is merged.
   Next: `reports/backtest_cashout.md` from Data's aggregates, against the pre-registered expectations (Δ ≈ −1 to −3¢,
