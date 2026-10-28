@@ -31,7 +31,7 @@ conflict (git merges edits that touch different blocks).
 - **Lead.** Now: review and merge; the Odds API budget; owner reports. Next: consolidate the scanner and collector
   clients; the README. Waiting on: the owner's screenshots of the new Paper/Portfolio folder layouts.
 
-- **Data.** Now: cash-out, MISMATCH50, MISMATCH50-U and E1r runs done (2026-10-28; all FAIL); aggregates sent to Backtest.
+- **Data.** Now: cash-out, MISMATCH50, MISMATCH50-U, E1r and fallen-favourite runs done (2026-10-28; all FAIL); aggregates sent to Backtest.
   Next: the OddsPapi test; Kalshi work otherwise paused. Waiting on: the owner's OddsPapi key.
 
 - **Backtest.** Done: cash-out study complete, every gate FAILs (`reports/backtest_cashout.md`): DOG50, DOGL, take-profit,
