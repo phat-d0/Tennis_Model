@@ -88,3 +88,15 @@ def test_event_found_by_names_when_dk_moves_the_start_and_unknown_matches_stop()
     fetch, calls = snap_fn("2024-01-15 11:20")
     res = di.walk(w, fetch, step_min=10, slack_min=180)
     assert res["matches"].iloc[0]["event_id"] is None and len(calls) == 5   # 10:00 .. 10:40: 3 in-window misses
+
+
+def test_full_pull_goes_newest_season_first_and_stops_at_the_cap():
+    older = match_w().assign(season=2023, commence=pd.Timestamp("2023-01-15 10:00", tz="UTC"))
+    newer = match_w()                                                          # 2024
+    order = []
+
+    def fetch(key, when):
+        order.append(when[:4])
+        return None if len(order) > 4 else {"timestamp": when, "data": []}
+    res = di.walk_recent_first(pd.concat([older, newer], ignore_index=True), fetch)
+    assert order[0] == "2024" and set(order[:4]) == {"2024"} and res["stopped"]   # 2023 never reached

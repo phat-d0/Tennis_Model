@@ -150,6 +150,21 @@ def walk(w: pd.DataFrame, fetch, step_min: int = 10, slack_min: int = 180) -> di
     return {"fetched": fetched, "stopped": stopped, "matches": pd.concat([w, st], axis=1)}
 
 
+def walk_recent_first(w: pd.DataFrame, fetch, step_min: int = 10, slack_min: int = 180) -> dict:
+    """walk() one season at a time, newest first, so a cap stop loses the oldest seasons."""
+    parts, fetched = [], 0
+    for season in sorted(w["season"].unique(), reverse=True):
+        res = walk(w[w["season"] == season], fetch, step_min, slack_min)
+        parts.append(res["matches"])
+        fetched += res["fetched"]
+        print(f"[season {season}: {res['fetched']:,} snapshots; matches {len(res['matches']):,}, event found "
+              f"{int(res['matches']['event_id'].notna().sum()):,}]", flush=True)
+        if res["stopped"]:
+            return {"fetched": fetched, "stopped": True, "matches": pd.concat(parts, ignore_index=True)}
+    return {"fetched": fetched, "stopped": False,
+            "matches": pd.concat(parts, ignore_index=True) if parts else w.iloc[:0]}
+
+
 def pilot_stats(m: pd.DataFrame, snaps: list[dict], planned: int, spent: float) -> str:
     """Pilot report: coverage, stop-on-finish, live window and quote freshness. No outcomes are read."""
     ages, live_rows = {b: [] for b in BOOKS}, 0
@@ -225,12 +240,18 @@ def main(argv=None) -> None:
             body = api.historical_odds(key, when, bookmakers=BOOKS)
             dh.write_cache(p, body)
             time.sleep(0.2)
-        got.append(body)
+        if a.pilot:                 # the pilot's freshness check reads them back; a full pull would not fit in memory
+            got.append(body)
         return body
-    res = walk(w, fetch, a.step, a.slack)
+    res = walk(w, fetch, a.step, a.slack) if a.pilot else walk_recent_first(w, fetch, a.step, a.slack)
     print(f"[fetched {res['fetched']:,} snapshots; spent this run {api.spent:,.0f}; job total "
           f"{dh.logged_total(log):,.0f}" + ("; STOPPED at the cap" if res["stopped"] else "") + "]")
-    print(pilot_stats(res["matches"], got, planned, api.spent))
+    if a.pilot:
+        print(pilot_stats(res["matches"], got, planned, api.spent))
+    else:
+        m = res["matches"]
+        print(f"[matches {len(m):,}; event found {int(m['event_id'].notna().sum()):,}; seen in play "
+              f"{int((m['snaps'] > 0).sum()):,}; finish detected {int(m['finished_at'].notna().sum()):,}]")
 
 
 if __name__ == "__main__":
