@@ -39,8 +39,8 @@ conflict (git merges edits that touch different blocks).
 
 - **Upsets.** Now: page builder + Portfolio upkeep (Polymarket Challengers #111, power de-vig #112 live). The Portfolio ledger
   and month's spend are restored from the live page when the cache is evicted (#129). Now (owner 2026-10-28): "seed loses
-  early" — pre-registered (`reports/upsets_seed_portfolio.md`), next the backtest + report, then the live Portfolio
-  strategy (Wikipedia seeds, parser tested on a fixture). Later: the line-shopping forward-test readout in Jan 2027.
+  early" — pre-registered (#131); backtest done, gate FAIL on all 3 sub-rules (all −10.3%, qualifiers −8.2%, 3,123 bets).
+  Next: the live Portfolio strategy (Wikipedia seeds, parser tested on a fixture), as a labelled forward test. Later: the line-shopping forward-test readout in Jan 2027.
   Waiting on: owner to allow en.wikipedia.org in this environment (for live parser tests only).
 
 
