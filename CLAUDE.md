@@ -454,7 +454,7 @@ Since phat-d0/Tennis_Model#116 also: `min_arb_profit_per_contract` (the alert th
   **gate FAIL for all 3 pre-registered sub-rules.** All: 3,123 bets, −10.3% at DK vs −14.2% expected at Pinnacle-fair.
   Qualifiers/LL: 538 bets, −8.2% (3 of 4 recent seasons positive, but −44u in total). Unseeded DK favourites: 269 bets,
   −1.7%. Seeds 1–4: −30%. 0 credits; identical output under pandas 3.1; 311 tests.
-- 2026-10-28: "Seed loses early" live Portfolio strategy (phat-d0/Tennis_Model#—): two new rows, "seed" (label "backtest:
+- 2026-10-28: "Seed loses early" live Portfolio strategy (phat-d0/Tennis_Model#137): two new rows, "seed" (label "backtest:
   −10.3%, not proven") and "seed_q" (the qualifier sub-line). Seeds and qualifiers come from Wikipedia's draw articles
   (`upsets/wiki_seeds.py`: MediaWiki API, descriptive User-Agent, ≤ 2 titles per event per build, cached once parsed). The
   parse is strict (4/8/16/32 linked seeds, else skipped and logged). Rounds 1–2 use a proxy: the seed's first or second
