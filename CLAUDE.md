@@ -459,6 +459,12 @@ Since phat-d0/Tennis_Model#116 also: `min_arb_profit_per_contract` (the alert th
   curve (L 0.40–0.90 + hold; P&L, ROI, Δ, SD, P10, stale-bid share, for < 20¢ and < 30¢) and the DOGL walk-forward on L
   (hold always eligible; ≥ 30 OOS positions). Pre-registered expectation: every L loses, holding is cheapest, FAIL. Not run yet.
   308 tests passing (pandas 3.0.5 and 3.1.0).
+- 2026-10-28 (Backtest): **cash-out study result** (`reports/backtest_cashout.md`; Data's run on 4,695 ATP/WTA + 8,349
+  Challenger/WTA 125 matches, candles). **Every gate FAILs** (E1, E2, DOG50, DOGL in both groups), as pre-registered.
+  Dogs < 20¢: every exit level 40–90¢ is within ±1¢/contract of holding; DOG50 ROI −10.7% / −21.7% at 0¢ (−18.8% /
+  −28.7% at 1¢). Selling lowers SD only by capping the upside; P10 (lost stake) is unchanged. In-play take-profits cost
+  −2¢ to −5¢ per triggered contract and cut SD a lot. Set end vs mid-set: no difference. E1 entries are mostly
+  opening-book asks (82–87% at ≥ 80¢). Identity bid(A) = 1 − ask(B): max gap 0 over 17.3 M rows.
 - 2026-10-28 (Data): cash-out study run locally on main e41c055 (with #130); 0 Kalshi requests, 308 tests passing.
   g0 (4,695 ATP/WTA) and g12 (8,349 Challenger/WTA 125): every gate FAILs. DOG50 at 1¢: g0 −$226.07 (ROI −18.8%, 2/7 months +),
   g12 −$641.46 (−28.7%, 0/7); DOGL g0 1/6, g12 0/6 folds +; E1/E2 FAIL on both. bid(A) = 1 − ask(B) exactly (max gap 0).
