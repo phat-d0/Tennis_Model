@@ -517,7 +517,7 @@ Since phat-d0/Tennis_Model#116 also: `min_arb_profit_per_contract` (the alert th
   no snapshot bodies in memory outside the pilot (phat-d0/Tennis_Model#161). Code only, 0 credits. 364 tests (pandas 2 and 3.1).
 - 2026-10-28: DK in-play stages run from the merged module only (Lead: no unreviewed spending code). `make_fetch()` holds
   the job cap and the per-match drift stop; the CLI gains `--season` (one stage) and `--per-match-max`, plus a floor check
-  before any call (phat-d0/Tennis_Model#PRNUM). Stage 1 (2026) ran from a local driver with the same checks, started before
+  before any call (phat-d0/Tennis_Model#162). Stage 1 (2026) ran from a local driver with the same checks, started before
   this rule. Code only, 0 credits. 365 tests (pandas 2 and 3.1).
 - 2026-10-28 (Backtest): cash-out study code merged (phat-d0/Tennis_Model#125): `swinglock/backtest/cashout.py`, CLI
   `python -m swinglock.backtest.cashout --data <dir> [--sets <dir>/sets.parquet]`. Dated amendment (before any run):
