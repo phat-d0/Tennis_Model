@@ -4,25 +4,28 @@ Status for every project. Each role updates its own block of the Master plan and
 the same PR as the work (CLAUDE.md, Team rule 7). The Lead keeps the priority order and merges. Durable rules
 and facts are in `CLAUDE.md`.
 
-## Master plan (read first; updated 2026-10-28)
+## Master plan (read first; updated 2026-10-28, evening)
 **Where we stand:** no edge found anywhere after fees. That covers Kalshi true arbs and swing locks, early-round
-underdogs at Kalshi and DraftKings, Elo models against Pinnacle, and the penultimate-set and decider prices. Line
-shopping is a thin, unproven edge. What's running now: live forward tests on real order books (paper trading) and
-answers to the owner's open questions.
+underdogs at Kalshi and DraftKings, Elo models against Pinnacle, the penultimate-set and decider prices, and now every
+cash-out rule (`reports/backtest_cashout.md`: take-profit, DOG50, the exit-level curve, MISMATCH50 and -U all FAIL; dogs are
+overpriced, and the exit level only trims the upside). Seed loses early also fails (−10.3%). Line shopping is a thin,
+unproven edge. What's running now: live forward tests (Kalshi paper P1–P4 + cash-out C0–C4 on the VPS; the page Portfolio
+incl. Seed loses early).
 
 **Priority order (owner sets it; the Lead records it):**
-1. **Cash-out study** (owner 2026-10-28): when to cash out, including the owner's DOG50. Design: docs/edge_cashout.md.
-2. **Paper trading forward test** on the VPS: 4 frozen rules, live ledger + nightly lookback. Read monthly, with
-   ≥ 30 settled trades per rule before any verdict.
-3. **Public Tennis Odds page + Portfolio** upkeep. Line-shopping forward test via the Portfolio (readout Jan 2027).
-4. **Open on the owner:** `ODDSPAPI_KEY` + allow oddspapi.io / api.oddspapi.io (DK Challenger lines test). Optional:
-   ask GitHub Support to purge the orphaned commit ae08bf5.
+1. **Paper trading forward test** on the VPS: swing P1–P4 and cash-out C0–C4, live ledger + nightly lookback over
+   recorded books. Read monthly, with ≥ 30 settled trades per rule before any verdict. Cash-out study itself: **done**.
+2. **Public Tennis Odds page + Portfolio** upkeep (folder layout #150). Forward tests read out in Jan 2027.
+3. **Not built (owner can ask):** a live MISMATCH50 rule (backtest FAIL; the Elo-rank feed `upsets.elo_ranks.current()`
+   exists, a VPS job doesn't).
+4. **Open on the owner:** `ODDSPAPI_KEY` + allow oddspapi.io / api.oddspapi.io (DK Challenger lines test); allow
+   en.wikipedia.org (seed parser test on a real draw). Optional: GitHub Support purge of the orphaned commit ae08bf5.
 
 **Roles.** Each role edits only its own block. The blocks are kept apart by blank lines so that two PRs don't
 conflict (git merges edits that touch different blocks).
 
-- **Lead.** Now: review and merge; the Odds API budget; owner reports; reading the first paper lookback (owner screenshot).
-  Next: consolidate the scanner and collector clients; the README. Waiting on: the owner's health-check paste and screenshot.
+- **Lead.** Now: review and merge; the Odds API budget; owner reports. Next: consolidate the scanner and collector
+  clients; the README. Waiting on: the owner's screenshots of the new Paper/Portfolio folder layouts.
 
 - **Data.** Now: cash-out study run done (2026-10-28; g0 + g12, all FAIL); aggregates sent to Backtest. Next: the OddsPapi
   test; Kalshi work otherwise paused. Waiting on: the owner's OddsPapi key.
