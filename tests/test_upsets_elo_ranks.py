@@ -108,3 +108,21 @@ def test_ranks_are_integers_and_follow_matches_parquet_order():
     km = kmatches([("k1", "2025-12-01 10:00", "Pedro Perez", "Xavier One", 1.0)])
     r = er.ranks(km, sack(), min_n=1)
     assert str(r["rank_a"].dtype) == "Int64" and r.loc[0, "rank_a"] == 1 and r.loc[0, "rank_b"] > 1
+
+
+def test_current_table_for_the_live_engine():
+    now = pd.Timestamp("2025-12-10 12:00", tz="UTC")
+    res = kmatches([("r1", "2025-12-05 10:00", "Xavier One", "Quinn Quill", 1.0),       # x1 beats q after Sackmann ends
+                    ("r2", "2025-12-20 10:00", "Xavier Two", "Pedro Perez", 1.0)])      # after `now`: ignored
+    doc = er.current(sack(), res, now, min_n=1)
+    assert doc["generated_at"] == "2025-12-10T12:00:00Z" and doc["sackmann_through"] == sack()["date"].max().strftime("%Y-%m-%d")
+    assert doc["results_through"] == "2025-12-05"
+    atp = doc["tours"]["atp"]
+    assert [p["rank"] for p in atp] == list(range(1, len(atp) + 1)) and atp[0]["name"] == "Pedro Perez"
+    by = {p["name"]: p for p in atp}
+    assert by["Xavier One"]["last_played"] == "2025-12-05" and by["Xavier One"]["n"] == 4
+    assert by["Pedro Perez"]["key"] == er.ke.name_key("Pedro Perez") and by["Pedro Perez"]["sackmann_id"] == "p"
+    assert doc["tours"]["wta"] == []
+    # without results, and much later: nobody has played in the last year
+    later = er.current(sack(), None, pd.Timestamp("2027-06-01", tz="UTC"), min_n=1)
+    assert later["tours"]["atp"] == [] and later["results_through"] is None
