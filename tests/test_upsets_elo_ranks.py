@@ -47,7 +47,7 @@ def test_ranks_order_unmatched_and_challenger():
     r = er.ranks(km, sack(), min_n=1).set_index("match_id")
     assert r.loc["k1", "rank_b"] == 1 and r.loc["k1", "rank_a"] > 2          # p is #1, x1 below p and q
     assert r.loc["k2", "rank_a"] == 2                                       # q is #2
-    assert np.isnan(r.loc["k2", "rank_b"]) and not r.loc["k2", "matched_b"]  # unmatched name: blank
+    assert pd.isna(r.loc["k2", "rank_b"]) and not r.loc["k2", "matched_b"]  # unmatched name: blank
     assert r.loc["k3", "series"] == "KXATPCHALLENGERMATCH" and r.loc["k3", "rank_b"] == 2
     # k2's unmatched player is a real player rated from Kalshi results: in the pool from the next day, but
     # never given a rank himself
@@ -57,10 +57,10 @@ def test_ranks_order_unmatched_and_challenger():
 def test_min_n_and_inactive_players_are_blank_or_excluded():
     km = kmatches([("k1", "2025-12-01 10:00", "Xavier One", "Pedro Perez", 0.0)])
     r = er.ranks(km, sack(), min_n=5).set_index("match_id")
-    assert np.isnan(r.loc["k1", "rank_a"]) and r.loc["k1", "rank_b"] == 1    # x1 has 3 matches < 5
+    assert pd.isna(r.loc["k1", "rank_a"]) and r.loc["k1", "rank_b"] == 1    # x1 has 3 matches < 5
     late = kmatches([("k9", "2027-06-01 10:00", "Xavier One", "Pedro Perez", 0.0)])
     r = er.ranks(late, sack(), min_n=1, active_days=365).set_index("match_id")
-    assert np.isnan(r.loc["k9", "rank_a"]) and r.loc["k9", "pool"] == 0      # nobody active: no rank
+    assert pd.isna(r.loc["k9", "rank_a"]) and r.loc["k9", "pool"] == 0      # nobody active: no rank
 
 
 def test_same_day_results_are_not_in_the_pool_and_never_rank_a_player_below_himself():
@@ -84,3 +84,27 @@ def test_no_lookahead_later_results_never_change_earlier_ranks():
     b = er.ranks(kmatches(later), sack(), min_n=1).set_index("match_id")
     assert a.loc["k1", ["rank_a", "rank_b", "elo_a", "elo_b"]].tolist() == \
         b.loc["k1", ["rank_a", "rank_b", "elo_a", "elo_b"]].tolist()
+
+
+def test_flipping_a_later_result_never_changes_an_earlier_rank():
+    """Data's check: a rank uses only matches that finished before its match started. Flip later results
+    (the same evening, and the next day) and the earlier match's ranks stay put; a match that started
+    late the evening before (it may still be running) isn't in the pool either."""
+    def run(later_a_wins, eve_a_wins):
+        rows = [("eve", "2025-11-30 23:30", "Xavier Two", "Quinn Quill", eve_a_wins),     # started 30 min before midnight
+                ("k1", "2025-12-01 10:00", "Xavier One", "Quinn Quill", 0.0),
+                ("pm", "2025-12-01 18:00", "Xavier Three", "Pedro Perez", later_a_wins),
+                ("next", "2025-12-02 10:00", "Xavier Two", "Pedro Perez", later_a_wins)]
+        return er.ranks(kmatches(rows), sack(), min_n=1).set_index("match_id").loc["k1"]
+    base = run(0.0, 0.0)
+    for later, eve in ((1.0, 0.0), (0.0, 1.0), (1.0, 1.0)):
+        other = run(later, eve)
+        assert (other["rank_a"], other["rank_b"]) == (base["rank_a"], base["rank_b"])
+    # but q's own result the evening before does move q's own (exact) Elo
+    assert run(0.0, 1.0)["elo_b"] < base["elo_b"]
+
+
+def test_ranks_are_integers_and_follow_matches_parquet_order():
+    km = kmatches([("k1", "2025-12-01 10:00", "Pedro Perez", "Xavier One", 1.0)])
+    r = er.ranks(km, sack(), min_n=1)
+    assert str(r["rank_a"].dtype) == "Int64" and r.loc[0, "rank_a"] == 1 and r.loc[0, "rank_b"] > 1
