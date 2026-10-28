@@ -528,8 +528,15 @@ Since phat-d0/Tennis_Model#116 also: `min_arb_profit_per_contract` (the alert th
   10-min snapshots, DK + Pinnacle, R1–R2 matches we hold DK closes for: 2026 1,131 matches / 58,990 credits (52.2 per match),
   2025 1,753 / 79,530 (45.4), 2024 1,056 / 41,990 (39.8), 2023 733 / 23,670 (32.3). **Job total 205,930** of the 270,000 cap
   (pilot included); every season under its plan; no 429s; one 502 (#163). Events found 97–99% per season. Finish was
-  detected less often in 2024 (775 of 1,032) and 2023 (385 of 712): many listed starts later moved by about a day
-  (postponed), see the in-play window amendment. No outcomes read; snapshots stay in data/raw/odds_api/inplay/ (gitignored).
+  detected less often in 2024 (775 of 1,032) and 2023 (385 of 712). The cause is name matching that followed stale
+  duplicate DK listings of the same pairing; it is not postponement (corrected the same day, see the next line and the
+  in-play window amendment). No outcomes read; snapshots stay in data/raw/odds_api/inplay/ (gitignored).
+- 2026-10-28: DK close-timing check (phat-d0/Tennis_Model#PRNUM, `upsets/dk_close_check.py`, reports/upsets_dk_close_check.md;
+  Lead-approved re-statement, 0 credits, no rule search). Matches whose listed start moved > 1 h after the close: 2023 17
+  (2%), 2024 38 (4%), 2025 75 (4%), 2026 26 (2%), median move 1.5 h; 2020–22 unknown (no later snapshots). Without them:
+  every DK dog −9.6% → −9.1% (Pinnacle −6.4% → −6.0%), seed all −10.3% → −9.9%, Portfolio model −12.7% → −12.3%, line
+  +9.2% → +9.6%, dogs −10.4% → −9.9%; DK vs Pinnacle margin unchanged (5.12% vs 2.70%). No verdict changes. 367 tests
+  (pandas 2 and 3.1).
 - 2026-10-28 (Backtest): cash-out study code merged (phat-d0/Tennis_Model#125): `swinglock/backtest/cashout.py`, CLI
   `python -m swinglock.backtest.cashout --data <dir> [--sets <dir>/sets.parquet]`. Dated amendment (before any run):
   Level exits (12 gate rules), DOG50 fixed-rule gate on absolute P&L, DOG30 descriptive, set-end split (descriptive),
