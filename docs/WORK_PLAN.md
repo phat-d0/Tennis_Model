@@ -27,9 +27,10 @@ conflict (git merges edits that touch different blocks).
 - **Data.** Now: cash-out study run done (2026-10-28; g0 + g12, all FAIL); aggregates sent to Backtest. Next: the OddsPapi
   test; Kalshi work otherwise paused. Waiting on: the owner's OddsPapi key.
 
-- **Backtest.** Done: cash-out study + MISMATCH50 (all FAIL; `reports/backtest_cashout.md`). E1 is invalid (listing-book
-  placeholders); E1r robustness check coded (amendment 5, post hoc: verdicts reported, not counted). Next: MISMATCH50-U + E1r read from Data's next
-  run; re-run on recorded order books later. Waiting on: Upsets' reason columns, then Data's single run.
+- **Backtest.** Done: cash-out study complete, every gate FAILs (`reports/backtest_cashout.md`): DOG50, DOGL, take-profit,
+  MISMATCH50, MISMATCH50-U (unranked players are often the favourite, not a dog); E1 invalid (listing-book placeholders),
+  E1r robustness check (post hoc, not counted) also FAILs everywhere. Next: re-run on recorded order books when the Lead
+  asks. Waiting on: nothing.
 
 - **Scanner.** Now: paper trading live on the VPS since 2026-10-27 17:34 UTC; cash-out group C0–C4 (owner 2026-10-28)
   built and pre-registered, PR #132. Next: after merge the owner updates the server; watch 429s, the 04:00 UTC lookback and
