@@ -6,7 +6,7 @@ import pytest
 
 from swinglock.backtest.align import align
 from swinglock.backtest.cashout import (DOG_CURVE_RULES, RULES, cash_paths, mismatch_positions, mismatch_summary,
-                                        ranked_positions, target_bid, dog_positions, dog_summary,
+                                        price_distribution, ranked_positions, target_bid, unranked_positions, dog_positions, dog_summary,
                                         dogl_walk_forward, fee_vec, fixed_rule_gate, identity_check, main,
                                         match_months, simulate_cashout, summarize, tag_set_split,
                                         walk_forward_cashout)
@@ -347,3 +347,42 @@ def test_cli_with_ranks(tmp_path):
     assert "MISMATCH50" in (out / "cashout_summary.md").read_text() and "PROXY" in (out / "cashout_summary.md").read_text()
     assert main(["--data", str(data), "--out", str(tmp_path / "o2")]) == 0
     assert not (tmp_path / "o2" / "cashout_mm50.csv").exists()
+
+
+# ---- addendum 4: MISMATCH50-U (unranked player vs a top-100 player) ---------------------
+
+def test_unranked_positions_and_reasons():
+    pos = simulate_cashout(cash_paths(align(book(DOG), matches("M1")), matches("M1"), CFG), CFG, 0.0)
+    nan = np.nan
+    rk = pd.DataFrame({"match_id": ["M1"], "rank_a": [nan], "rank_b": [20.0], "reason_a": ["few_matches"],
+                       "reason_b": [None]})
+    u = unranked_positions(pos, rk)
+    assert set(u["side"]) == {"A"} and set(u["rule"]) == {"L=50c"} and len(u) == 2
+    assert set(u["reason"]) == {"few_matches"} and (u["better_rank"] == 20).all()
+    assert ranked_positions(pos, rk).empty                                # MISMATCH50 stays as registered
+    assert unranked_positions(pos, rk.assign(rank_b=150.0)).empty         # better player outside the top 100
+    assert unranked_positions(pos, rk.assign(rank_b=nan)).empty           # both unranked
+    assert unranked_positions(pos, rk.assign(rank_a=500.0)).empty         # both ranked
+    no_reason = unranked_positions(pos, rk[["match_id", "rank_a", "rank_b"]])
+    assert set(no_reason["reason"]) == {"unknown"}
+    flipped = rk.assign(rank_a=30.0, rank_b=nan, reason_b="inactive")
+    assert set(unranked_positions(pos, flipped)["side"]) == {"B"}
+    pd_ = price_distribution(u, ("reason",)).iloc[0]
+    assert pd_["entries"] == 2 and pd_["ask_p50"] == pytest.approx((0.10 + 0.57) / 2)
+    assert pd_["frac_under_20c"] == 0.5 and pd_["frac_over_50c"] == 0.5
+
+
+def test_cli_unranked_section(tmp_path):
+    m, q = monthly(n_per_month=2)
+    data, out = tmp_path / "data", tmp_path / "out"
+    data.mkdir()
+    m.to_parquet(data / "matches.parquet")
+    q.to_parquet(data / "quotes.parquet")
+    pd.DataFrame({"match_id": m["match_id"], "rank_a": np.nan, "rank_b": 20.0, "reason_a": "unmatched",
+                  "reason_b": None}).to_parquet(tmp_path / "ranks.parquet")
+    assert main(["--data", str(data), "--out", str(out), "--ranks", str(tmp_path / "ranks.parquet")]) == 0
+    for f in ("cashout_u50.csv", "cashout_u50_reason.csv", "cashout_u50_price.csv", "cashout_u50_gate.csv"):
+        assert (out / f).exists()
+    md = (out / "cashout_summary.md").read_text()
+    assert "MISMATCH50-U" in md and "ASSUMPTION" in md
+    assert pd.read_csv(out / "cashout_mm50.csv").empty                   # no fully ranked matches here

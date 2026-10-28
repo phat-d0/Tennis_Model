@@ -437,10 +437,12 @@ MISMATCH_COLUMNS = ["reach_eligible", "reach_rate", "implied_rate", "frac_under_
 
 
 def load_ranks(path: Path | None) -> pd.DataFrame | None:
-    """Pre-match rank table (match_id, rank_a, rank_b); a proxy from results before each match."""
+    """Pre-match rank table (match_id, rank_a, rank_b; NaN = unranked, with optional reason_a/reason_b);
+    a proxy computed from results before each match."""
     if path is None or not path.exists():
         return None
-    r = pd.read_parquet(path)[["match_id", "rank_a", "rank_b"]].dropna()
+    r = pd.read_parquet(path)
+    r = r[[c for c in ("match_id", "rank_a", "rank_b", "reason_a", "reason_b") if c in r.columns]]
     return r.assign(match_id=r["match_id"].astype(str)).drop_duplicates("match_id", keep="last")
 
 
@@ -450,7 +452,8 @@ def ranked_positions(positions: pd.DataFrame, ranks: pd.DataFrame | None, rule: 
     cols = [*positions.columns, "better_rank", "rank_ratio", "ratio_bucket"]
     if ranks is None or ranks.empty or positions.empty:
         return pd.DataFrame(columns=cols)
-    d = positions[positions["rule"] == rule].astype({"match_id": str}).merge(ranks, on="match_id")
+    d = positions[positions["rule"] == rule].astype({"match_id": str}).merge(
+        ranks[["match_id", "rank_a", "rank_b"]].dropna(), on="match_id")
     worse = np.where(d["rank_a"] > d["rank_b"], "A", np.where(d["rank_b"] > d["rank_a"], "B", ""))
     d = d[d["side"].to_numpy() == worse]
     better = np.minimum(d["rank_a"], d["rank_b"]).astype(float)
@@ -463,6 +466,47 @@ def mismatch_positions(ranked: pd.DataFrame, min_ratio: float = MISMATCH_RATIO,
                        max_better: float = MISMATCH_BEST) -> pd.DataFrame:
     """MISMATCH50 entries: worse rank >= min_ratio x the better one's, better ranked <= max_better."""
     return ranked[(ranked["rank_ratio"] >= min_ratio) & (ranked["better_rank"] <= max_better)]
+
+
+UNRANKED_COLUMNS = [*POSITION_COLUMNS, "better_rank", "reason"]
+
+
+def unranked_positions(positions: pd.DataFrame, ranks: pd.DataFrame | None, rule: str = DOG_RULE,
+                       max_better: float = MISMATCH_BEST) -> pd.DataFrame:
+    """MISMATCH50-U (addendum 4): matches where one player is ranked <= max_better and the other is
+    unranked (NaN rank; treated as below the whole active pool, a labelled assumption). Keeps the
+    unranked player's positions under `rule`, with `reason` from reason_a/reason_b ("unknown" if absent)."""
+    if ranks is None or ranks.empty or positions.empty:
+        return pd.DataFrame(columns=UNRANKED_COLUMNS)
+    r = ranks.copy()
+    for s in ("a", "b"):
+        if f"reason_{s}" not in r.columns:
+            r[f"reason_{s}"] = "unknown"
+    ua, ub = r["rank_a"].isna(), r["rank_b"].isna()
+    side = np.where(ua & ~ub & (r["rank_b"] <= max_better), "A",
+                    np.where(ub & ~ua & (r["rank_a"] <= max_better), "B", ""))
+    r = r.assign(u_side=side, better_rank=np.where(side == "A", r["rank_b"], r["rank_a"]),
+                 reason=np.where(side == "A", r["reason_a"], r["reason_b"]))
+    r = r[r["u_side"] != ""]
+    d = positions[positions["rule"] == rule].astype({"match_id": str}).merge(
+        r[["match_id", "u_side", "better_rank", "reason"]], on="match_id")
+    d = d[d["side"] == d["u_side"]].assign(reason=lambda x: x["reason"].fillna("unknown").astype(str))
+    return d[UNRANKED_COLUMNS]
+
+
+PRICE_COLUMNS = ["entries", "ask_p10", "ask_p25", "ask_p50", "ask_p75", "ask_p90", "frac_under_20c", "frac_over_50c"]
+
+
+def price_distribution(d: pd.DataFrame, by: Sequence[str]) -> pd.DataFrame:
+    """Entry-ask distribution per group (does the market price these players as heavy dogs?)."""
+    by = list(by)
+    rows = []
+    for k, g in (d.groupby(by, sort=True) if len(d) else []):
+        a = g["entry_ask"].astype(float)
+        rows.append({**dict(zip(by, k if isinstance(k, tuple) else (k,))), "entries": len(g),
+                     **{f"ask_p{q}": float(a.quantile(q / 100)) for q in (10, 25, 50, 75, 90)},
+                     "frac_under_20c": float((a < 0.20).mean()), "frac_over_50c": float((a > 0.50).mean())})
+    return pd.DataFrame(rows, columns=[*by, *PRICE_COLUMNS])
 
 
 def target_bid(fm: FeeModel, n: float, level: float = 0.50) -> float:
@@ -509,6 +553,20 @@ def mismatch_md(mm: dict[str, pd.DataFrame], gate: FixedGate) -> list[str]:
             fmt(mm["mm50_tier"]), "",
             "All worse-ranked players (any ratio, any better rank), by rank-ratio bucket and tour level:", "",
             fmt(mm["ratio_bucket"]), "", fmt(mm["ratio_tier"]), ""]
+
+
+def unranked_md(u: dict[str, pd.DataFrame], gate: FixedGate) -> list[str]:
+    fmt = lambda df: md_table(df.round(4))                               # noqa: E731
+    verdict = "PASS" if gate.passed else "FAIL: " + "; ".join(gate.reasons)
+    return ["## MISMATCH50-U: buy the UNRANKED player vs a player ranked <= 100, sell at net bid >= 50c",
+            "ASSUMPTION: an unranked player (rank proxy missing) is treated as below the whole active pool. "
+            "Reported apart from MISMATCH50. Reasons: too few rated matches / inactive 365 d / name not matched.", "",
+            f"- Gate (fixed rule, absolute P&L, monthly): **{verdict}**", "",
+            fmt(gate.gate.assign(slippage=gate.gate["slippage"].map(slip_label))), "", fmt(gate.folds), "",
+            "Overall, by unranked reason, by entry type and by tour level:", "", fmt(u["u50"]), "",
+            fmt(u["u50_reason"]), "", fmt(u["u50_mode"]), "", fmt(u["u50_tier"]), "",
+            "Entry-price distribution by unranked reason (0c; are they priced as heavy dogs?):", "",
+            fmt(u["u50_price"]), ""]
 
 
 # ---- walk-forward gate ---------------------------------------------------------
@@ -630,8 +688,17 @@ def main(argv: list[str] | None = None) -> int:
               "ratio_bucket": mismatch_summary(rk_all, ("slippage", "ratio_bucket"), fm, st),
               "ratio_tier": mismatch_summary(rk_all, ("slippage", "tier", "ratio_bucket"), fm, st)}
         mm_gate = fixed_rule_gate(mm_by, months, st)
+        u_by = {s: unranked_positions(d, ranks).assign(slippage=s) for s, d in by_slip.items()}
+        u_all = pd.concat(u_by.values(), ignore_index=True)
+        u = {"u50": mismatch_summary(u_all, ("slippage",), fm, st),
+             "u50_reason": mismatch_summary(u_all, ("slippage", "reason"), fm, st),
+             "u50_mode": mismatch_summary(u_all, ("slippage", "mode"), fm, st),
+             "u50_tier": mismatch_summary(u_all, ("slippage", "tier"), fm, st),
+             "u50_price": price_distribution(u_by[0.0], ("reason",))}
+        u_gate = fixed_rule_gate(u_by, months, st)
         mm_tables = [*((f"cashout_{k}", v) for k, v in mm.items()), ("cashout_mm50_gate", mm_gate.gate),
-                     ("cashout_mm50_months", mm_gate.folds)]
+                     ("cashout_mm50_months", mm_gate.folds), *((f"cashout_{k}", v) for k, v in u.items()),
+                     ("cashout_u50_gate", u_gate.gate), ("cashout_u50_months", u_gate.folds)]
 
     args.out.mkdir(parents=True, exist_ok=True)
     for name, df in [*mm_tables, ("cashout_summary", summary), ("cashout_bands", bands), ("cashout_exit_phase", phases),
@@ -646,7 +713,7 @@ def main(argv: list[str] | None = None) -> int:
     md = report_md(args.data, aligned, identity_check(aligned), summary, bands, gates, set_split, dog, dog_gate,
                    dogl)
     if ranks is not None:
-        md += "\n" + "\n".join(mismatch_md(mm, mm_gate))
+        md += "\n" + "\n".join([*mismatch_md(mm, mm_gate), *unranked_md(u, u_gate)])
     (args.out / "cashout_summary.md").write_text(md)
     print(md)
     return 0

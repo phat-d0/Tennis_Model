@@ -224,3 +224,27 @@ wants "buy the underdog, cash out at 50-50" tracked as a portfolio. No MISMATCH5
 
    A reach rate clearly above the implied rate *and* positive Δ vs hold would mean ranking mismatches are under-priced
    in-play, i.e. the owner's observation is an edge.
+
+### 2026-10-28, fourth amendment (before any run): MISMATCH50-U (unranked players)
+Owner request: include unranked players too. Data's MISMATCH50 run was in progress; no number for unranked players
+existed.
+
+1. **MISMATCH50-U:** in matches where one player is ranked ≤ 100 and the other is **unranked** (no pre-match Elo rank:
+   NaN in the rank file), buy the unranked player at E1 and E2, at any price.
+   - **Exit:** sell at net bid ≥ 0.50 (entries below 50¢ all-in only, as for every level rule), else hold.
+   - **Metrics:** the same as MISMATCH50, including reach-50 vs the price-implied rate.
+   - **Gate:** the same fixed-rule gate.
+2. **Assumption, labelled in every output:** an unranked player is treated as ranked below the whole active pool.
+   They're usually lower-level players, but not always.
+3. **Report by unranked reason, in separate rows** (from `reason_a` / `reason_b` in the rank file, written by Upsets;
+   "unknown" if the column is missing):
+   - (i) too few rated matches (< 10);
+   - (ii) inactive, no match in 365 days. This could be a comeback from injury, so the proxy is weakest here;
+   - (iii) name not matched to the results data (a new player or a spelling gap).
+
+   **Also report the entry-price distribution per reason** (P10–P90, the share under 20¢, the share over 50¢). If the
+   market prices them as heavy dogs, that supports the assumption.
+4. **Kept apart from MISMATCH50**, so the registered test is unchanged. MISMATCH50 still uses only fully ranked matches.
+5. **Expectation:** the same as MISMATCH50. Reach-50 at or below the implied rate, negative ROI, **FAIL**. Reason (ii)
+   may differ: if comeback players are mispriced, it would show as a reach rate above the implied rate in that row only,
+   which would need its own pre-registered test.
