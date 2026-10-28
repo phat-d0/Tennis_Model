@@ -12,12 +12,18 @@ Parsing is strict, so a wrong seed list is never used:
 Anything else (no article, no Seeds section, an odd count) returns None: the event is skipped and logged,
 never guessed. The article titles below follow Wikipedia's usual naming; a title that turns out wrong
 also just means "skipped".
+
+Rate limits: Wikimedia answers HTTP 429 to busy shared IPs (seen from cloud sessions, 2026-10-28). A 429 is
+never retried inside a build: it writes a back-off mark (`wiki_backoff.json`, honouring Retry-After, at least
+MIN_BACKOFF_S) and every Wikipedia call is skipped and logged until it expires, this build included.
 """
 
 from __future__ import annotations
 
 import json
 import re
+from datetime import datetime, timedelta, timezone
+from email.utils import parsedate_to_datetime
 from pathlib import Path
 
 from .names import name_key
@@ -26,6 +32,28 @@ API = "https://en.wikipedia.org/w/api.php"
 HEADERS = {"User-Agent": "tennis-odds-page/1.0 (https://github.com/phat-d0/Tennis_Model; research, read-only)"}
 SEED_COUNTS = {4, 8, 16, 32}
 MAX_TITLES = 2
+MIN_BACKOFF_S = 600
+MAX_BACKOFF_S = 86400
+
+
+class RateLimited(Exception):
+    """Wikimedia answered 429; `seconds` is its Retry-After (None when absent or unreadable)."""
+    def __init__(self, seconds: float | None):
+        super().__init__("429")
+        self.seconds = seconds
+
+
+def _retry_after(value, now: datetime) -> float | None:
+    if value is None:
+        return None
+    try:
+        return max(0.0, float(value))
+    except (TypeError, ValueError):
+        pass
+    try:
+        return max(0.0, (parsedate_to_datetime(str(value)) - now).total_seconds())
+    except (TypeError, ValueError, OverflowError):
+        return None
 
 # Odds API key suffix -> Wikipedia event name. Titles tried: "{year} {name} – Men's singles" (or Women's), then
 # "{year} {name} – Singles" for single-gender events. Only keys The Odds API scores matter (portfolio.SCORED_KEYS).
@@ -82,6 +110,9 @@ def fetch(session, title: str) -> str | None:
     """The article's wikitext, or None when there is no such article. Other errors raise."""
     r = session.get(API, params={"action": "parse", "page": title, "prop": "wikitext", "redirects": 1,
                                  "format": "json", "formatversion": 2}, headers=HEADERS, timeout=30)
+    if r.status_code == 429:
+        raise RateLimited(_retry_after((getattr(r, "headers", None) or {}).get("Retry-After"),
+                                       datetime.now(timezone.utc)))
     r.raise_for_status()
     d = r.json()
     if "error" in d:
@@ -89,16 +120,34 @@ def fetch(session, title: str) -> str | None:
     return (d.get("parse") or {}).get("wikitext")
 
 
-def seeds_for(session, cache: Path, sport_key: str, year: int) -> tuple[dict | None, str]:
+def _backoff_until(cache: Path) -> datetime | None:
+    try:
+        return datetime.fromisoformat(json.loads((cache / "wiki_backoff.json").read_text())["until"])
+    except (OSError, ValueError, KeyError, TypeError):
+        return None
+
+
+def seeds_for(session, cache: Path, sport_key: str, year: int,
+              now: datetime | None = None) -> tuple[dict | None, str]:
     """Cached seeds of one event, fetching once if needed. -> (seeds or None, log note)."""
+    now = now or datetime.now(timezone.utc)
     path = cache / "wiki_seeds.json"
     known = json.loads(path.read_text()) if path.exists() else {}
     k = f"{sport_key}:{year}"
     if k in known:
         return known[k], "cached"
+    until = _backoff_until(cache)
+    if until is not None and until > now:
+        return None, f"skipped: Wikipedia rate limit, backing off until {until:%Y-%m-%d %H:%M}Z"
     for title in titles(sport_key, year):
         try:
             text = fetch(session, title)
+        except RateLimited as e:
+            wait = min(MAX_BACKOFF_S, max(MIN_BACKOFF_S, e.seconds or 0))
+            until = now + timedelta(seconds=wait)
+            cache.mkdir(parents=True, exist_ok=True)
+            (cache / "wiki_backoff.json").write_text(json.dumps({"until": until.isoformat()}))
+            return None, f"rate-limited (429); skipping Wikipedia until {until:%Y-%m-%d %H:%M}Z"
         except Exception as e:   # never str(e)
             code = getattr(getattr(e, "response", None), "status_code", None)
             return None, f"fetch failed ({type(e).__name__}{f' {code}' if code else ''})"
