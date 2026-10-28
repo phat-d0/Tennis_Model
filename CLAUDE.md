@@ -445,6 +445,11 @@ Since phat-d0/Tennis_Model#116 also: `min_arb_profit_per_contract` (the alert th
   trade id; the cache's copy wins) and takes this month's `used_this_month` from its `odds.json`, keeping the larger value.
   A cold cache plus an unreadable page stops the build, so nothing deploys; a 404 starts an empty ledger with a loud log
   line. Nothing is committed. 290 tests (pandas 2 and 3.1).
+- 2026-10-28 (owner): "add seed losing early as a portfolio". Pre-registered in `reports/upsets_seed_portfolio.md`
+  (phat-d0/Tennis_Model#—): in R1/R2, back the unseeded player vs a seed at DK, with sub-rules all / qualifier-LL / other.
+  Gate: ≥ 30 bets, P&L > 0, ≥ 3 of the last 4 seasons positive. Expected negative. The Explorer's seeded-favourite slice
+  (2,894 bets, ≈ −11%) was already seen, and the doc says so. Live seeds will come from Wikipedia (MediaWiki API, CC BY-SA;
+  Lead's choice) and R1/R2 from a labelled proxy. No code yet; 0 credits.
 - 2026-10-28 (Backtest): cash-out study code merged (phat-d0/Tennis_Model#125): `swinglock/backtest/cashout.py`, CLI
   `python -m swinglock.backtest.cashout --data <dir> [--sets <dir>/sets.parquet]`. Dated amendment (before any run):
   Level exits (12 gate rules), DOG50 fixed-rule gate on absolute P&L, DOG30 descriptive, set-end split (descriptive),
