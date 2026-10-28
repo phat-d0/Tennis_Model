@@ -32,8 +32,8 @@ conflict (git merges edits that touch different blocks).
   pre-registered expectation (Δ ≈ −1 to −3¢/contract, DOG50 negative ROI, both FAIL). Waiting on: #125 merge,
   then Data's runs on groups 0 and 1.
 
-- **Scanner.** Now: paper trading live on the VPS since 2026-10-27 17:34 UTC; cash-out group C0/C1/C2 (owner 2026-10-28)
-  built and pre-registered, PR open. Next: after merge the owner updates the server; watch 429s, the 04:00 UTC lookback and
+- **Scanner.** Now: paper trading live on the VPS since 2026-10-27 17:34 UTC; cash-out group C0–C4 (owner 2026-10-28)
+  built and pre-registered, PR #132. Next: after merge the owner updates the server; watch 429s, the 04:00 UTC lookback and
   the C rules' first exits. Waiting on: Dashboard's contract-test update for the new keys; the owner's health-check paste.
 
 - **Dashboard.** Now: Paper tab live (#118, #121); first live screenshot checked 2026-10-27 (renders as designed).

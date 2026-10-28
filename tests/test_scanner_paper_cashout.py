@@ -18,16 +18,19 @@ from swinglock.scanner.paper import CASH_RULES, RULES, PaperBook
 from test_scanner_paper import CFG, FEES, MID, PAIR, T0, FakeClient, matches_frame
 
 ROOT = Path(__file__).resolve().parent.parent
-C0, C1, C2 = (r.id for r in CASH_RULES)
+C0, C1, C2, C3, C4 = (r.id for r in CASH_RULES)
 NAN = float("nan")
 
 # (seconds, ask_a, size_a, bid_a, bid_size_a, ask_b, size_b, bid_b, bid_size_b); start at 600 s
 PATH = [
-    (0, 0.15, 500, 0.14, 500, 0.87, 500, 0.84, 500),    # E1: A is a dog -> C0, C1, C2 buy A
+    (0, 0.15, 500, 0.14, 500, 0.87, 500, 0.84, 500),    # E1: A is a dog -> C0-C4 buy A
     (5, 0.16, 500, 0.15, 500, None, None, None, None),  # B has no ask: not an observation
     (10, 0.25, 500, 0.24, 500, 0.76, 500, 0.74, 500),
     (20, 0.56, 500, 0.55, 50, 0.45, 500, 0.44, 500),    # net bid 53.3c but only 50 contracts bid
     (30, 0.56, 500, 0.55, 500, 0.45, 500, 0.44, 500),   # C1, C2 (E1) sell
+    (40, 0.64, 500, 0.63, 500, 0.37, 500, 0.36, 500),   # net 61.4c: C3 sells
+    (50, 0.70, 500, 0.69, 500, 0.31, 500, 0.30, 500),   # net 67.9c: not yet 70c
+    (60, 0.74, 500, 0.73, 500, 0.27, 500, 0.26, 500),   # net 71.6c: C4 sells
     (610, 0.28, 500, 0.27, 500, 0.73, 500, 0.72, 500),  # E2 (first live): A at 28c -> C2 only
     (620, 0.51, 500, 0.50, 500, 0.50, 500, 0.49, 500),  # bid 50c, but net of the fee 48.25c: no
     (630, 0.54, 500, 0.53, 500, 0.47, 500, 0.46, 500),  # net 51.25c: C2 (E2) sells
@@ -65,39 +68,60 @@ def quotes_frame(path=PATH):
     return pd.DataFrame(rows)
 
 
-def cashout_positions():
+def cash_paths_for_test():
     cfg = copy.deepcopy(CFG)
     cfg["backtest"]["contracts_per_entry"] = 100
-    paths = cash_paths(align(quotes_frame(), matches_frame()), matches_frame(), cfg)
-    pos = simulate_cashout(paths, cfg, 0.0)
-    return pos[pos["rule"] == "L=50c"]
+    return cfg, cash_paths(align(quotes_frame(), matches_frame()), matches_frame(), cfg)
+
+
+def lookback_positions(slip=0.0):
+    _, paths = cash_paths_for_test()
+    return lookback.level_positions(paths, 100, slip)
 
 
 # ---- the core guarantee: same trades as backtest/cashout.py on the same path -------------------
 
-def test_live_cash_engine_matches_backtest_cashout_sim():
+def test_level_positions_equal_backtest_simulate_cashout():
+    """The lookback's level exits are cashout's own maths: identical to simulate_cashout at the levels
+    cashout simulates (50c, 60c), at 0c and 1c slippage."""
+    cfg, paths = cash_paths_for_test()
+    for slip in (0.0, 0.01):
+        pos = simulate_cashout(paths, cfg, slip)
+        mine = lookback.level_positions(paths, 100, slip)
+        for rule in (r for r in CASH_RULES if r.level in (0.50, 0.60)):
+            sim = pos[(pos["rule"] == f"L={rule.level * 100:g}c") & (pos["entry_ask"] < rule.max_ask)]
+            got = mine[mine["rule"] == rule.id].set_index(["entry_type", "side"])
+            assert len(sim) == len(got) > 0, rule.id
+            for r in sim.itertuples():
+                g = got.loc[(r.mode, r.side)]
+                assert g["entry_ts"] == r.entry_ts and g["contracts"] == pytest.approx(r.contracts)
+                assert bool(g["locked"]) == bool(r.locked) and g["pnl"] == pytest.approx(r.rule_pnl, abs=1e-9)
+                if r.locked:
+                    assert g["exit_ts"] == r.exit_ts
+        c0 = mine[mine["rule"] == C0].set_index(["entry_type", "side"])
+        for r in pos[(pos["rule"] == "L=50c") & (pos["entry_ask"] < 0.20)].itertuples():
+            assert c0.loc[(r.mode, r.side), "pnl"] == pytest.approx(r.hold_pnl, abs=1e-9)   # control = hold
+
+
+def test_live_cash_engine_matches_the_lookback_sim_for_every_rule():
     book = live_book()
     book.settle(MID, *PAY, T0 + timedelta(hours=3))
-    pos = cashout_positions()
+    pos = lookback_positions()
     checked = 0
     for rule in CASH_RULES:
         live = {(t.entry_type, t.side): t for t in book.trades.values() if t.rule == rule.id}
-        sim = pos[(pos["entry_ask"] < rule.max_ask) & pos["mode"].isin(rule.entries)]
-        assert set(live) == set(zip(sim["mode"], sim["side"])), rule.id
+        sim = pos[pos["rule"] == rule.id]
+        assert set(live) == set(zip(sim["entry_type"], sim["side"])), rule.id
         for r in sim.itertuples():
-            t = live[(r.mode, r.side)]
+            t = live[(r.entry_type, r.side)]
             assert pd.Timestamp(t.entry_ts) == r.entry_ts and t.entry_ask == pytest.approx(r.entry_ask)
-            assert t.contracts == pytest.approx(r.contracts) and t.entry_cost == pytest.approx(r.entry_cost)
-            if rule.level is None:                          # control: always held
-                assert t.exit_ts is None and t.pnl == pytest.approx(r.hold_pnl, abs=1e-6)
-            else:
-                assert bool(t.exit_ts) == bool(r.locked), rule.id
-                if r.locked:
-                    assert pd.Timestamp(t.exit_ts) == r.exit_ts
-                    assert t.exit_value == pytest.approx(r.exit_value)
-                assert t.pnl == pytest.approx(r.rule_pnl, abs=1e-6), rule.id
+            assert t.contracts == pytest.approx(r.contracts) and t.entry_cost == pytest.approx(r.capital)
+            assert bool(t.exit_ts) == bool(r.locked), rule.id
+            if r.locked:
+                assert pd.Timestamp(t.exit_ts) == r.exit_ts
+            assert t.pnl == pytest.approx(r.pnl, abs=1e-6), rule.id
             checked += 1
-    assert checked == 4                                     # C0 E1, C1 E1, C2 E1, C2 E2
+    assert checked == 6                                     # C0, C1, C2 (E1 + E2), C3, C4
 
 
 def test_path_exercises_every_branch():
@@ -107,6 +131,8 @@ def test_path_exercises_every_branch():
     assert c1.exit_value == pytest.approx(100 * 0.55 - 1.74) and c1.status == "exited"
     assert t[f"{C2}:{MID}:E2:A"].exit_ts == "2026-10-27T12:10:30Z"   # 50c bid nets 48.25c: no exit at 620
     assert f"{C1}:{MID}:E2:A" not in t and f"{C0}:{MID}:E2:A" not in t     # 28c isn't a < 20c dog
+    assert t[f"{C3}:{MID}:E1:A"].exit_ts == "2026-10-27T12:00:40Z"
+    assert t[f"{C4}:{MID}:E1:A"].exit_ts == "2026-10-27T12:01:00Z"   # 67.9c net at 50 s isn't 70c
     assert t[f"{C0}:{MID}:E1:A"].status == "open"           # the control never exits
     assert t[f"{C0}:{MID}:E1:A"].entry_cost == c1.entry_cost   # same entries as C1
 
@@ -125,16 +151,16 @@ def test_settlement_skips_exited_trades():
 
 def test_exit_event_ledger_replay_and_no_reentry(tmp_path):
     ledger = tmp_path / "paper" / "ledger.jsonl"
-    book = live_book(ledger, PATH[:5])                      # through the E1 exits, still pre-match
+    book = live_book(ledger, PATH[:5])                      # through the 50c exits, still pre-match
     events = [json.loads(x)["event"] for x in ledger.read_text().splitlines()]
-    assert events == ["open", "open", "open", "exit", "exit"]
+    assert events == ["open"] * 5 + ["exit"] * 2             # C0-C4 buy; C1, C2 sell at 30 s
     state = json.loads((tmp_path / "paper" / "paper_state.json").read_text())
     assert state["cash_seen"] == {MID: ["E1"]} and set(state["since"]) == {r.id for r in CASH_RULES}
     again = PaperBook(rules=(), cash_rules=CASH_RULES, ledger_path=ledger)
     assert {k: v.status for k, v in again.trades.items()} == {k: v.status for k, v in book.trades.items()}
     # another pre-match observation after the restart is not a new E1
     again.step([PAIR], {MID: quote(PATH[0])}, {"KXATPMATCH": FEES}, T0 + timedelta(seconds=40))
-    assert len(again.trades) == 3
+    assert len(again.trades) == 5
 
 
 def test_new_rules_get_their_own_since_and_old_ones_keep_the_first_poll(tmp_path):
@@ -147,7 +173,8 @@ def test_new_rules_get_their_own_since_and_old_ones_keep_the_first_poll(tmp_path
     first = min(json.loads(x)["entry_ts"] for x in ledger.read_text().splitlines())
     book = PaperBook(ledger_path=ledger)                     # now with the cash rules too
     later = T0 + timedelta(hours=1)
-    book.step([PAIR], {MID: quote(PATH[5])}, {"KXATPMATCH": FEES}, later)
+    first_live = next(row for row in PATH if row[0] == 610)
+    book.step([PAIR], {MID: quote(first_live)}, {"KXATPMATCH": FEES}, later)
     rules = {r["id"]: r for r in book.summary()["rules"]}
     assert all(rules[r.id]["since"] == first for r in RULES)
     assert all(rules[r.id]["since"] == "2026-10-27T13:00:00Z" for r in CASH_RULES)
@@ -162,6 +189,7 @@ def test_summary_rows_for_the_cash_group():
     by = {r["rule"]: r for r in book.summary()["by_rule"]}
     assert by[C1] == {**by[C1], "group": "cashout", "trades": 1, "locked": 1, "settled": 1, "open": 0}
     assert by[C2]["trades"] == 2 and by[C2]["locked"] == 2 and by[C0]["locked"] == 0
+    assert by[C3]["locked"] == by[C4]["locked"] == 1 and by[C4]["pnl_settled"] > by[C3]["pnl_settled"]
     c1 = book.trades[f"{C1}:{MID}:E1:A"]
     assert by[C1]["pnl_settled"] == pytest.approx(c1.exit_value - c1.entry_cost)
     assert by[C0]["pnl_settled"] < 0 < by[C1]["pnl_settled"]

@@ -63,8 +63,11 @@ track cash-outs as a live paper portfolio. P1–P4 above stay frozen and unchang
 | `C0-dog20-hold` | 0.20 | hold | Control: C1's entries, never sold, held to settlement |
 | `C1-dog20-sell50` | 0.20 | 0.50 | The owner's DOG50 |
 | `C2-dog30-sell50` | 0.30 | 0.50 | DOG50 with a wider entry band |
+| `C3-dog20-sell60` | 0.20 | 0.60 | Cash out once the dog is past 50-50 (owner, same day) |
+| `C4-dog20-sell70` | 0.20 | 0.70 | Cash out once the dog is clearly winning (owner, same day) |
 
-Semantics are exactly `cashout.py`'s (`_positions`, level rule L = 50¢, `DOG_RULE`):
+C3 and C4 were added the same day at the owner's request ("at 50-50 or even winning"), also before
+any result existed. Semantics are exactly `cashout.py`'s (`_positions`; level rule L, `DOG_RULE` for C1):
 - **Entries E1 and E2.** At a match's **first observation before the scheduled start (E1)** and its
   **first observation after it (E2)**, each player whose ask is below the rule's limit is bought. Both
   asks must be present. Size is min(100, size at the ask), filled at the ask + slippage with the taker
@@ -77,7 +80,11 @@ Semantics are exactly `cashout.py`'s (`_positions`, level rule L = 50¢, `DOG_RU
   contracts, the position is sold whole at the bid (the sell fee is rounded up per order). It only
   applies while the entry all-in is under 50¢, which is always true here.
 - **Otherwise held to settlement:** 1/0, or the fair price for a match that never started.
-- **The measured quantity is Δ = C1 − C0 per contract, on the same entries,** plus C1's and C2's own P&L.
+- **The measured quantity is Δ = rule − C0 per contract, on the same entries,** for C1, C3 and C4. C2 is
+  compared with C0's matching entries below 20¢, plus its own P&L. The spread of outcomes is reported too.
+- cashout.py simulates only L = 40/50/60¢, so the lookback's level exits come from
+  `lookback.level_positions`. It is cashout's own maths written out, and a test checks it equals
+  `simulate_cashout` at 50¢ and 60¢. The live engine equals it at every level, 70¢ included.
 
 **Expected result, pre-registered so the test can fail.** Under a martingale, a dog bought at p0
 reaches 50¢ with probability ≈ 2·p0, so the take-profit is break-even before costs. Costs make it
@@ -85,7 +92,9 @@ negative:
 - a spread and a taker fee on both the buy and the sale;
 - the dog overpricing already measured (Kalshi early-round dogs lost 15.7%).
 
-So C1 and C2 should be negative, and **Δ (C1 vs C0) should be about −1 to −3¢ per contract**. A clearly
+So C1 and C2 should be negative, and **Δ (C1 vs C0) should be about −1 to −3¢ per contract**. C3 and
+C4 trigger less often, on fewer and later rallies. Their Δ should also be negative and of similar size per
+contract, with fewer exits and a wider spread. A clearly
 positive Δ over ≥ 30 settled C1 trades would be the surprise worth reporting. Changing anything here
 needs a new dated entry, written before the results exist.
 

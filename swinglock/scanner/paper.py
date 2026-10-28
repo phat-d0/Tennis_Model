@@ -119,6 +119,8 @@ CASH_RULES: tuple[CashRule, ...] = (
     CashRule("C0-dog20-hold", max_ask=0.20, level=None),
     CashRule("C1-dog20-sell50", max_ask=0.20, level=0.50),
     CashRule("C2-dog30-sell50", max_ask=0.30, level=0.50),
+    CashRule("C3-dog20-sell60", max_ask=0.20, level=0.60),     # owner: cash out at 50-50 "or even winning"
+    CashRule("C4-dog20-sell70", max_ask=0.20, level=0.70),
 )
 ENTRY_TYPE = {"pre": "E1", "live": "E2"}
 

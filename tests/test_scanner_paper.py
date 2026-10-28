@@ -207,8 +207,8 @@ def test_lookback_runs_rules_over_recorded_books_incrementally(tmp_path):
     by = {(r["rule"], r["slippage"]): r for r in s["by_rule"]}
     assert set(by) == {(r.id, sl) for r in (*RULES, *CASH_RULES) for sl in (0.0, 0.01)}
     assert {by[(r.id, 0.0)]["group"] for r in CASH_RULES} == {"cashout"}
-    # this path's only dog entry is E2 (first live row, A at 25c): C2 takes it, C0/C1 (< 20c) don't
-    assert [by[(r.id, 0.0)]["trades"] for r in CASH_RULES] == [0, 0, 1]
+    # this path's only dog entry is E2 (first live row, A at 25c): C2 takes it, the < 20c rules don't
+    assert [by[(r.id, 0.0)]["trades"] for r in CASH_RULES] == [0, 0, 1, 0, 0]
     assert by[(RULES[0].id, 0.0)]["trades"] == 1 and by[(RULES[0].id, 0.0)]["locked"] == 1
     assert by[(RULES[1].id, 0.0)]["locked"] == 0 and by[(RULES[1].id, 0.0)]["pnl"] < 0
     assert by[(RULES[0].id, 0.0)]["contracts"] == 100 and by[(RULES[1].id, 0.0)]["contracts"] == 60
