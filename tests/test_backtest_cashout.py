@@ -5,7 +5,7 @@ import pandas as pd
 import pytest
 
 from swinglock.backtest.align import align
-from swinglock.backtest.cashout import (DOG_CURVE_RULES, RULES, cash_paths, mismatch_positions, mismatch_summary,
+from swinglock.backtest.cashout import (DOG_CURVE_RULES, RULES, cash_paths, formed_book_coverage, mismatch_positions, mismatch_summary,
                                         price_distribution, ranked_positions, target_bid, unranked_positions, dog_positions, dog_summary,
                                         dogl_walk_forward, fee_vec, fixed_rule_gate, identity_check, main,
                                         match_months, simulate_cashout, summarize, tag_set_split,
@@ -386,3 +386,38 @@ def test_cli_unranked_section(tmp_path):
     md = (out / "cashout_summary.md").read_text()
     assert "MISMATCH50-U" in md and "ASSUMPTION" in md
     assert pd.read_csv(out / "cashout_mm50.csv").empty                   # no fully ranked matches here
+
+
+# ---- addendum 5: E1r (first pre row with a formed book; post hoc, descriptive) ----------------
+
+# Listing-time placeholder book at t=0 (0.92 + 0.92), a formed pre-match book at t=30 (0.40 + 0.62).
+PLACEHOLDER = [(0, 0.92, 0.05, 0.92, 0.05), (30, 0.40, 0.38, 0.62, 0.60), (60, 0.50, 0.48, 0.52, 0.50),
+               (90, 0.51, 0.49, 0.51, 0.49), (200, 0.57, 0.55, 0.45, 0.43)]
+
+
+def test_e1r_skips_the_placeholder_book():
+    paths = cash_paths(align(book(PLACEHOLDER), matches("M1")), matches("M1"), CFG)
+    e1 = pick(simulate_cashout(paths, CFG, 0.0), mode="E1")
+    e1r = pick(simulate_cashout(paths, CFG, 0.0, entries=("E1r",)), mode="E1r")
+    assert (e1["entry_ts"], e1["entry_ask"]) == (t(0), 0.92)            # E1 buys the placeholder
+    assert (e1r["entry_ts"], e1r["entry_ask"]) == (t(30), 0.40)         # E1r waits for a formed book
+    assert e1r["exit_ts"] == t(90)                                      # then as before: 0.49 nets 0.472
+    cov = formed_book_coverage(paths)
+    assert (cov["with_pre"], cov["with_formed_pre"], cov["median_first_pre_combined"]) == (1, 1, 1.84)
+    never = cash_paths(align(book([PLACEHOLDER[0], PLACEHOLDER[-1]]), matches("M1")), matches("M1"), CFG)
+    assert simulate_cashout(never, CFG, 0.0, entries=("E1r",)).empty
+    assert formed_book_coverage(never)["frac_formed"] == 0
+
+
+def test_cli_e1r_section(tmp_path):
+    m, q = monthly(n_per_month=2)
+    data, out = tmp_path / "data", tmp_path / "out"
+    data.mkdir()
+    m.to_parquet(data / "matches.parquet")
+    q.to_parquet(data / "quotes.parquet")
+    assert main(["--data", str(data), "--out", str(out)]) == 0
+    for f in ("cashout_e1r_dog50.csv", "cashout_e1r_summary.csv", "cashout_e1r_coverage.csv"):
+        assert (out / f).exists()
+    assert not (out / "cashout_e1r_mm50.csv").exists()                  # no --ranks
+    md = (out / "cashout_summary.md").read_text()
+    assert "E1r robustness check" in md and "POST HOC" in md

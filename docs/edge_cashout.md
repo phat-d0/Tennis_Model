@@ -248,3 +248,16 @@ existed.
 5. **Expectation:** the same as MISMATCH50. Reach-50 at or below the implied rate, negative ROI, **FAIL**. Reason (ii)
    may differ: if comeback players are mispriced, it would show as a reach rate above the implied rate in that row only,
    which would need its own pre-registered test.
+
+### 2026-10-28, fifth amendment (POST HOC, after E1 results were seen): E1r robustness check
+Data found that at a match's **first** pre-match observation the book is mostly empty: the median ask_a + ask_b is
+$1.84 (ATP/WTA, 4,677 matches) and $1.88 (Challenger/WTA 125, 8,304 matches). E1 therefore buys listing-time
+placeholder offers, usually 75–97¢, on both players. **Every E1 result so far measures that empty book, not the
+strategy.** This covers the E1 gate, the E1 share of DOG50/DOGL and MISMATCH50 E1. E2 entries come from formed books
+and are unaffected.
+
+- **E1r** = the first pre-match row where ask_a + ask_b ≤ $1.05, i.e. a two-sided book within 5¢ of fair.
+- It is re-run for DOG50, MISMATCH50 and MISMATCH50-U, plus every rule's summary, in the same Data run as
+  MISMATCH50-U. The run also reports how many matches ever show such a book before the start.
+- **Descriptive only, never gated:** the E1 results had already been seen when this was defined. The registered gate
+  verdicts stand unchanged (all FAIL), and the original E1 rows stay in the reports, marked as a listing-book artefact.
