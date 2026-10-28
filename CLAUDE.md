@@ -477,7 +477,7 @@ Since phat-d0/Tennis_Model#116 also: `min_arb_profit_per_contract` (the alert th
   Unmatched names are left blank. Synthetic check on the real archive: ~99.6% of names matched, 38 s per 3,000 matches,
   Sinner #1, Alcaraz #2. Data runs it; nothing committed. 341 tests (pandas 2 and 3.1).
 - 2026-10-28: Elo rank export follow-ups. #142 put the lagged pool (6 h replay), integer ranks and the flip test on main
-  (#141 had merged before them). PRNUM adds `reason_a`/`reason_b` for MISMATCH50-U (owner: account for unranked players):
+  (#141 had merged before them). phat-d0/Tennis_Model#145 adds `reason_a`/`reason_b` for MISMATCH50-U (owner: account for unranked players):
   null when ranked, else `unmatched` (name not found), `few_matches` (< min_n rated matches; elo/n keep the provisional
   rating) or `inactive` (empty active pool on the match day; a player's own activity isn't required for a rank, so this
   is rare). rank_a/rank_b unchanged. The CLI summary prints the reason counts. 6 rank tests; 343 tests (pandas 2 and 3.1).
