@@ -3,6 +3,7 @@ Plan only, pre-registered in reports/upsets_dk_inplay.md. This module makes no p
 
     python -m upsets.dk_inplay plan [--sackmann PATH]
     python -m upsets.dk_inplay pull --pilot KEY:TOURNEY_ID --cap 2000 --yes    # paid, staged (Lead's go)
+    python -m upsets.dk_inplay pull --season 2025 --cap 270000 --per-match-max 87.5 --yes   # one full-pull stage
 
 Universe: the early-round matches we already hold DraftKings + Pinnacle closes for (upsets.dk_history.collect,
 from the cached Odds API snapshots, 0 credits), with Sackmann results (through May 2026).
@@ -194,12 +195,46 @@ def pilot_stats(m: pd.DataFrame, snaps: list[dict], planned: int, spent: float) 
     return "\n".join(L)
 
 
+def make_fetch(api, log: Path, cap: float, stage_budget: float | None = None, keep: list | None = None,
+               pause_s: float = 0.2):
+    """fetch(key, when) for walk(): cached snapshots first (in-play cache, then the close studies' cache, read
+    only); else one paid call, unless it would take this job's spend log past `cap`, or this stage's spend past
+    `stage_budget` (the per-match drift stop), in which case it returns None (walk stops). fetch.why says which."""
+    from . import dk_history as dh
+    start = dh.logged_total(log)
+
+    def fetch(key, when):
+        p = dh.cache_path("odds", key, when, INPLAY_CACHE)
+        old = dh.cache_path("odds", key, when)
+        if p.exists() or old.exists():
+            body = dh.read_cache(p if p.exists() else old)
+        else:
+            total = dh.logged_total(log)
+            if total + CREDITS_PER_SNAPSHOT > cap:
+                fetch.why = "job cap"
+                return None
+            if stage_budget is not None and total - start + CREDITS_PER_SNAPSHOT > stage_budget:
+                fetch.why = "per-match drift budget"
+                return None
+            body = api.historical_odds(key, when, bookmakers=BOOKS)
+            dh.write_cache(p, body)
+            time.sleep(pause_s)
+        if keep is not None:
+            keep.append(body)
+        return body
+    fetch.why = None
+    return fetch
+
+
 def main(argv=None) -> None:
     ap = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     ap.add_argument("cmd", choices=["plan", "pull"])
     ap.add_argument("--sackmann", type=Path, default=Path("/home/user/phat-d0/tennis-sackmann-archive"))
     ap.add_argument("--pilot", default=None, help="KEY:TOURNEY_ID, one tournament only")
     ap.add_argument("--since", type=int, default=2023, help="first season of the full pull")
+    ap.add_argument("--season", type=int, default=None, help="one stage: this season only")
+    ap.add_argument("--per-match-max", type=float, default=None,
+                    help="stop the stage once it spends more than this x its matches (drift stop)")
     ap.add_argument("--step", type=int, default=10)
     ap.add_argument("--slack", type=int, default=180)
     ap.add_argument("--cap", type=float, required=False, default=0, help="max credits in this job's spend log")
@@ -218,6 +253,8 @@ def main(argv=None) -> None:
     if a.pilot:
         key, tid = a.pilot.split(":", 1)
         w = w[(w["key"] == key) & (w["tourney_id"].astype(str) == tid)]
+    elif a.season is not None:
+        w = w[w["season"] == a.season]
     else:
         w = w[w["season"] >= a.since]
     planned = credits(w, a.step, a.slack)
@@ -227,25 +264,19 @@ def main(argv=None) -> None:
     from .odds_api import OddsApi
     log = INPLAY_CACHE / "spend.log"
     api = OddsApi(floor=a.floor, spend_log=log)
-    got = []
-
-    def fetch(key, when):
-        p = dh.cache_path("odds", key, when, INPLAY_CACHE)
-        old = dh.cache_path("odds", key, when)       # the close studies' cache: read, never written
-        if p.exists() or old.exists():
-            body = dh.read_cache(p if p.exists() else old)
-        else:
-            if dh.logged_total(log) + 10 > a.cap:
-                return None
-            body = api.historical_odds(key, when, bookmakers=BOOKS)
-            dh.write_cache(p, body)
-            time.sleep(0.2)
-        if a.pilot:                 # the pilot's freshness check reads them back; a full pull would not fit in memory
-            got.append(body)
-        return body
-    res = walk(w, fetch, a.step, a.slack) if a.pilot else walk_recent_first(w, fetch, a.step, a.slack)
-    print(f"[fetched {res['fetched']:,} snapshots; spent this run {api.spent:,.0f}; job total "
-          f"{dh.logged_total(log):,.0f}" + ("; STOPPED at the cap" if res["stopped"] else "") + "]")
+    api.sports()                    # free: the balance, for the stage's floor check
+    start = dh.logged_total(log)
+    if api.remaining - min(planned, max(a.cap - start, 0)) < a.floor:
+        raise SystemExit(f"this stage could take the balance below the floor {a.floor:,}: stopped before any call")
+    got = [] if a.pilot else None   # the pilot's freshness check reads bodies back; a full pull wouldn't fit in memory
+    budget = a.per_match_max * len(w) if a.per_match_max else None
+    fetch = make_fetch(api, log, a.cap, budget, got)
+    res = walk(w, fetch, a.step, a.slack) if (a.pilot or a.season is not None) else \
+        walk_recent_first(w, fetch, a.step, a.slack)
+    used = dh.logged_total(log) - start
+    print(f"[fetched {res['fetched']:,} snapshots; credits this stage {used:,.0f} ({used / max(len(w), 1):.1f}/match, "
+          f"planned {planned / max(len(w), 1):.1f}); job total {dh.logged_total(log):,.0f}"
+          + (f"; STOPPED: {fetch.why}" if res["stopped"] else "") + "]")
     if a.pilot:
         print(pilot_stats(res["matches"], got, planned, api.spent))
     else:
