@@ -10,7 +10,10 @@ exists. Any change gets a dated amendment written before its run.
   - Every dog exit level 40–90¢ is within ±1¢/contract of holding.
   - The worse-ranked player reaches 50¢ less often than its price implies.
 - **On DraftKings pre-match** (#86, #99, #134): early-round dogs lose about DK's margin (−10% to −19%).
-- **FAVDIP is new on both venues.** No fallen-favourite result has been seen on either.
+- FAVDIP had not been run on either venue when this plan was written.
+- **Amendment 2026-10-28, before any pull:** Kalshi's FAVDIP result has since come back (Backtest): **FAIL**. Buying at 50%
+  in play did worse than buying at the start in 5 of 6 cells. The one bright cell is WTA favourites ≥ 80%: +11.2% on 132
+  bets, CI −6% to +28%. That is now a disclosed prior for DK-FAVDIP. The rules above don't change.
 - **Data audit:** the only in-play prices we have looked at are a data audit of the cached snapshots, run while writing
   this plan. It covered quote ages and price ranges only, never outcomes (§ Data).
 

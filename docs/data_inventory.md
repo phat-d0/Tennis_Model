@@ -132,3 +132,13 @@ Shared paid-plan key since 2026-10-26 (owner). Global floor 5,000; dk_live reser
 | 2026-10-26 06:07–07:03 | Upsets, closing snapshots, 10,335 matches, `bookmakers=draftkings,pinnacle` | `/historical/sports/{key}/odds` | 4,296 paid (4,297 fetched) | 42,960 | 4,938,958 |
 | | **DK history total so far (spend log)** | | 7,190 | **62,675** | 4,938,958 |
 
+**DK in-play snapshots (DOG50 / exit curve / MISMATCH50 / FAVDIP on DK)** (owner-approved cap 300,000; Lead's job cap 270,000
+in this job's own spend log `data/raw/odds_api/inplay/spend.log`; floor 5,000; pre-registered in reports/upsets_dk_inplay.md,
+phat-d0/Tennis_Model#157). Staged: pilot ≤ 2,000 first, full pull only after the Lead's go. In-play snapshots are cached apart
+(`data/raw/odds_api/inplay/`) so the close studies' closes don't change.
+
+| Date (UTC) | Who / job | Endpoint | Calls | Credits | Balance after |
+|---|---|---|---|---|---|
+| 2026-10-28 17:09–17:11 | Upsets, in-play **pilot**, ATP Qatar 2025 (24 R1–R2 matches), 10-min, `bookmakers=draftkings,pinnacle` | `/historical/sports/{key}/odds` | 175 | 1,750 | 4,652,408 |
+| | **In-play job total (its spend log)** | | 175 | **1,750** | 4,652,408 |
+
