@@ -150,4 +150,6 @@ phat-d0/Tennis_Model#157). Staged: pilot ≤ 2,000 first, full pull only after t
 | 2026-10-28 22:00–22:32 | Upsets, in-play stage 4, season 2023 (`pull --season 2023`, from main 9c8c243) | `/historical/sports/{key}/odds` | 2,367 | 23,670 | 4,411,572 |
 | | **Season 2023 done:** 733 matches (Slams), 23,670 credits = 32.3/match (plan 38.0); event found 712, seen in play 712, finish detected 385 | | | | |
 | | **In-play job total, pull complete (its spend log)** | | 20,593 | **205,930** of the 270,000 cap | 4,411,572 |
+| 2026-10-28 23:3x | Upsets, in-play coverage re-walk of the real (close) events (Lead-approved ≤ 310): `pull --season` 2026/2024/2023 with close event ids; only un-pulled snapshots paid | `/historical/sports/{key}/odds` | 7 | 70 | 4,411,497 |
+| | **In-play job total (its spend log)** | | 20,600 | **206,000** of the 270,000 cap | 4,411,497 |
 
