@@ -19,20 +19,19 @@ Everything stays under data/ on the server (gitignored). Read-only; no order cod
 from __future__ import annotations
 
 import argparse
+import copy
 import json
 import logging
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import Any
 
-import numpy as np
 import pandas as pd
 
 from ..backtest.align import align, staleness_s
-from ..backtest.cashout import ENTRY_TYPES, cash_paths, fee_vec
+from ..backtest.cashout import HOLD, LEVEL, cash_paths, rule_label, simulate_cashout
 from ..backtest.swing import TRADE_COLUMNS, match_paths, simulate
 from ..config import ROOT, load_config
-from ..locks import SIDES
 from ..schema import MATCH_COLUMNS, conform
 from .client import KalshiReadClient
 from .engine import iso
@@ -107,61 +106,31 @@ CASH_COLUMNS = ["match_id", "side", "entry_type", "entry_ts", "entry_phase", "en
                 "exit_ts", "settle_ts", "pnl", "capital", "rule", "slippage", "group"]
 
 
-def level_positions(paths: list, contracts: float, slip: float, rules: tuple[CashRule, ...] = CASH_RULES
-                    ) -> pd.DataFrame:
-    """Cash-out rules over `backtest.cashout.cash_paths`, with cashout's own maths (`_positions`: E1/E2
-    entries, ask + slippage + taker fee; level exit when the net bid (bid - slip) - fee/n >= L with bid
-    size >= n). Written out here because cashout's simulate_cashout only covers its own LEVEL_L grid
-    (no 70c); tests check it equals simulate_cashout at 50c and 60c and the live engine at every level."""
-    rows = []
-    for p in paths:
-        for etype, phase in ENTRY_TYPES.items():
-            idx = np.flatnonzero(p.phase == phase)
-            if not idx.size:
-                continue
-            i = int(idx[0])
-            for side in SIDES:
-                ask, size = float(p.ask[side][i]), p.ask_size[side][i]
-                if not 0 < ask < 1 or (not np.isnan(size) and size <= 0):
-                    continue
-                n = contracts if np.isnan(size) else min(contracts, float(size))
-                fill = min(ask + slip, 1.0)
-                entry_cost = n * fill + p.fees.fee(fill, n)
-                hold = n * p.pay[side] - entry_cost
-                sale = np.clip(p.bid[side][i + 1:] - slip, 0.0, 1.0)
-                bsize = p.bid_size[side][i + 1:]
-                value = n * sale - fee_vec(p.fees, sale, n)
-                ok = (sale > 0) & ~np.isnan(sale) & (np.isnan(bsize) | (bsize >= n - 1e-9))
-                net = np.where(ok, value / n, -np.inf)
-                for r in rules:
-                    if etype not in r.entries or not ask < r.max_ask:
-                        continue
-                    sell = r.level is not None and entry_cost / n < r.level
-                    hit = np.flatnonzero(net >= r.level - 1e-12) if sell else np.array([], int)
-                    j = i + 1 + int(hit[0]) if hit.size else None
-                    rows.append({
-                        "match_id": p.match_id, "side": side, "entry_type": etype, "entry_ts": p.ts[i],
-                        "entry_phase": str(p.phase[i]), "entry_ask": ask, "contracts": n, "locked": j is not None,
-                        "exit_ts": p.ts[j] if j is not None else pd.NaT, "settle_ts": p.settle_ts,
-                        "pnl": float(value[j - i - 1]) - entry_cost if j is not None else hold,
-                        "capital": entry_cost, "rule": r.id, "slippage": slip, "group": r.group})
-    df = pd.DataFrame(rows, columns=CASH_COLUMNS)
-    for c in ("entry_ts", "exit_ts", "settle_ts"):
-        df[c] = pd.to_datetime(df[c], utc=True)
-    return df
-
-
 def simulate_cash_rules(aligned: pd.DataFrame, matches: pd.DataFrame, cfg: dict[str, Any],
                         rules: tuple[CashRule, ...] = CASH_RULES) -> pd.DataFrame:
-    """Every cash-out rule at every slippage: one row per (rule, slippage, match, entry type, side)
-    bought under the rule's max_ask. `locked` = exited; `pnl` = sale P&L if exited, else hold P&L."""
+    """Every cash-out rule at every slippage through `backtest.cashout.simulate_cashout` (level rule L, or
+    the hold rule for the control): one row per (rule, slippage, match, entry type, side) bought under
+    the rule's max_ask. `locked` = exited; `pnl` = the rule's P&L (sale if exited, else hold)."""
     frames = []
     for contracts in sorted({r.contracts for r in rules}):
-        paths = cash_paths(aligned, matches, cfg)
+        c = copy.deepcopy(cfg)
+        c.setdefault("backtest", {})["contracts_per_entry"] = contracts
+        group = [r for r in rules if r.contracts == contracts]
+        kinds = {r.id: (HOLD, 1.0) if r.level is None else (LEVEL, r.level) for r in group}
+        paths = cash_paths(aligned, matches, c)
         for slip in SLIPPAGES:
-            d = level_positions(paths, contracts, slip, tuple(r for r in rules if r.contracts == contracts))
-            if len(d):
-                frames.append(d)
+            pos = simulate_cashout(paths, c, slip, rules=tuple(dict.fromkeys(kinds.values())))
+            for r in group:
+                d = pos[(pos["rule"] == rule_label(*kinds[r.id])) & (pos["entry_ask"] < r.max_ask)
+                        & pos["mode"].isin(r.entries)]
+                if not len(d):
+                    continue
+                frames.append(pd.DataFrame({
+                    "match_id": d["match_id"], "side": d["side"], "entry_type": d["mode"],
+                    "entry_ts": d["entry_ts"], "entry_phase": d["entry_phase"], "entry_ask": d["entry_ask"],
+                    "contracts": d["contracts"], "locked": d["locked"].astype(bool), "exit_ts": d["exit_ts"],
+                    "settle_ts": d["settle_ts"], "pnl": d["rule_pnl"], "capital": d["entry_cost"],
+                    "rule": r.id, "slippage": slip, "group": r.group}))
     return pd.concat(frames, ignore_index=True)[CASH_COLUMNS] if frames else pd.DataFrame(columns=CASH_COLUMNS)
 
 

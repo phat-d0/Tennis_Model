@@ -11,7 +11,7 @@ import pandas as pd
 import pytest
 
 from swinglock.backtest.align import align
-from swinglock.backtest.cashout import cash_paths, simulate_cashout
+from swinglock.backtest.cashout import DOG_CURVE_RULES, DOG_LEVELS, cash_paths, simulate_cashout
 from swinglock.scanner import lookback
 from swinglock.scanner.market import MatchQuote, SideQuote
 from swinglock.scanner.paper import CASH_RULES, RULES, PaperBook
@@ -68,39 +68,33 @@ def quotes_frame(path=PATH):
     return pd.DataFrame(rows)
 
 
-def cash_paths_for_test():
-    cfg = copy.deepcopy(CFG)
-    cfg["backtest"]["contracts_per_entry"] = 100
-    return cfg, cash_paths(align(quotes_frame(), matches_frame()), matches_frame(), cfg)
-
-
 def lookback_positions(slip=0.0):
-    _, paths = cash_paths_for_test()
-    return lookback.level_positions(paths, 100, slip)
+    """The lookback's C rows: backtest.cashout.simulate_cashout with each rule's level (hold for C0)."""
+    pos = lookback.simulate_cash_rules(align(quotes_frame(), matches_frame()), matches_frame(), CFG)
+    return pos[pos["slippage"] == slip]
 
 
 # ---- the core guarantee: same trades as backtest/cashout.py on the same path -------------------
 
-def test_level_positions_equal_backtest_simulate_cashout():
-    """The lookback's level exits are cashout's own maths: identical to simulate_cashout at the levels
-    cashout simulates (50c, 60c), at 0c and 1c slippage."""
-    cfg, paths = cash_paths_for_test()
+def test_lookback_cash_rows_are_simulate_cashout_rows():
+    """No maths of our own: each C rule's rows are simulate_cashout's rows for its level (C4 = 70c, in
+    cashout's dog exit-level curve) or its hold rule, filtered to the rule's entries."""
+    cfg = copy.deepcopy(CFG)
+    cfg["backtest"]["contracts_per_entry"] = 100
+    paths = cash_paths(align(quotes_frame(), matches_frame()), matches_frame(), cfg)
+    assert {r.level for r in CASH_RULES if r.level} <= set(DOG_LEVELS)
     for slip in (0.0, 0.01):
-        pos = simulate_cashout(paths, cfg, slip)
-        mine = lookback.level_positions(paths, 100, slip)
-        for rule in (r for r in CASH_RULES if r.level in (0.50, 0.60)):
-            sim = pos[(pos["rule"] == f"L={rule.level * 100:g}c") & (pos["entry_ask"] < rule.max_ask)]
+        pos = simulate_cashout(paths, cfg, slip, rules=DOG_CURVE_RULES)
+        mine = lookback_positions(slip)
+        for rule in CASH_RULES:
+            label = "hold" if rule.level is None else f"L={rule.level * 100:g}c"
+            sim = pos[(pos["rule"] == label) & (pos["entry_ask"] < rule.max_ask)]
             got = mine[mine["rule"] == rule.id].set_index(["entry_type", "side"])
             assert len(sim) == len(got) > 0, rule.id
             for r in sim.itertuples():
                 g = got.loc[(r.mode, r.side)]
                 assert g["entry_ts"] == r.entry_ts and g["contracts"] == pytest.approx(r.contracts)
                 assert bool(g["locked"]) == bool(r.locked) and g["pnl"] == pytest.approx(r.rule_pnl, abs=1e-9)
-                if r.locked:
-                    assert g["exit_ts"] == r.exit_ts
-        c0 = mine[mine["rule"] == C0].set_index(["entry_type", "side"])
-        for r in pos[(pos["rule"] == "L=50c") & (pos["entry_ask"] < 0.20)].itertuples():
-            assert c0.loc[(r.mode, r.side), "pnl"] == pytest.approx(r.hold_pnl, abs=1e-9)   # control = hold
 
 
 def test_live_cash_engine_matches_the_lookback_sim_for_every_rule():

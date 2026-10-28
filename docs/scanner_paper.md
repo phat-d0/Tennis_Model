@@ -82,9 +82,9 @@ any result existed. Semantics are exactly `cashout.py`'s (`_positions`; level ru
 - **Otherwise held to settlement:** 1/0, or the fair price for a match that never started.
 - **The measured quantity is Δ = rule − C0 per contract, on the same entries,** for C1, C3 and C4. C2 is
   compared with C0's matching entries below 20¢, plus its own P&L. The spread of outcomes is reported too.
-- cashout.py simulates only L = 40/50/60¢, so the lookback's level exits come from
-  `lookback.level_positions`. It is cashout's own maths written out, and a test checks it equals
-  `simulate_cashout` at 50¢ and 60¢. The live engine equals it at every level, 70¢ included.
+- The lookback calls `cashout.simulate_cashout` with each rule's level, or the hold rule for C0. Every
+  level here (50, 60 and 70¢) is on cashout's dog exit-level curve (`DOG_LEVELS`, phat-d0/Tennis_Model#130),
+  and a test checks the live engine equals it for all five rules.
 
 **Expected result, pre-registered so the test can fail.** Under a martingale, a dog bought at p0
 reaches 50¢ with probability ≈ 2·p0, so the take-profit is break-even before costs. Costs make it
