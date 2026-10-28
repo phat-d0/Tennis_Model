@@ -39,8 +39,8 @@ import numpy as np
 import pandas as pd
 import requests
 
-from . import elo, elo_plus, model, polymarket, portfolio, sackmann
-from .names import match_names, player_table
+from . import elo, elo_plus, model, polymarket, portfolio, sackmann, wiki_seeds
+from .names import match_names, name_key, player_table
 from .odds_api import KEY_NAMES, BudgetError, OddsApi, parse_h2h
 
 BOOKS = ("draftkings", "pinnacle")
@@ -355,10 +355,12 @@ def page_matches(snaps: pd.DataFrame, titles: dict, rt: dict | None, now: pd.Tim
 
 def build(out: Path, cache: Path, archive: Path, floor: int = 5000, month_cap: int = 3000,
           now: pd.Timestamp | None = None, key: str | None = None, session=None,
-          run_every_h: float = 3.0, pm_session=None, page_session=None, page_base: str = PAGE_DATA) -> dict:
+          run_every_h: float = 3.0, pm_session=None, page_session=None, page_base: str = PAGE_DATA,
+          wiki_session=None) -> dict:
     """pm_session: an HTTP session for Polymarket's public APIs; None leaves the Challengers block out.
     page_session: an HTTP session for the live page, to restore the paper ledger and the month's spend
-    when the cache was evicted (`restore`); None skips it. Raises RestoreError when that can't be done."""
+    when the cache was evicted (`restore`); None skips it. Raises RestoreError when that can't be done.
+    wiki_session: an HTTP session for Wikipedia's API, for the "seed" Portfolio strategies; None skips them."""
     now = now or utcnow()
     cache.mkdir(parents=True, exist_ok=True)
     if page_session is not None:
@@ -426,20 +428,64 @@ def build(out: Path, cache: Path, archive: Path, floor: int = 5000, month_cap: i
     if pm_session is not None:
         doc["challengers"] = challenger_block(pm_session, cache, now, rt)
     _write_json(out / "odds.json", doc)
-    trades = paper(cache, matches, now, doc["odds_fetched_at"], api, led, month_cap)
+    seeds = None
+    if wiki_session is not None:
+        try:
+            seeds = seed_facts(wiki_session, cache, snaps, matches, now)
+        except Exception as e:   # never breaks the build; never str(e)
+            print(f"[seeds: {type(e).__name__}]")
+    trades = paper(cache, matches, now, doc["odds_fetched_at"], api, led, month_cap, seeds)
     _write_json(cache / "ledger.json", led)
     _write_json(out / "portfolio.json", portfolio.page(trades, now, titles))
     return doc
 
 
+SEED_EVENT_DAYS = 21   # a seed's earlier matches in the same event: listed in the 21 days before this one
+
+
+def seed_facts(session, cache: Path, snaps: pd.DataFrame, matches: list[dict], now: pd.Timestamp) -> dict:
+    """event_id -> {"seed_side", "seed", "qual", "round_ok"} for upcoming matches in scored tournaments where
+    exactly one player is seeded (Wikipedia, upsets.wiki_seeds). round_ok is the stated proxy for rounds 1-2:
+    this is the seed's first or second match listed for that tournament key. Events whose seeds can't be read
+    are skipped and logged."""
+    out, notes, seen = {}, [], {}
+    for m in matches:
+        k = m.get("sport_key")
+        start = pd.Timestamp(m.get("commence_time")) if m.get("commence_time") else None
+        if k not in portfolio.SCORED_KEYS or start is None or start <= now:
+            continue
+        ek = (k, start.year)
+        if ek not in seen:
+            seen[ek], note = wiki_seeds.seeds_for(session, cache, k, start.year)
+            notes.append(f"{k} {start.year}: {note}")
+        sd = seen[ek]
+        if not sd:
+            continue
+        keys = (name_key(m.get("player_1")), name_key(m.get("player_2")))
+        s1, s2 = (sd["seeds"].get(x) for x in keys)
+        if (s1 is None) == (s2 is None):
+            continue
+        side = 1 if s1 is not None else 2
+        seed_key = keys[side - 1]
+        before = snaps[(snaps["sport_key"] == k) & (snaps["commence_time"] < start)
+                       & (snaps["commence_time"] >= start - pd.Timedelta(days=SEED_EVENT_DAYS))] if len(snaps) else snaps
+        earlier = before.loc[[seed_key in (name_key(a), name_key(b)) for a, b in
+                              zip(before["player_1"], before["player_2"])], "event_id"].nunique() if len(before) else 0
+        out[m["event_id"]] = {"seed_side": side, "seed": s1 if s1 is not None else s2,
+                              "qual": keys[2 - side] in set(sd["qualifiers"]), "round_ok": earlier <= 1}
+    for n in notes:
+        print(f"[seeds: {n}]")
+    return out
+
+
 def paper(cache: Path, matches: list[dict], now: pd.Timestamp, fetched_at: str | None, api, led: dict,
-          month_cap: int) -> list[dict]:
+          month_cap: int, seeds: dict | None = None) -> list[dict]:
     """Paper portfolio: open/refresh trades from this build's matches, settle the finished ones
     (/scores, within the page's monthly cap and the floor). A failure here never breaks the build."""
     path = cache / "portfolio.json"
     trades = _read_json(path, [])
     try:
-        trades = portfolio.update(trades, matches, now, fetched_at)
+        trades = portfolio.update(trades, matches, now, fetched_at, seeds)
         if api is not None:
             def budget_ok(cost):
                 return (led["used"] + cost <= month_cap
@@ -472,7 +518,8 @@ def main(argv=None) -> None:
     a = ap.parse_args(argv)
     try:
         doc = build(a.out, a.cache, a.archive, a.floor, a.month_cap, run_every_h=a.run_every_h,
-                    pm_session=requests.Session(), page_session=requests.Session())
+                    pm_session=requests.Session(), page_session=requests.Session(),
+                    wiki_session=requests.Session())
     except RestoreError as e:
         raise SystemExit(f"[ledger: cache is empty and the live page's copy can't be read ({e}); stopping "
                          "so the live page and its ledger stay as they are]") from None

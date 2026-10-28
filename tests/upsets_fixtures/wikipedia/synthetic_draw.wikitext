@@ -1,0 +1,29 @@
+{{Infobox tennis tournament event|2031|Example Open}}
+The '''2031 Example Open – Men's singles''' was a made-up event.
+
+==Seeds==
+{{columns-list|colwidth=30em|
+# {{flagicon|ITA}} '''[[Marco Alpha]]''' (champion)
+# {{flagicon|ESP}} [[Pablo Beta (tennis)|Pablo Beta]] (second round)
+# {{flagicon|USA}} [[Chris Gamma]] (first round)
+# {{flagicon|FRA}} [[Jean-Luc Delta]] (quarterfinals)
+}}
+
+==Draw==
+{{Draw key}}
+===First section===
+{{16TeamBracket-Compact-Tennis3
+| RD1-seed01=1
+| RD1-team01={{flagicon|ITA}} '''[[Marco Alpha]]''' | RD1-score01-1=6
+| RD1-seed02=Q
+| RD1-team02={{flagicon|AUS}} [[Sam Epsilon]]
+| RD1-seed03=WC
+| RD1-team03={{flagicon|USA}} [[Tom Zeta]]
+| RD1-seed04=LL
+| RD1-team04={{flagicon|GER}} [[Felix Eta]]
+| RD1-seed05=
+| RD1-team05={{flagicon|ARG}} [[Juan Theta]]
+}}
+
+==References==
+{{reflist}}
