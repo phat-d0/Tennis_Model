@@ -217,6 +217,13 @@ const VIEWPORTS = { phone: { width: 390, height: 844 }, laptop: { width: 1280, h
     if (outDir && vp === "phone") await page.screenshot({ path: path.join(outDir, `${prefix}-findings-${tag}.png`), fullPage: true });
     await page.click('.tabbar button[data-tab="portfolio"]');
     const pfGrab = () => page.evaluate(() => ({
+      level: document.getElementById("view").dataset.level,
+      folders: [...document.querySelectorAll("#view .row-btn.folder .who b")].map((b) => b.textContent),
+      notProven: [...document.querySelectorAll("#view .row-btn.folder .tag")].filter((t) => t.textContent === "not proven").length,
+      bt: [...document.querySelectorAll("#view .row-btn.folder .bt")].map((b) => b.textContent),
+      crumbs: [...document.querySelectorAll("#view .crumbs .crumb")].map((b) => b.textContent),
+      title: document.querySelector("#view .pf-title")?.textContent || "",
+      sub: document.querySelector("#view .pf-sub")?.textContent || "",
       tiles: document.querySelectorAll("#view .tile").length,
       chart: !!document.querySelector("#view .chart svg"),
       trades: document.querySelectorAll("#view .trade").length,
@@ -224,16 +231,34 @@ const VIEWPORTS = { phone: { width: 390, height: 844 }, laptop: { width: 1280, h
       rule: document.querySelector("#view .rule")?.textContent || "",
       overflow: document.documentElement.scrollWidth - window.innerWidth,
     }));
+    const shot = async (name) => { if (outDir) await page.screenshot({ path: path.join(outDir, `${prefix}-${name}-${tag}.png`), fullPage: true }); };
+    info.pfHome = await pfGrab();
+    await shot("portfolio-home");
+    await page.click('#view [data-pfid="model"]');                 // a one-strategy portfolio opens the strategy
     info.portfolio = await pfGrab();
-    if (outDir) await page.screenshot({ path: path.join(outDir, `${prefix}-portfolio-${tag}.png`), fullPage: true });
-    await page.click('#view .segmented:nth-of-type(1) button:nth-child(2)');     // the line-shopping strategy
+    await shot("portfolio");
+    await page.click('#view [data-pfnav="home"]');
+    await page.click('#view [data-pfid="line"]');
     info.portfolioLine = await pfGrab();
-    await page.click('#view .segmented:nth-of-type(2) button:nth-child(2)');     // backtest view
+    await page.click('#view .segmented button:nth-child(2)');       // backtest view
     info.backtest = await pfGrab();
-    if (outDir) await page.screenshot({ path: path.join(outDir, `${prefix}-backtest-${tag}.png`), fullPage: true });
-    await page.click('#view .segmented:nth-of-type(2) button:nth-child(1)');     // back to live
-    await page.click('#view .segmented:nth-of-type(1) button:nth-child(1)');
-    for (const o of [info.portfolio.overflow, info.backtest.overflow]) if (o > 0) problems.push(`${tag} portfolio overflow ${o}px`);
+    await shot("backtest");
+    await page.click('#view .segmented button:nth-child(1)');       // back to live
+    await page.click('#view [data-pfnav="home"]');
+    await page.click('#view [data-pfid="seed"]');                  // two strategies: the portfolio level
+    info.pfSeed = await pfGrab();
+    await shot("portfolio-seed");
+    await page.click('#view [data-pfstrat="seed_q"]');
+    info.pfSeedQ = await pfGrab();
+    await shot("portfolio-strategy");
+    await page.click('#view [data-pfnav="portfolio"]');
+    info.pfSeedBack = (await pfGrab()).level;
+    await page.click('#view [data-pfstrat="seed"]');
+    await page.click('.tabbar button[data-tab="portfolio"]');      // tapping the tab again returns home
+    info.pfRetap = (await pfGrab()).level;
+    for (const g of [info.pfHome, info.portfolio, info.backtest, info.pfSeed, info.pfSeedQ]) {
+      if (g.overflow > 0) problems.push(`${tag} portfolio overflow ${g.overflow}px`);
+    }
     await page.click('.tabbar button[data-tab="matches"]');
     if (await page.$("#view .segmented button:nth-child(3)")) {
       await page.click("#view .segmented button:nth-child(3)");   // WTA
@@ -367,16 +392,30 @@ def test_page_ok(site, tmp_path):
 
 @needs_browser
 def test_page_portfolio(site, tmp_path):
-    """Portfolio tab: tiles, realized-vs-expected chart and trade rows; an empty strategy; backtest."""
+    """Portfolio tab as folders: home lists the portfolios, a portfolio its strategies, a strategy its
+    Live paper / Backtest views; the crumbs and a second tap on the tab go back."""
     sample_pf = json.loads(PORTFOLIO.read_text())
     model = next(s for s in sample_pf["strategies"] if s["id"] == "model")
+    bt = json.loads((SITE / "portfolio_backtest.json").read_text())
     for res in _check(tmp_path, site(shifted(sample())), "pf"):
+        h = res["pfHome"]
+        assert h["level"] == "home" and h["folders"] == ["Elo model", "DK vs Pinnacle", "Underdogs", "Seed loses early"]
+        assert h["notProven"] == 4 and h["tiles"] == 0 and h["crumbs"] == []
+        assert all(b.startswith("Backtest ") and "ROI" in b for b in h["bt"])
         p = res["portfolio"]
+        assert p["level"] == "strategy" and p["title"] == "Elo model" and p["crumbs"] == ["‹ Portfolios"]
         assert p["tiles"] == 8 and p["chart"] and p["trades"] == min(20, model["summary"]["settled"]) + model["summary"]["open"]
         assert "not proven" in p["rule"] and "Elo model" in p["rule"]
         assert res["portfolioLine"]["trades"] == 0 and "No paper trades yet" in res["portfolioLine"]["empty"]
-        bt = json.loads((SITE / "portfolio_backtest.json").read_text())
         assert res["backtest"]["tiles"] == 4 and res["backtest"]["chart"] == bool(bt["strategies"]["line"]["bets"])
+        s = res["pfSeed"]
+        assert s["level"] == "portfolio" and s["title"] == "Seed loses early"
+        assert s["folders"] == ["All seeded matches", "Qualifiers and lucky losers"] and s["notProven"] == 2
+        assert f"{bt['strategies']['seed_q']['bets']:,} bets" in s["bt"][1]
+        q = res["pfSeedQ"]
+        assert q["level"] == "strategy" and q["title"] == "Seed loses early: Qualifiers and lucky losers"
+        assert q["crumbs"] == ["‹ Portfolios", "Seed loses early"] and "not proven" in q["rule"]
+        assert res["pfSeedBack"] == "portfolio" and res["pfRetap"] == "home"
 
 
 @needs_browser

@@ -26,6 +26,8 @@ let portfolioErr = "";
 let backtest = null;    // portfolio_backtest.json (static aggregates)
 let pfStrategy = store.get("tennis-pf-strategy", "model");
 let pfView = store.get("tennis-pf-view", "live");
+let pfLevel = "home";   // Portfolio tab level: "home" (folders) → "portfolio" → "strategy"
+let pfPort = "model";
 let pfShown = 20;
 let tour = store.get("tennis-tour", "all");
 let level = store.get("tennis-level", "tour");      // "tour" (DraftKings/Pinnacle) or "challengers" (Polymarket)
@@ -504,25 +506,124 @@ function backtestView(id) {
   ];
 }
 
-function portfolioView() {
-  const strategies = portfolio && Array.isArray(portfolio.strategies) ? portfolio.strategies.filter((s) => s && s.id) : [];
-  const ids = strategies.length ? strategies.map((s) => s.id) : Object.keys(backtest?.strategies || PF_SHORT);
-  if (!ids.includes(pfStrategy)) pfStrategy = ids[0];
-  const seg = (items, cur, onPick, label) => el("div", { class: "segmented", role: "tablist", "aria-label": label },
-    items.map(([k, name]) => el("button", { class: k === cur ? "on" : "", role: "tab", "aria-selected": String(k === cur), onclick: () => onPick(k) }, name)));
-  const out = [
-    seg(ids.map((k) => [k, PF_SHORT[k] || k]), pfStrategy, (k) => { pfStrategy = k; pfShown = 20; store.set("tennis-pf-strategy", k); render(); }, "Strategy"),
-    seg([["live", "Live paper trades"], ["backtest", "Backtest"]], pfView, (k) => { pfView = k; store.set("tennis-pf-view", k); render(); }, "View"),
-  ];
-  const s = strategies.find((x) => x.id === pfStrategy);
-  const rule = s?.rule || backtest?.strategies?.[pfStrategy]?.rule || "";
+// Portfolio tab: portfolios listed like folders (home) → a portfolio's strategies → one strategy's
+// Live paper / Backtest. Tapping the Portfolio tab again returns home.
+const PF_FOLDERS = [
+  { id: "model", name: "Elo model", about: "The page's Elo + serve/return model sees value at DraftKings.", strategies: ["model"] },
+  { id: "line", name: "DK vs Pinnacle", about: "Line shopping: DraftKings pays more than Pinnacle's fair price.", strategies: ["line"] },
+  { id: "dogs", name: "Underdogs", about: "The longer DraftKings price in every match; a baseline.", strategies: ["dogs"] },
+  { id: "seed", name: "Seed loses early", about: "Rounds 1–2: the unseeded player against a seed.", strategies: ["seed", "seed_q"] },
+];
+const PF_INNER = { seed: "All seeded matches", seed_q: "Qualifiers and lucky losers" };
+
+function pfStrategies() {
+  return portfolio && Array.isArray(portfolio.strategies) ? portfolio.strategies.filter((s) => s && s.id) : [];
+}
+
+function pfFolders() {
+  // Every strategy in portfolio.json or the backtest stays reachable; an unknown one gets its own folder.
+  const ids = [...pfStrategies().map((s) => s.id), ...Object.keys(backtest?.strategies || {})];
+  const known = new Set(PF_FOLDERS.flatMap((f) => f.strategies));
+  const extra = [...new Set(ids.filter((k) => !known.has(k)))]
+    .map((k) => ({ id: k, name: PF_SHORT[k] || k, about: "", strategies: [k] }));
+  return [...PF_FOLDERS, ...extra];
+}
+
+function goPf(level, port, strat) {
+  pfLevel = level;
+  if (port) pfPort = port;
+  if (strat) { pfStrategy = strat; store.set("tennis-pf-strategy", strat); }
+  pfShown = 20;
+  render();
+  window.scrollTo(0, 0);
+}
+
+function btLine(id) {
+  const b = backtest?.strategies?.[id];
+  return b && isNum(b.roi) ? `Backtest ${signed(b.roi)} ROI on ${(b.bets || 0).toLocaleString()} bets` : "No backtest";
+}
+
+function liveVals(list) {
+  // Realized profit over the live strategies in `list`; "" when none of them has a trade.
+  const sums = list.map((s) => s?.summary || {});
+  const trades = sums.reduce((n, x) => n + (x.trades || 0), 0);
+  if (!trades) return [el("b", { class: "muted" }, "—"), el("small", {}, portfolio ? "no trades yet" : "no live data")];
+  const profit = sums.reduce((n, x) => n + (isNum(x.profit) ? x.profit : 0), 0);
+  const open = sums.reduce((n, x) => n + (x.open || 0), 0);
+  return [el("b", { class: sgnCls(profit) }, money(profit)), el("small", {}, `${trades} trade${trades === 1 ? "" : "s"}${open ? ` · ${open} open` : ""}`)];
+}
+
+function folderRow(attrs, name, meta, bt, vals) {
+  return el("button", { class: "row-btn folder", ...attrs },
+    el("span", { class: "who" }, el("b", {}, name), " ", el("span", { class: "tag warn" }, "not proven"),
+      meta ? el("span", { class: "meta" }, meta) : null, el("span", { class: "bt" }, bt)),
+    el("span", { class: "vals" }, ...vals),
+    el("span", { class: "chev", "aria-hidden": "true" }, "›"));
+}
+
+function crumbs(folder, strat) {
+  const kids = [el("button", { class: "crumb", "data-pfnav": "home", onclick: () => goPf("home") }, "‹ Portfolios")];
+  if (strat && folder.strategies.length > 1) {
+    kids.push(el("span", { class: "crumb-sep" }, "/"),
+      el("button", { class: "crumb", "data-pfnav": "portfolio", onclick: () => goPf("portfolio", folder.id) }, folder.name));
+  }
+  return el("nav", { class: "crumbs", "aria-label": "Portfolio path" }, kids);
+}
+
+function pfHome() {
+  const live = pfStrategies();
+  const rows = pfFolders().map((f) => {
+    const ss = f.strategies.map((k) => live.find((s) => s.id === k)).filter(Boolean);
+    const n = f.strategies.length;
+    return folderRow({ "data-pfid": f.id, onclick: () => (n > 1 ? goPf("portfolio", f.id) : goPf("strategy", f.id, f.strategies[0])) },
+      f.name, f.about + (n > 1 ? ` ${n} strategies.` : ""), btLine(f.strategies[0]), liveVals(ss));
+  });
+  const out = [el("h2", { class: "section-title" }, el("span", {}, "Portfolios"), el("span", { class: "count" }, "hypothetical $10 paper bets")),
+    el("div", { class: "card list folders" }, rows)];
+  if (!portfolio) out.push(el("p", { class: "note" }, portfolioErr ? `Paper trades unavailable (${portfolioErr}). The first build with the portfolio may not have run yet.` : "Loading paper trades…"));
+  out.push(el("p", { class: "note" }, "Every strategy here is a hypothesis being tracked, not a proven edge. Tap one for its live paper trades and its backtest."));
+  return out;
+}
+
+function pfPortfolio(folder) {
+  const live = pfStrategies();
+  const rows = folder.strategies.map((k) => {
+    const s = live.find((x) => x.id === k);
+    const rule = s?.rule || backtest?.strategies?.[k]?.rule || "";
+    return folderRow({ "data-pfstrat": k, onclick: () => goPf("strategy", folder.id, k) },
+      PF_INNER[k] || PF_SHORT[k] || k, rule, btLine(k), liveVals(s ? [s] : []));
+  });
+  return [crumbs(folder), el("h1", { class: "pf-title" }, folder.name), el("p", { class: "pf-sub" }, folder.about),
+    el("div", { class: "card list folders" }, rows)];
+}
+
+function pfStrategyView(folder, id) {
+  const s = pfStrategies().find((x) => x.id === id);
+  const rule = s?.rule || backtest?.strategies?.[id]?.rule || "";
+  const title = folder.strategies.length > 1 ? `${folder.name}: ${PF_INNER[id] || id}` : folder.name;
+  const seg = el("div", { class: "segmented", role: "tablist", "aria-label": "View" },
+    [["live", "Live paper trades"], ["backtest", "Backtest"]].map(([k, name]) => el("button",
+      { class: k === pfView ? "on" : "", role: "tab", "aria-selected": String(k === pfView),
+        onclick: () => { pfView = k; store.set("tennis-pf-view", k); render(); } }, name)));
+  const out = [crumbs(folder, id), el("h1", { class: "pf-title" }, title)];
+  if (s?.name && s.name !== title) out.push(el("p", { class: "pf-sub" }, s.name));
   if (rule) out.push(el("div", { class: "card rule" }, el("span", { class: "tag warn" }, "not proven"), " ", rule));
-  if (pfView === "backtest") return [...out, ...backtestView(pfStrategy)];
+  out.push(seg);
+  if (pfView === "backtest") return [...out, ...backtestView(id)];
   if (!portfolio) {
     out.push(el("div", { class: "card empty" }, portfolioErr ? `Paper trades unavailable (${portfolioErr}). The first build with the portfolio may not have run yet.` : "Loading…"));
     return out;
   }
   return [...out, ...liveView(s || { trades: [] })];
+}
+
+function portfolioView() {
+  const folders = pfFolders();
+  const folder = folders.find((f) => f.id === pfPort) || folders[0];
+  if (pfLevel === "strategy" && folder.strategies.includes(pfStrategy)) return pfStrategyView(folder, pfStrategy);
+  if (pfLevel !== "home" && folder.strategies.length > 1) return pfPortfolio(folder);
+  pfLevel = "home";
+  return pfHome();
 }
 
 // ---------------------------------------------------------------- footer + render
@@ -556,6 +657,7 @@ function footer() {
 function render() {
   $("banners").replaceChildren(...banners());
   $("view").replaceChildren(...(tab === "findings" ? findingsView() : tab === "portfolio" ? portfolioView() : matchesView()));
+  $("view").dataset.level = tab === "portfolio" ? pfLevel : "";
   $("footer").replaceChildren(...footer());
   const fetched = odds && ageText(odds.odds_fetched_at);
   $("updated").textContent = odds ? (fetched ? `Odds ${fetched}` : "Odds time unknown") : (oddsErr ? "No data" : "Loading…");
@@ -593,6 +695,7 @@ async function load(force = false) {
 
 for (const b of document.querySelectorAll(".tabbar button")) {
   b.addEventListener("click", () => {
+    if (b.dataset.tab === "portfolio" && tab === "portfolio") pfLevel = "home";   // tapping it again goes home
     tab = b.dataset.tab;
     history.replaceState(null, "", tab === "matches" ? location.pathname + location.search : `#${tab}`);
     render();
