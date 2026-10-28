@@ -44,8 +44,9 @@ conflict (git merges edits that touch different blocks).
   early" — pre-registered (#131); backtest done, gate FAIL on all 3 sub-rules (all −10.3%, qualifiers −8.2%, 3,123 bets).
   Live strategy built (#137): Wikipedia seeds + round proxy, rows "seed" and "seed_q"; trades only in /scores
   tournaments, so empty until about Jan 2027. Real-draw parser test pending en.wikipedia.org on the allowlist. Now (owner
-  2026-10-28, MISMATCH50): pre-match Elo rank export for Backtest (`upsets/elo_ranks.py`, #141; Data runs it), plus a
-  live-rank table `current()` (#144, for Scanner's nightly job once the Lead decides after the MISMATCH50 backtest). Later: the line-shopping forward-test readout in Jan 2027.
+  2026-10-28, MISMATCH50): pre-match Elo rank export for Backtest (`upsets/elo_ranks.py`, #141/#142, unranked reasons #145;
+  Data runs it), plus a live-rank table `current()` (#144; Lead: live loads from 2010, backtest stays on 1990, a known
+  gap of a median 2–4 places; Scanner owns the nightly job). Later: the line-shopping forward-test readout in Jan 2027.
   Waiting on: owner to allow en.wikipedia.org in this environment (real-draw parser fixture).
 
 
