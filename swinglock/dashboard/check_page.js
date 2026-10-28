@@ -46,56 +46,102 @@ const VIEWPORTS = { phone: { width: 390, height: 844 }, laptop: { width: 1280, h
         fs.mkdirSync(outDir, { recursive: true });
         await page.screenshot({ path: path.join(outDir, `dashboard-${tag}.png`), fullPage: true });
       }
-      // Paper tab: rules, trades (all, then settled only), lookback.
+      // Paper tab, three levels (home › portfolio › strategy). Readings from both portfolios are
+      // combined under the keys the tests used before the folder layout, plus per-level keys.
       await page.click('.views button[data-view="paper"]');
       await page.waitForFunction(() => !document.getElementById("view-paper").hidden);
       await page.waitForFunction(() => !document.getElementById("view-paper").textContent.includes("Loading…"));
-      const paperGrab = () => page.evaluate(() => {
+      const grab = () => page.evaluate(() => {
         const box = document.getElementById("view-paper");
+        const txt = (sel, n) => [...box.querySelectorAll(sel)].map((x) => x.textContent);
         return {
+          level: box.dataset.level,
+          folders: txt(".card.list.folders > .row-btn .who b"),
+          folderVals: txt(".card.list.folders > .row-btn .vals b"),
+          crumbs: txt(".crumbs .crumb"),
+          title: box.querySelector(".pf-title")?.textContent || "",
           rules: box.querySelectorAll("table.paper-rules tbody tr:not(.total):not(.group):not(.startup):not(:has(td.empty))").length,
           startup: box.querySelectorAll("table.paper-rules tr.startup").length,
           total: box.querySelector("table.paper-rules tr.total td:nth-child(7)")?.textContent || "",
-          perContract: [...box.querySelectorAll("table.paper-rules tbody tr:not(.total):not(.group):not(.startup) td:nth-child(7)")].map((td) => td.textContent),
+          perContract: txt("table.paper-rules tbody tr:not(.total):not(.group):not(.startup) td:nth-child(7)"),
+          trades: box.querySelectorAll("table.paper-trades tbody tr:not(:has(td.empty))").length,
+          locked: box.querySelectorAll("table.paper-trades tr.hot-lock").length,
           startupBadges: [...box.querySelectorAll("table.paper-trades .badge")].filter((b) => b.textContent === "start-up").length,
+          sold: [...box.querySelectorAll("table.paper-trades td")].filter((td) => td.textContent.startsWith("sold @")).length,
+          lookbackRows: box.querySelectorAll("table.lookback tbody tr:not(:has(td.empty))").length,
+          lbPerCt: txt("table.lookback tbody tr td:nth-child(8)"),
+          lbCashRows: box.querySelectorAll("table.lookback-cash tbody tr").length,
+          lbCashDelta: txt("table.lookback-cash tbody tr td:nth-child(8)"),
+          days: box.querySelectorAll("table.by-day tbody tr").length,
           chart: !!box.querySelector("svg.daychart"),
+          charts: box.querySelectorAll("svg.daychart").length,
           chartLines: box.querySelectorAll("svg.daychart path, svg.daychart circle").length,
+          notes: txt(".card-note, .banner.inline"),
+          metaLines: txt(".meta-line"),
           hypo: box.querySelector(".badge.hypo")?.textContent || "",
           intro: box.querySelector(".paper-note b")?.textContent || "",
           cashRules: box.querySelectorAll("table.paper-cash tbody tr:not(.group):not(.startup)").length,
           cashStartup: box.querySelectorAll("table.paper-cash tr.startup").length,
-          cashPerCt: [...box.querySelectorAll("table.paper-cash tbody tr:not(.group):not(.startup) td:nth-child(6)")].map((td) => td.textContent),
-          cashDelta: [...box.querySelectorAll("table.paper-cash tbody tr:not(.group):not(.startup) td:nth-child(7)")].map((td) => td.textContent),
-          cashSpread: [...box.querySelectorAll("table.paper-cash tbody tr:not(.group):not(.startup) td:nth-child(8)")].map((td) => td.textContent),
-          cashHead: [...box.querySelectorAll("h2")].map((h) => h.textContent).find((t) => t.startsWith("Cash-out")) || "",
-          sold: [...box.querySelectorAll("table.paper-trades td")].filter((td) => td.textContent.startsWith("sold @")).length,
-          lbCashRows: box.querySelectorAll("table.lookback-cash tbody tr").length,
-          lbCashDelta: [...box.querySelectorAll("table.lookback-cash tbody tr td:nth-child(8)")].map((td) => td.textContent),
-          charts: box.querySelectorAll("svg.daychart").length,
-          lbPerCt: [...box.querySelectorAll("table.lookback tbody tr td:nth-child(8)")].map((td) => td.textContent),
-          metaLines: [...box.querySelectorAll(".meta-line")].map((n) => n.textContent),
-          trades: box.querySelectorAll("table.paper-trades tbody tr:not(:has(td.empty))").length,
-          locked: box.querySelectorAll("table.paper-trades tr.hot-lock").length,
-          lookbackRows: box.querySelectorAll("table.lookback tbody tr:not(:has(td.empty))").length,
-          days: box.querySelectorAll("table.by-day tbody tr").length,
-          height: document.documentElement.scrollHeight,
-          notes: [...box.querySelectorAll(".card-note, .banner.inline")].map((n) => n.textContent),
+          cashPerCt: txt("table.paper-cash tbody tr:not(.group):not(.startup) td:nth-child(6)"),
+          cashDelta: txt("table.paper-cash tbody tr:not(.group):not(.startup) td:nth-child(7)"),
+          cashSpread: txt("table.paper-cash tbody tr:not(.group):not(.startup) td:nth-child(8)"),
+          cashHead: txt("h2:not(.pf-title)").find((t) => t.startsWith("Cash-out")) || "",
+          toggle: txt(".segmented button"),
           overflow: document.documentElement.scrollWidth - window.innerWidth,
           liveHidden: document.getElementById("view-live").hidden,
         };
       });
-      info.paper = await paperGrab();
-      if (info.paper.overflow > 0) problems.push(`${tag} paper overflow ${info.paper.overflow}px`);
-      if (outDir) await page.screenshot({ path: path.join(outDir, `dashboard-paper-${tag}.png`), fullPage: true });
-      if (await page.$("#view-paper .chip[data-filter='settled']")) {
-        await page.click("#view-paper .chip[data-filter='settled']");
-        info.paperSettled = (await paperGrab()).trades;
-        if (await page.$("#view-paper .chip[data-filter='exited']")) {
-          await page.click("#view-paper .chip[data-filter='exited']");
-          info.paperExited = (await paperGrab()).trades;
-        }
+      const chipCount = async (k) => {
+        if (!(await page.$(`#view-paper .chip[data-filter='${k}']`))) return 0;
+        await page.click(`#view-paper .chip[data-filter='${k}']`);
+        const n = (await grab()).trades;
         await page.click("#view-paper .chip[data-filter='all']");
+        return n;
+      };
+      const shot = async (name) => { if (outDir) await page.screenshot({ path: path.join(outDir, `dashboard-paper-${name}-${tag}.png`), fullPage: true }); };
+      const levels = {};
+      levels.home = await grab();
+      await shot("home");
+      const ports = {};
+      for (const g of ["swing", "cashout"]) {
+        if (!(await page.$(`#view-paper [data-pfid='${g}']`))) continue;
+        await page.click(`#view-paper [data-pfid='${g}']`);
+        ports[g] = await grab();
+        ports[g].settled = await chipCount("settled");
+        ports[g].exited = await chipCount("exited");
+        await shot(g === "swing" ? "portfolio" : "cashout");
+        // first strategy: Live paper, then Backtest; then back up via the crumbs
+        await page.click("#view-paper [data-pfstrat]");
+        ports[g].strategyLive = await grab();
+        await page.click("#view-paper .segmented button[data-pf='backtest']");
+        ports[g].strategyBacktest = await grab();
+        if (g === "cashout") await shot("strategy");
+        await page.click("#view-paper .segmented button[data-pf='live']");
+        await page.click("#view-paper .crumbs [data-pfnav='portfolio']");
+        ports[g].backToPortfolio = (await grab()).level;
+        await page.click("#view-paper .crumbs [data-pfnav='home']");
       }
+      // tapping the Paper tab again from a deeper level returns home
+      if (await page.$("#view-paper [data-pfid='swing']")) {
+        await page.click("#view-paper [data-pfid='swing']");
+        await page.click('.views button[data-view="paper"]');
+        levels.tapAgain = (await grab()).level;
+      }
+      const sw = ports.swing || levels.home, ca = ports.cashout || {};
+      const sum = (k) => (ports.swing ? ports.swing[k] : 0) + (ca[k] || 0);
+      info.paper = {
+        ...sw,
+        trades: ports.swing ? sum("trades") : 0, locked: sum("locked"), sold: sum("sold"), startupBadges: sum("startupBadges"),
+        charts: sum("charts"), chartLines: sum("chartLines"),
+        notes: ports.swing ? sw.notes : levels.home.notes, metaLines: [...(sw.metaLines || []), ...(ca.metaLines || [])],
+        cashRules: ca.cashRules || 0, cashStartup: ca.cashStartup || 0, cashPerCt: ca.cashPerCt || [], cashDelta: ca.cashDelta || [],
+        cashSpread: ca.cashSpread || [], cashHead: ca.cashHead || "", lbCashRows: ca.lbCashRows || 0, lbCashDelta: ca.lbCashDelta || [],
+        overflow: Math.max(levels.home.overflow, ...Object.values(ports).flatMap((x) => [x.overflow, x.strategyLive.overflow, x.strategyBacktest.overflow])),
+      };
+      info.paperLevels = { home: levels.home, tapAgain: levels.tapAgain, ...ports };
+      if (ports.swing) info.paperSettled = sum("settled");
+      if (ca.exited !== undefined) info.paperExited = ca.exited;
+      if (info.paper.overflow > 0) problems.push(`${tag} paper overflow ${info.paper.overflow}px`);
       await page.click('.views button[data-view="live"]');
 
       // Filters: row counts after a search, after a phase filter, and with both cleared.
@@ -119,6 +165,6 @@ const VIEWPORTS = { phone: { width: 390, height: 844 }, laptop: { width: 1280, h
     }
   }
   await browser.close();
-  console.log(JSON.stringify({ results, problems }, null, 2));
-  process.exit(problems.length ? 1 : 0);
+  // write, then exit once flushed: a large result piped to Python would otherwise be cut off at 64 KB
+  process.stdout.write(JSON.stringify({ results, problems }, null, 2) + "\n", () => process.exit(problems.length ? 1 : 0));
 })();

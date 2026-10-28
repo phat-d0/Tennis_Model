@@ -211,6 +211,37 @@ table.by-day th { font-size: 12px; color: var(--muted); background: var(--surfac
 table.by-day .num { text-align: right; white-space: nowrap; }
 table.by-day tr:last-child td { border-bottom: 0; }
 
+/* Paper tab drill-down (owner 2026-10-28, like the soccer app's Portfolio): portfolios › strategies › one strategy. */
+.card.list { background: var(--surface); border: 1px solid var(--line); border-radius: 10px; padding: 2px 14px; margin-bottom: 10px; }
+.row-btn {
+  display: grid; grid-template-columns: 1fr auto auto; align-items: center; gap: 2px 10px;
+  width: 100%; padding: 12px 0; border: 0; border-top: 1px solid var(--line);
+  background: none; color: inherit; font: inherit; text-align: left; cursor: pointer;
+}
+.row-btn:first-child { border-top: 0; }
+.row-btn:active { transform: scale(0.995); }
+.row-btn:focus-visible { outline: 2px solid var(--info); outline-offset: 2px; border-radius: 6px; }
+.row-btn .who { min-width: 0; }
+.row-btn .who b { font-weight: 650; }
+.row-btn .who .pill { margin-left: 6px; vertical-align: 1px; white-space: nowrap; }
+.row-btn .meta { display: block; font-size: 12px; color: var(--muted); margin-top: 1px; }
+.row-btn .bt { display: block; font-size: 12px; color: var(--muted); margin-top: 2px; }
+.row-btn .vals { text-align: right; font-variant-numeric: tabular-nums; min-width: 72px; }
+.row-btn .vals b { font-size: 16px; font-weight: 650; }
+.row-btn .vals small { display: block; font-size: 11px; color: var(--muted); white-space: nowrap; }
+.row-btn .chev { color: var(--muted); font-size: 22px; line-height: 1; }
+.pill { display: inline-block; font-size: 11px; font-weight: 600; padding: 1px 8px; border-radius: 999px; background: var(--surface-2); color: var(--muted); }
+.crumbs { display: flex; flex-wrap: wrap; align-items: center; gap: 2px 6px; margin: 0 0 4px; font-size: 14px; }
+.crumbs .crumb { background: none; border: 0; padding: 4px 0; font: inherit; color: var(--info); cursor: pointer; }
+.crumbs .crumb-back { color: var(--info); font-size: 18px; line-height: 1; }
+.crumbs .crumb-sep { color: var(--muted); }
+.pf-title { font-size: 20px; font-weight: 700; margin: 2px 0; line-height: 1.25; }
+.pf-title .pill { vertical-align: 3px; }
+.pf-sub { font-size: 13px; color: var(--muted); margin: 0 0 10px; }
+.segmented { display: flex; gap: 4px; background: var(--surface-2); border-radius: 8px; padding: 3px; max-width: 320px; margin: 0 0 14px; }
+.segmented button { flex: 1; font: inherit; font-size: 13px; font-weight: 600; border: 0; border-radius: 6px; padding: 5px 0; background: none; color: var(--muted); cursor: pointer; }
+.segmented button.on { background: var(--surface); color: var(--text); box-shadow: 0 1px 2px rgba(0, 0, 0, 0.12); }
+
 .foot { color: var(--muted); font-size: 12px; }
 
 /* Phone: tables become stacked cards; each cell shows its column name. */

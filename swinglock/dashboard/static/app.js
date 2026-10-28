@@ -395,10 +395,10 @@ function ruleRow(name, sub, a, cls) {
     td("Capital", money(a.capital, false)));
 }
 
-function paperRules(paper) {
+function paperRules(paper, only) {
   const rules = new Map(objs(paper.rules).map((r) => [r.id, r]));
   const trades = objs(paper.trades);
-  const byRule = objs(paper.by_rule).filter((b) => !isCash(b) && !isCash(rules.get(b.rule)));
+  const byRule = objs(paper.by_rule).filter((b) => !isCash(b) && !isCash(rules.get(b.rule)) && (!only || b.rule === only));
   const ids = byRule.map((b) => b.rule).filter(Boolean);
   const rows = [], startRows = [], head = [], start = [];
   let truncated = false;
@@ -475,11 +475,12 @@ function cashRow(name, sub, a, dv, sp, cls) {
     td("Capital", money(a.capital, false)));
 }
 
-function cashSection(paper) {
-  const rules = objs(paper.rules).filter(isCash);
-  if (!rules.length) return [];
+function cashSection(paper, only) {
+  const allRules = objs(paper.rules).filter(isCash);
+  if (!allRules.length) return [];
+  const rules = only ? allRules.filter((r) => r.id === only) : allRules;
   const trades = objs(paper.trades);
-  const control = rules.find((r) => !isNum(r.level));
+  const control = allRules.find((r) => !isNum(r.level));
   const head = (id) => trades.filter((t) => t.rule === id && !isStartup(paper, t));
   const ctlTrades = control ? head(control.id) : [];
   const rows = [], startRows = [];
@@ -501,11 +502,6 @@ function cashSection(paper) {
   }
   const truncated = trades.length >= 200;
   return [
-    el("div", { class: "sec-head" }, el("h2", {}, "Cash-out portfolio (pre-registered 2026-10-28)"),
-      el("span", { class: "hint" }, rules[0].since ? `since ${fmtDateTime(rules[0].since)}` : "")),
-    el("p", { class: "paper-note" },
-      el("b", {}, "Expected result (pre-registered): Δ (C1 vs C0) about −1 to −3¢ per contract; C1 and C2 negative. "),
-      "A clearly positive Δ over ≥ 30 settled C1 trades would be the surprise. C1 is the owner's DOG50."),
     table("paper-cash", [["Rule"], ["Trades", 1], ["Open / exited / final", 1], ["Exit rate", 1],
       ["Final P&L", 1], ["P&L / contract", 1], ["Δ vs C0 / contract", 1], ["Spread / contract", 1], ["Capital", 1]], rows),
     el("p", { class: "meta-line" },
@@ -549,32 +545,37 @@ function tradeRow(paper, t) {
     td("Entry", entry), td(isCash(t) ? "Exit" : "Lock", lock), td(st === "open" ? "If each player wins" : "P&L", result));
 }
 
-function paperTrades(paper) {
-  const all = objs(paper.trades);
+// Trades for one portfolio (group) or one rule; status chips filter within that scope.
+function paperTrades(paper, scope) {
+  const inScope = (t) => (scope.rule ? t.rule === scope.rule : groupOf(paper, t.rule) === scope.group);
+  const all = objs(paper.trades).filter(inScope);
   const counts = { all: all.length, open: 0, locked: 0, settled: 0, exited: 0 };
   for (const t of all) if (t.status in counts) counts[t.status] += 1;
-  const ruleIds = [...new Set([...objs(paper.rules).map((r) => r.id), ...all.map((t) => t.rule)])].filter(Boolean);
+  const ruleIds = [...new Set(all.map((t) => t.rule))].filter(Boolean);
   if (pfRule !== "all" && !ruleIds.includes(pfRule)) pfRule = "all";
-  const shown = all.filter((t) => (pfStatus === "all" || t.status === pfStatus) && (pfRule === "all" || t.rule === pfRule));
+  const shown = all.filter((t) => (pfStatus === "all" || t.status === pfStatus) && (scope.rule || pfRule === "all" || t.rule === pfRule));
   // Status chips are view filters only (read-only page).
   const chips = el("div", { class: "chips", role: "group", "aria-label": "Trade status" },
-    ["all", "open", "locked", "exited", "settled"].filter((k) => k !== "exited" || counts.exited || pfStatus === "exited").map((k) => el("button", {
-      class: "chip" + (k === pfStatus ? " on" : ""), "data-filter": k, "aria-pressed": String(k === pfStatus),
-      onclick: () => { pfStatus = k; paperKey = ""; renderPaper(); },
-    }, `${k === "all" ? "All" : k[0].toUpperCase() + k.slice(1)} ${counts[k]}`)));
-  const ruleSel = el("select", { "aria-label": "Rule" },
-    el("option", { value: "all" }, "All rules"), ruleIds.map((id) => el("option", { value: id }, id)));
-  ruleSel.value = pfRule;
-  ruleSel.addEventListener("change", () => { pfRule = ruleSel.value; paperKey = ""; renderPaper(); });
+    ["all", "open", "locked", "exited", "settled"]
+      .filter((k) => (k !== "exited" || counts.exited || pfStatus === "exited") && (k !== "locked" || scope.group !== "cashout"))
+      .map((k) => el("button", {
+        class: "chip" + (k === pfStatus ? " on" : ""), "data-filter": k, "aria-pressed": String(k === pfStatus),
+        onclick: () => { pfStatus = k; paperKey = ""; renderPaper(); },
+      }, `${k === "all" ? "All" : k[0].toUpperCase() + k.slice(1)} ${counts[k]}`)));
+  let ruleSel = null;
+  if (!scope.rule && ruleIds.length > 1) {
+    ruleSel = el("select", { "aria-label": "Rule" }, el("option", { value: "all" }, "All rules"), ruleIds.map((id) => el("option", { value: id }, id)));
+    ruleSel.value = pfRule;
+    ruleSel.addEventListener("change", () => { pfRule = ruleSel.value; paperKey = ""; renderPaper(); });
+  }
   const rows = shown.map((t) => tradeRow(paper, t));
   if (!rows.length) rows.push(el("tr", {}, el("td", { colspan: 4, class: "empty" }, all.length ? "No trades match the filter." : "No paper trades yet.")));
   return [
-    el("div", { class: "filters" }, chips, el("label", {}, "Rule ", ruleSel),
-      el("span", { class: "hint" }, all.length >= 200 ? "newest 200" : "")),
+    el("div", { class: "filters" }, chips, ruleSel && el("label", {}, "Rule ", ruleSel),
+      el("span", { class: "hint" }, objs(paper.trades).length >= 200 ? "the scanner sends the newest 200" : "")),
     table("paper-trades", [["Match"], ["Entry", 1], ["Lock / exit", 1], ["P&L", 1]], rows),
   ];
 }
-
 // Cumulative P&L per rule by settlement day (0c), as an inline SVG line chart.
 function dayChart(days) {
   const NS = "http://www.w3.org/2000/svg";
@@ -616,16 +617,26 @@ function dayChart(days) {
   return el("div", { class: "chart-card" }, svg, legend);
 }
 
-function lookbackSection() {
-  const out = [el("div", { class: "sec-head" }, el("h2", {}, "Nightly lookback"),
-    el("span", { class: "hint" }, "same rules over recorded order books")) ];
-  if (!lookback) {
-    out.push(el("div", { class: "card-note" }, lookbackErr.includes("not found")
-      ? "No lookback yet. It runs nightly at about 04:00 UTC over the recorder's order books."
-      : lookbackErr ? `Lookback unavailable (${lookbackErr}).` : "Loading…"));
-    return out;
+// ---- nightly lookback, by portfolio (group) or one rule
+function lookbackRows() {
+  const rows = new Map();
+  for (const b of objs(lookback && lookback.by_rule)) {
+    if (!rows.has(b.rule)) rows.set(b.rule, {});
+    rows.get(b.rule)[b.slippage === 0 ? "s0" : "s1"] = b;
   }
-  const L = lookback;
+  return rows;
+}
+const lbRules = () => new Map(objs(lookback && lookback.rules).map((r) => [r.id, r]));
+const lbGroup = (id, rows, rules) => (isCash(rules.get(id)) || isCash((rows.get(id) || {}).s0 || {}) ? "cashout" : "swing");
+const lbPerCt = (b) => (b && isNum(b.contracts) && b.contracts > 0 && isNum(b.pnl) ? b.pnl / b.contracts : null);
+
+function lookbackMeta() {
+  if (!lookback) {
+    return [el("div", { class: "card-note" }, lookbackErr.includes("not found")
+      ? "No lookback yet. It runs nightly at about 04:00 UTC over the recorder's order books."
+      : lookbackErr ? `Lookback unavailable (${lookbackErr}).` : "Loading…")];
+  }
+  const L = lookback, out = [];
   const age = parseTs(L.generated_at);
   if (age !== null && Date.now() - age > LOOKBACK_STALE_H * 3.6e6) {
     out.push(el("div", { class: "banner inline" }, `Lookback is ${fmtAge(Date.now() - age)} old; the nightly run may have failed.`));
@@ -633,69 +644,67 @@ function lookbackSection() {
   out.push(el("p", { class: "meta-line" },
     `Run ${fmtDateTime(L.generated_at)} (${age === null ? "time unknown" : fmtAge(Date.now() - age)}) · data ${fmtDate(L.data_from)} → ${fmtDate(L.data_to)} · `,
     `${qty(L.matches_processed)} of ${qty(L.matches_recorded)} recorded matches processed, ${qty(L.matches_with_trades)} with trades, `,
-    `${qty(L.matches_new_this_run)} new this run, ${qty(L.matches_awaiting_result)} awaiting a result`));
-  const rows = new Map();
-  for (const b of objs(L.by_rule)) {
-    if (!rows.has(b.rule)) rows.set(b.rule, {});
-    rows.get(b.rule)[b.slippage === 0 ? "s0" : "s1"] = b;
+    `${qty(L.matches_new_this_run)} new this run, ${qty(L.matches_awaiting_result)} awaiting a result`
+    + (isNum(L.matches_processed_cashout) ? ` · cash-out: ${qty(L.matches_processed_cashout)} processed` : "")));
+  return out;
+}
+
+function lookbackSection(scope) {
+  const out = [el("div", { class: "sec-head" }, el("h2", {}, scope.rule ? "Backtest: nightly lookback" : "Nightly lookback"),
+    el("span", { class: "hint" }, "same rules over recorded order books")), ...lookbackMeta()];
+  if (!lookback) return out;
+  const L = lookback, rows = lookbackRows(), rules = lbRules();
+  const ids = [...rows.keys()].filter((id) => (scope.rule ? id === scope.rule : lbGroup(id, rows, rules) === scope.group));
+  if (!ids.length) {
+    out.push(el("div", { class: "card-note" }, scope.rule ? `No lookback rows for ${scope.rule} yet.` : "No lookback rows for this portfolio yet."));
+    return out;
   }
-  const rules = new Map(objs(L.rules).map((r) => [r.id, r]));
-  const cashIds = new Set([...rows.keys()].filter((id) => isCash(rules.get(id)) || isCash((rows.get(id).s0 || {}))));
-  const cashRows = [...rows].filter(([id]) => cashIds.has(id));
-  const trs = [...rows].filter(([id]) => !cashIds.has(id)).map(([rule, { s0, s1 }]) => el("tr", {},
-    el("td", { class: "match" }, el("div", { class: "players" }, rule || "?"), el("div", { class: "sub" }, ruleText(rules.get(rule)))),
-    td("Trades", qty(s0?.trades)),
-    td("Locked", s0 ? `${qty(s0.locked)} (${pctText(s0.lock_rate)})` : "—"),
-    td("P&L at 0¢", money(s0?.pnl)),
-    td("Per trade at 0¢", money(s0?.pnl_per_trade)),
-    td("P&L at 1¢ slippage", money(s1?.pnl)),
-    td("Per trade at 1¢", money(s1?.pnl_per_trade)),
-    td("Per contract at 0¢", perCt(s0 && isNum(s0.contracts) && s0.contracts > 0 ? s0.pnl / s0.contracts : null)),
-    td("Per contract at 1¢", perCt(s1 && isNum(s1.contracts) && s1.contracts > 0 ? s1.pnl / s1.contracts : null)),
-    td("Win rate", pctText(s0?.win_rate)),
-    td("Locked / unlocked P&L", [money(s0?.pnl_locked), " / ", money(s0?.pnl_unlocked)])));
-  if (!trs.length) trs.push(el("tr", {}, el("td", { colspan: 11, class: "empty" }, "No lookback trades yet.")));
-  out.push(table("lookback", [["Rule"], ["Trades", 1], ["Locked", 1], ["P&L 0¢", 1], ["Per trade 0¢", 1], ["P&L 1¢", 1],
-    ["Per trade 1¢", 1], ["Per ct 0¢", 1], ["Per ct 1¢", 1], ["Win rate", 1], ["Locked / unlocked", 1]], trs));
-  if (objs(L.by_rule).length && !objs(L.by_rule).some((b) => isNum(b.contracts))) {
-    out.push(el("p", { class: "meta-line" }, "Per contract needs a `contracts` total in the lookback's by_rule rows (scanner update phat-d0/Tennis_Model#119)."));
-  }
-  const cashOut = [];
-  if (cashRows.length) {
-    // Cash-out rules in the lookback: per contract and the difference to the hold-only control C0.
-    const pc = (b) => (b && isNum(b.contracts) && b.contracts > 0 && isNum(b.pnl) ? b.pnl / b.contracts : null);
-    const ctlId = [...cashIds].find((id) => { const r = rules.get(id); return r && !isNum(r.level); });
+  if (scope.group === "cashout") {
+    const ctlId = [...rows.keys()].find((id) => { const r = rules.get(id); return lbGroup(id, rows, rules) === "cashout" && r && !isNum(r.level); });
     const ctl = ctlId ? rows.get(ctlId) : null;
-    const dl = (b, c) => (pc(b) !== null && pc(c) !== null ? pc(b) - pc(c) : null);
-    cashOut.push(el("div", { class: "sec-head" }, el("h3", {}, "Cash-out rules in the lookback"),
-      el("span", { class: "hint" }, isNum(L.matches_processed_cashout) ? `${qty(L.matches_processed_cashout)} matches processed` : "")));
-    cashOut.push(table("lookback-cash", [["Rule"], ["Trades", 1], ["Exits", 1], ["P&L 0¢", 1], ["Per ct 0¢", 1], ["P&L 1¢", 1],
-      ["Per ct 1¢", 1], ["Δ vs C0 0¢", 1], ["Δ vs C0 1¢", 1], ["Win rate", 1]], cashRows.map(([rule, { s0, s1 }]) => {
-      const isCtl = rule === ctlId;
+    const dl = (b, c) => (lbPerCt(b) !== null && lbPerCt(c) !== null ? lbPerCt(b) - lbPerCt(c) : null);
+    out.push(table("lookback-cash", [["Rule"], ["Trades", 1], ["Exits", 1], ["P&L 0¢", 1], ["Per ct 0¢", 1], ["P&L 1¢", 1],
+      ["Per ct 1¢", 1], ["Δ vs C0 0¢", 1], ["Δ vs C0 1¢", 1], ["Win rate", 1]], ids.map((rule) => {
+      const { s0, s1 } = rows.get(rule), isCtl = rule === ctlId;
       return el("tr", {},
         el("td", { class: "match" }, el("div", { class: "players" }, rule || "?"), el("div", { class: "sub" }, ruleText(rules.get(rule)))),
         td("Trades", qty(s0?.trades)),
         td("Exits", s0 ? `${qty(s0.locked)} (${pctText(s0.lock_rate)})` : "—"),
         td("P&L at 0¢", money(s0?.pnl)),
-        td("Per contract at 0¢", perCt(pc(s0))),
+        td("Per contract at 0¢", perCt(lbPerCt(s0))),
         td("P&L at 1¢ slippage", money(s1?.pnl)),
-        td("Per contract at 1¢", perCt(pc(s1))),
+        td("Per contract at 1¢", perCt(lbPerCt(s1))),
         td("Δ vs C0 at 0¢", isCtl ? el("span", { class: "na" }, "control") : perCt(ctl ? dl(s0, ctl.s0) : null)),
         td("Δ vs C0 at 1¢", isCtl ? el("span", { class: "na" }, "control") : perCt(ctl ? dl(s1, ctl.s1) : null)),
         td("Win rate", pctText(s0?.win_rate)));
     })));
-    cashOut.push(el("p", { class: "meta-line" }, "Δ here is per-contract P&L minus C0's over each rule's own trades: exact for C1 (same entries as C0); C2 also holds 20–30¢ entries that C0 doesn't."));
-    const cashChart = dayChart(objs(L.by_day).filter((d) => cashIds.has(d.rule)));
-    if (cashChart) {
-      cashOut.push(el("div", { class: "sec-head" }, el("h3", {}, "Cash-out rules: cumulative P&L by settlement day"), el("span", { class: "hint" }, "0¢ slippage")));
-      cashOut.push(cashChart);
+    out.push(el("p", { class: "meta-line" }, "Δ here is per-contract P&L minus C0's over each rule's own trades: exact for C1, C3 and C4 (same entries as C0); C2 also holds 20–30¢ entries that C0 doesn't."));
+  } else {
+    out.push(table("lookback", [["Rule"], ["Trades", 1], ["Locked", 1], ["P&L 0¢", 1], ["Per trade 0¢", 1], ["P&L 1¢", 1],
+      ["Per trade 1¢", 1], ["Per ct 0¢", 1], ["Per ct 1¢", 1], ["Win rate", 1], ["Locked / unlocked", 1]], ids.map((rule) => {
+      const { s0, s1 } = rows.get(rule);
+      return el("tr", {},
+        el("td", { class: "match" }, el("div", { class: "players" }, rule || "?"), el("div", { class: "sub" }, ruleText(rules.get(rule)))),
+        td("Trades", qty(s0?.trades)),
+        td("Locked", s0 ? `${qty(s0.locked)} (${pctText(s0.lock_rate)})` : "—"),
+        td("P&L at 0¢", money(s0?.pnl)),
+        td("Per trade at 0¢", money(s0?.pnl_per_trade)),
+        td("P&L at 1¢ slippage", money(s1?.pnl)),
+        td("Per trade at 1¢", money(s1?.pnl_per_trade)),
+        td("Per contract at 0¢", perCt(lbPerCt(s0))),
+        td("Per contract at 1¢", perCt(lbPerCt(s1))),
+        td("Win rate", pctText(s0?.win_rate)),
+        td("Locked / unlocked P&L", [money(s0?.pnl_locked), " / ", money(s0?.pnl_unlocked)]));
+    })));
+    if (objs(L.by_rule).length && !objs(L.by_rule).some((b) => isNum(b.contracts))) {
+      out.push(el("p", { class: "meta-line" }, "Per contract needs a `contracts` total in the lookback's by_rule rows (scanner update phat-d0/Tennis_Model#119)."));
     }
   }
-
-  const days = objs(L.by_day).filter((d) => !cashIds.has(d.rule));
+  const idSet = new Set(ids);
+  const days = objs(L.by_day).filter((d) => idSet.has(d.rule));
   const chart = dayChart(days);
   if (chart) {
-    out.push(el("div", { class: "sec-head" }, el("h3", {}, "Swing-lock rules: cumulative P&L by settlement day"), el("span", { class: "hint" }, "0¢ slippage")));
+    out.push(el("div", { class: "sec-head" }, el("h3", {}, "Cumulative P&L by settlement day"), el("span", { class: "hint" }, "0¢ slippage")));
     out.push(chart);
     // The numbers behind the chart, last 14 days (a compact table even on phones).
     const dayList = [...new Set(days.map((d) => d.day).filter(Boolean))].sort().reverse().slice(0, 14);
@@ -713,31 +722,166 @@ function lookbackSection() {
           }))))),
       el("p", { class: "meta-line" }, ruleList.map((r) => `${short(r)} = ${r}`).join(" · "))));
   }
-  out.push(...cashOut);
   return out;
+}
+
+// ---- folder levels (owner 2026-10-28, the soccer app's Portfolio layout):
+// home (portfolios) › portfolio (its strategies) › strategy (Live paper / Backtest).
+const PORTFOLIOS = {
+  swing: { name: "Swing-lock", pill: "Pre-registered 27 Oct",
+    expect: "Expected result (pre-registered): about −3 to −5¢ per contract. A rule clearly above zero over ≥ 30 settled trades would be the surprise.",
+    note: "Buy a side cheap, lock later by buying the other side when the pair costs less than $1 after fees. Rules frozen 2026-10-27." },
+  cashout: { name: "Cash-out", pill: "Pre-registered 28 Oct",
+    expect: "Expected result (pre-registered): Δ (C1 vs C0) about −1 to −3¢ per contract; C1 and C2 negative. A clearly positive Δ over ≥ 30 settled C1 trades would be the surprise.",
+    note: "Buy an underdog under 20¢ (C2: 30¢) and sell at the bid once it nets the rule's level; C0 holds the same entries to settlement as the control. C1 is the owner's DOG50." },
+};
+let pfLevel = "home", pfPort = "swing", pfStrat = "", pfDetail = "live";
+const CHEV = () => el("span", { class: "chev", "aria-hidden": "true" }, "›");
+
+function groupOf(paper, ruleId) {
+  const r = objs(paper.rules).find((x) => x.id === ruleId);
+  return isCash(r) ? "cashout" : "swing";
+}
+const groupRules = (paper, g) => objs(paper.rules).filter((r) => (g === "cashout" ? isCash(r) : !isCash(r)));
+const headTrades = (paper, id) => objs(paper.trades).filter((t) => t.rule === id && !isStartup(paper, t));
+// Headline P&L = settled/sold + locked-but-unsettled (start-up entries excluded).
+const livePnl = (a) => a.realized + a.lockedUn;
+
+function goPaper(level, port, strat) {
+  pfLevel = level;
+  if (port) pfPort = port;
+  if (strat !== undefined) pfStrat = strat;
+  pfStatus = "all"; pfRule = "all"; paperKey = "";
+  renderPaper();
+  window.scrollTo(0, 0);
+}
+
+function folderRow(attrs, name, pill, meta, bt, right, small) {
+  return el("button", { class: "row-btn folder", type: "button", ...attrs },
+    el("span", { class: "who" }, el("b", {}, name), pill ? el("span", { class: "pill" }, pill) : null,
+      meta ? el("span", { class: "meta" }, meta) : null, bt ? el("span", { class: "bt" }, bt) : null),
+    el("span", { class: "vals" }, right, el("small", {}, small)), CHEV());
+}
+
+function crumbs(level) {
+  const steps = [el("button", { class: "crumb", type: "button", "data-pfnav": "home", onclick: () => goPaper("home") },
+    level === "strategy" ? "Paper" : "‹ Paper")];
+  if (level === "strategy") {
+    steps.push(el("span", { class: "crumb-sep", "aria-hidden": "true" }, "›"),
+      el("button", { class: "crumb", type: "button", "data-pfnav": "portfolio", onclick: () => goPaper("portfolio") }, PORTFOLIOS[pfPort].name));
+  }
+  return el("nav", { class: "crumbs", "aria-label": "Back to" },
+    level === "strategy" ? el("span", { class: "crumb-back", "aria-hidden": "true" }, "‹") : null, steps);
+}
+
+function hypoNote(g) {
+  return el("div", { class: "paper-note", role: "note" },
+    el("span", { class: "badge hypo" }, "Hypothetical, no orders"), " ",
+    el("b", {}, PORTFOLIOS[g].expect + " "),
+    "Fills assume the whole size at the displayed ask (sales at the bid) plus fees, so results are optimistic about fills.");
+}
+
+function paperHome(paper) {
+  const rows = [];
+  for (const g of ["swing", "cashout"]) {
+    const rules = groupRules(paper, g);
+    if (!rules.length) continue;
+    const a = agg(rules.flatMap((r) => headTrades(paper, r.id)));
+    const names = rules.map((r) => (g === "cashout" && !isNum(r.level) ? `${r.id} (control)` : r.id));
+    rows.push(folderRow({ "data-pfid": g, onclick: () => goPaper("portfolio", g) },
+      PORTFOLIOS[g].name, PORTFOLIOS[g].pill, `${rules.length} strategies: ${names.join(", ")}`, null,
+      a.contracts ? el("b", { class: livePnl(a) > 0 ? "pos" : livePnl(a) < 0 ? "neg" : "" }, money(livePnl(a)).textContent || money(livePnl(a)))
+        : el("b", { class: "na" }, "–"),
+      `${qty(a.settled + a.exited + a.locked)} final or locked · ${qty(a.open)} open`));
+  }
+  return [
+    el("div", { class: "sec-head" }, el("h2", {}, "Portfolios"), el("span", { class: "hint" }, paper.since ? `paper trading since ${fmtDateTime(paper.since)}` : "")),
+    el("div", { class: "card list folders" }, rows),
+    el("p", { class: "meta-line" },
+      el("span", { class: "badge hypo" }, "Hypothetical, no orders"),
+      " Each portfolio holds pre-registered paper rules. Its figure is its rules together (settled, sold and locked P&L), start-up entries left out. Open one for its strategies, trades and nightly lookback."),
+    el("div", { class: "sec-head" }, el("h3", {}, "Nightly lookback"), el("span", { class: "hint" }, "inside each portfolio")),
+    ...lookbackMeta(),
+  ];
+}
+
+function strategyFolders(paper, g) {
+  const rules = groupRules(paper, g);
+  const trades = objs(paper.trades);
+  const control = g === "cashout" ? rules.find((r) => !isNum(r.level)) : null;
+  const lbRowsMap = lookbackRows();
+  return el("div", { class: "card list folders" }, rules.map((r) => {
+    const h = headTrades(paper, r.id), a = agg(h);
+    const lb = lbRowsMap.get(r.id)?.s0;
+    const bt = lookback ? (lb ? ["Lookback: ", money(lb.pnl), ` · ${lbPerCt(lb) !== null ? ctText(lbPerCt(lb)) + "/ct · " : ""}${qty(lb.trades)} trades`] : "Lookback: no rows yet") : null;
+    let small = `${a.perContract !== null ? ctText(a.perContract) + "/ct · " : ""}${qty(a.trades)} trades`;
+    if (control) {
+      if (r === control) small = `control · ${qty(a.trades)} trades`;
+      else {
+        const dv = deltaVsControl(h, headTrades(paper, control.id));
+        small = `Δ vs C0 ${dv.delta !== null ? ctText(dv.delta) : "—"} · ${qty(a.trades)} trades`;
+      }
+    }
+    const startN = trades.filter((t) => t.rule === r.id && isStartup(paper, t)).length;
+    return folderRow({ "data-pfstrat": r.id, onclick: () => goPaper("strategy", g, r.id) },
+      r.id, null, ruleText(r) + (startN ? ` · ${startN} start-up entr${startN === 1 ? "y" : "ies"} apart` : ""), bt,
+      a.contracts ? el("b", { class: livePnl(a) > 0 ? "pos" : livePnl(a) < 0 ? "neg" : "" }, money(livePnl(a)).textContent || money(livePnl(a)))
+        : el("b", { class: "na" }, "–"),
+      small);
+  }));
+}
+
+function paperPortfolio(paper) {
+  const g = pfPort, P = PORTFOLIOS[g];
+  const rules = groupRules(paper, g);
+  const since = rules[0] && (rules[0].since || paper.since);
+  return [
+    crumbs("portfolio"),
+    el("h2", { class: "pf-title" }, P.name, " ", el("span", { class: "pill" }, P.pill)),
+    el("div", { class: "pf-sub" }, P.note + (since ? ` Since ${fmtDateTime(since)}.` : "")),
+    hypoNote(g),
+    el("div", { class: "sec-head" }, el("h2", {}, "Strategies"), el("span", { class: "hint" }, "open one for its trades and lookback")),
+    strategyFolders(paper, g),
+    el("div", { class: "sec-head" }, el("h2", {}, g === "cashout" ? "Cash-out portfolio (pre-registered 2026-10-28)" : "Swing-lock rules: P&L by rule"),
+      el("span", { class: "hint" }, "start-up entries apart")),
+    ...(g === "cashout" ? cashSection(paper) : paperRules(paper)),
+    el("div", { class: "sec-head" }, el("h2", {}, "Trades"), el("span", { class: "hint" }, "open and locked first")),
+    ...paperTrades(paper, { group: g }),
+    ...lookbackSection({ group: g }),
+  ];
+}
+
+function paperStrategy(paper) {
+  const g = pfPort, r = groupRules(paper, g).find((x) => x.id === pfStrat);
+  if (!r) { pfLevel = "portfolio"; return paperPortfolio(paper); }
+  const toggle = el("div", { class: "segmented", role: "group", "aria-label": "Which view" },
+    [["live", "Live paper"], ["backtest", "Backtest"]].map(([k, label]) => el("button", {
+      type: "button", class: k === pfDetail ? "on" : "", "data-pf": k, "aria-pressed": String(k === pfDetail),
+      onclick: () => { pfDetail = k; paperKey = ""; renderPaper(); },
+    }, label)));
+  const head = [crumbs("strategy"), el("h2", { class: "pf-title" }, r.id),
+    el("div", { class: "pf-sub" }, ruleText(r) + (r.since ? ` · since ${fmtDateTime(r.since)}` : "")), toggle];
+  if (pfDetail === "backtest") return [...head, ...lookbackSection({ group: g, rule: r.id })];
+  return [...head,
+    ...(g === "cashout" ? cashSection(paper, r.id) : paperRules(paper, r.id)),
+    el("div", { class: "sec-head" }, el("h2", {}, "Trades"), el("span", { class: "hint" }, "this rule only")),
+    ...paperTrades(paper, { group: g, rule: r.id })];
 }
 
 function renderPaper() {
   const box = $("view-paper");
   const paper = state && state.paper && typeof state.paper === "object" ? state.paper : null;
-  const key = JSON.stringify([!!state, paper, lookback && lookback.generated_at, lookbackErr, pfStatus, pfRule]);
+  const key = JSON.stringify([!!state, paper, lookback && lookback.generated_at, lookbackErr, pfStatus, pfRule, pfLevel, pfPort, pfStrat, pfDetail]);
   if (key === paperKey) return;   // unchanged: don't rebuild (keeps an open filter select usable)
   paperKey = key;
-  const out = [el("div", { class: "paper-note", role: "note" },
-    el("span", { class: "badge hypo" }, "Hypothetical, no orders"), " ",
-    el("b", {}, "Expected result (pre-registered): about −3 to −5¢ per contract. A rule clearly above zero over ≥ 30 settled trades would be the surprise. "),
-    "Rules frozen 2026-10-27. Fills assume the whole size at the displayed ask plus fees, so results are optimistic about fills.")];
+  let out;
   if (!paper) {
-    out.push(el("div", { class: "card-note" }, state ? "The scanner isn't paper trading (no `paper` in state.json; it may run with --no-paper)." : "Loading…"));
+    out = [el("div", { class: "card-note" }, state ? "The scanner isn't paper trading (no `paper` in state.json; it may run with --no-paper)." : "Loading…"), ...lookbackMeta()];
   } else {
-    out.push(el("div", { class: "sec-head" }, el("h2", {}, "Swing-lock rules: P&L by rule"),
-      el("span", { class: "hint" }, paper.since ? `since ${fmtDateTime(paper.since)}` : "no trades yet")));
-    out.push(...paperRules(paper));
-    out.push(...cashSection(paper));
-    out.push(el("div", { class: "sec-head" }, el("h2", {}, "Trades"), el("span", { class: "hint" }, "open and locked first")));
-    out.push(...paperTrades(paper));
+    if (!groupRules(paper, pfPort).length) pfLevel = "home";
+    out = pfLevel === "strategy" ? paperStrategy(paper) : pfLevel === "portfolio" ? paperPortfolio(paper) : paperHome(paper);
   }
-  out.push(...lookbackSection());
+  box.dataset.level = paper ? pfLevel : "none";
   box.replaceChildren(el("section", {}, out));
 }
 
@@ -823,7 +967,12 @@ function applyTheme(v) {
 })();
 
 $("sort").addEventListener("change", render);
-for (const b of document.querySelectorAll(".views button")) b.addEventListener("click", () => showView(b.dataset.view));
+for (const b of document.querySelectorAll(".views button")) {
+  b.addEventListener("click", () => {
+    if (b.dataset.view === "paper" && view === "paper" && pfLevel !== "home") goPaper("home");   // tap again: back to the portfolios
+    showView(b.dataset.view);
+  });
+}
 showView(view);
 loadLookback(true);
 setInterval(() => loadLookback(), LOOKBACK_EVERY_MS);

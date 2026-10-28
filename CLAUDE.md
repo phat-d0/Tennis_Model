@@ -532,6 +532,11 @@ Since phat-d0/Tennis_Model#116 also: `min_arb_profit_per_contract` (the alert th
 - 2026-10-28 (Dashboard): public page labels Upsets' new Portfolio strategies ("Seed loses early", "Seed loses early
   (qualifiers)", phat-d0/Tennis_Model#137) and credits their seed source in the footer: "Seeds and qualifiers for the 'Seed
   loses early' strategies: Wikipedia (CC BY-SA)". Service-worker cache v5. 14 site tests passing.
+- 2026-10-28 (Dashboard): Paper tab in the soccer app's folder layout (owner request): home lists the portfolios (Swing-lock
+  P1–P4, Cash-out C0–C4) with their P&L; a portfolio shows its strategies as rows (live P&L, per contract, Δ vs C0, a
+  "Lookback:" line) plus its summary table, trades and lookback; a strategy has Live paper / Backtest. Everything on the old
+  page stays reachable. The browser check walks every level; it now writes its result before exiting (a large result was
+  cut at 64 KB). 323 tests passing.
 - 2026-10-28 (Scanner): paper C rules checked against Kalshi's placeholder listing books (combined ask ≈ $1.84): no rule
   opens on them, but **E1 is effectively consumed by the placeholder listing book; live C entries are E2 apart from the
   start-up batch**. P1–P4 unaffected. No rule change (Lead); dated note in docs/scanner_paper.md.
