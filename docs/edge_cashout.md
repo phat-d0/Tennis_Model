@@ -111,4 +111,45 @@ Cashing out should cost a little and reduce variance (lower SD, better P10). Exp
   the ask.
 
 ## Amendments
-_(none)_
+### 2026-10-28 (before any run): set-end proxy, Level exits, DOG50
+Asked for by the Lead and the owner after registration. No cash-out number had been computed.
+
+1. **Set end vs mid-set uses Kalshi set-winner markets, not the recorder's `score/` table** (the VPS is
+   unreachable from cloud sessions).
+   - A live exit counts as **at set end** if it falls within ±3 min of a set-winner `close_time` for
+     that match (`sets.parquet`, KXATPSETWINNER / KXWTASETWINNER; close_time ≈ set end, median −1 min).
+     A live exit outside every window counts as **mid-set**.
+   - Kalshi lists only the sets before the decider, so the end of the decider (the match end) is never
+     tagged.
+   - Only ATP/WTA have set markets. Matches with no set rows (all Challenger/WTA 125) are reported as
+     a separate **no set data** group.
+   - Pre-match exits stay `pre`.
+   - **Descriptive only, never gated.**
+2. **New exit family, Level:** net bid ≥ L, with L ∈ {0.40, 0.50, 0.60}.
+   - It applies only to positions with all-in entry < L, which keeps it a take-profit. Positions bought
+     at or above L simply hold.
+   - The gate's candidate set grows from 9 to 12 rules; walk-forward selection covers the extra choices.
+3. **Owner's strategy, DOG50**, tested as a full strategy (entry + exit):
+   - **Entry:** E1 and E2 sides with ask < 20¢.
+   - **Exit:** net bid ≥ 0.50 (the L = 0.50 rule); otherwise hold to settlement.
+   - **Report:** absolute P&L per contract and ROI (total P&L / total entry cost), Δ vs hold, trigger
+     rate. Split by entry band < 10¢ / 10–20¢ and by entry type, at 0¢ and 1¢, with match-clustered CIs.
+   - **DOG30** (ask < 30¢, adds a 20–30¢ band) is reported, **descriptive only**.
+   - **DOG50 gate, on absolute P&L.** It's a fixed rule, so there is no selection and every month is
+     out-of-sample. E1 and E2 positions are pooled, and CIs resample whole matches. PASS only if all hold:
+     - P&L > 0 in ≥ ⌈0.75 × months⌉ months at 1¢;
+     - total P&L > 0 at 0¢ and 1¢;
+     - ≥ 30 triggers;
+     - ≥ 4 months.
+   - **Expectation:** if the price is a martingale, P(reach 50¢ from p0) ≈ p0 / 0.5. So "cash out at 50¢
+     or hold" has EV ≈ p0, which is break-even before costs. Add the dog overpricing already measured
+     (Kalshi early-round dogs −15.7%, DraftKings −18.7%) and spread + fee on two trades, and we expect:
+     - a clearly negative absolute ROI;
+     - a trigger rate ≈ 2·p0 (≈ 20–35%);
+     - Δ vs hold small, of either sign.
+
+     **Expected verdict: FAIL.**
+4. **Bid staleness** (reported, not gated): the share of triggers whose exit bid had not changed for
+   more than 60 s, read off a carried candle (`frac_stale_bid`). A trigger on an old bid is less
+   reliable. bid(A) is built from the same two market quotes as ask(B), so its age is align's `age_b`
+   (and bid(B)'s is `age_a`).

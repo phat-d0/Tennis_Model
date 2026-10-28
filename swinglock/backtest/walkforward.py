@@ -128,8 +128,10 @@ class WalkForward:
 
 def evaluate(trades_by_slip: dict[float, pd.DataFrame], months: pd.Series,
              combos: Sequence[tuple[str, float, float]], st: dict[str, Any]) -> WalkForward:
-    """Walk-forward over precomputed grid trades (one table per slippage, tagged mode/x/y)."""
+    """Walk-forward over precomputed trades (one table per slippage, tagged mode/x/y; needs match_id,
+    settle_ts, pnl and locked). Any other columns are carried into the OOS trades table."""
     report = [float(s) for s in st["slippages"]]
+    months = months.astype("period[M]")   # keeps .map() Period-typed (pandas 3 infers str from str keys)
     periods = sorted(set(months.dropna()))
     tagged = {s: t.assign(period=t["match_id"].map(months)) for s, t in trades_by_slip.items()}
     sel_all = tagged[float(st["select_slippage"])]
@@ -167,7 +169,8 @@ def evaluate(trades_by_slip: dict[float, pd.DataFrame], months: pd.Series,
                  "train_trades", "train_pnl",
                  *[f"oos_{m}_{slip_label(s)}" for s in report for m in ("trades", "pnl", "lock_rate")]]
     folds = pd.DataFrame(fold_rows, columns=fold_cols)
-    oos_cols = [*TRADE_COLUMNS, *KEYS, "fold", "test_month", "slippage"]
+    base = next(iter(trades_by_slip.values()), pd.DataFrame(columns=[*TRADE_COLUMNS, *KEYS]))
+    oos_cols = [*[c for c in base.columns if c != "period"], "fold", "test_month", "slippage"]
     oos_df = pd.concat([o for o in oos if len(o)], ignore_index=True) if any(len(o) for o in oos) \
         else pd.DataFrame(columns=oos_cols)
     return _gate(folds, oos_df[oos_cols], report, st)
