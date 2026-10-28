@@ -35,8 +35,9 @@ conflict (git merges edits that touch different blocks).
   built and pre-registered, PR #132. Next: after merge the owner updates the server; watch 429s, the 04:00 UTC lookback and
   the C rules' first exits. Waiting on: Dashboard's contract-test update for the new keys; the owner's health-check paste.
 
-- **Dashboard.** Now: Paper tab live (#118, #121); first live screenshot checked 2026-10-27 (renders as designed).
-  Next: check the lookback panel after the first 04:00 UTC run. Waiting on: an owner screenshot of the lookback.
+- **Dashboard.** Now: cash-out portfolio section on the Paper tab (C1/C2 vs C0, Δ per contract on paired entries), ready
+  for Scanner's cash-out PR. Next: check the lookback and cash-out panels on the owner's screenshots once both are live.
+  Waiting on: Scanner's cash-out merge; owner screenshots.
 
 - **Upsets.** Now: page builder + Portfolio upkeep (Polymarket Challengers #111, power de-vig #112 live). The Portfolio ledger
   and month's spend are restored from the live page when the cache is evicted (#129). Now (owner 2026-10-28): "seed loses

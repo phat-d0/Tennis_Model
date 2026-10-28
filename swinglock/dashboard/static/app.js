@@ -340,6 +340,10 @@ const otherName = (t) => (t.side === "A" ? t.player_b : t.player_a) || "other si
 
 function ruleText(r) {
   if (!r) return "";
+  if (isCash(r)) {
+    const exit = isNum(r.level) ? `sell all at the bid when it nets ≥ ${centsText(r.level)}` : "hold to settlement (control)";
+    return `buy every side with ask < ${centsText(r.max_ask)} at the first pre-start (E1) and first in-play (E2) look; ${exit}`;
+  }
   const phase = r.entry_phase && r.entry_phase !== "any" ? `, ${r.entry_phase} only` : "";
   return `buy ≤ ${centsText(r.x)}, lock when all-in ≤ ${centsText(r.y)}${phase}`;
 }
@@ -351,16 +355,22 @@ function table(cls, heads, rows) {
 }
 const cell = (label, ...kids) => el("td", { "data-label": label }, el("span", {}, ...kids));
 
-// Start-up entries: trades opened at the very first poll (entry_ts == paper.since) can be on
-// matches already in progress, so the pre-registration reads them separately from the headline.
-const isStartup = (paper, t) => !!paper.since && t.entry_ts === paper.since;
+// Start-up entries: trades opened at a rule's very first poll (entry_ts == that rule's `since`,
+// else paper.since for an older scanner) can be on matches already in progress, so the
+// pre-registration reads them separately from the headline.
+const isCash = (x) => !!x && x.group === "cashout";
+function ruleSince(paper, ruleId) {
+  const r = objs(paper.rules).find((x) => x.id === ruleId);
+  return (r && r.since) || paper.since || null;
+}
+const isStartup = (paper, t) => { const since = ruleSince(paper, t.rule); return !!since && t.entry_ts === since; };
 
 function agg(ts) {
-  const a = { trades: ts.length, open: 0, locked: 0, settled: 0, withLock: 0, realized: 0, lockedUn: 0, contracts: 0, capital: 0 };
+  const a = { trades: ts.length, open: 0, locked: 0, settled: 0, exited: 0, withLock: 0, realized: 0, lockedUn: 0, contracts: 0, capital: 0 };
   for (const t of ts) {
     if (t.status in a) a[t.status] += 1;
-    if (isNum(t.lock_ask)) a.withLock += 1;
-    if (t.status === "settled" && isNum(t.pnl)) { a.realized += t.pnl; a.contracts += t.contracts || 0; }
+    if (isNum(t.lock_ask) || t.status === "exited") a.withLock += 1;
+    if ((t.status === "settled" || t.status === "exited") && isNum(t.pnl)) { a.realized += t.pnl; a.contracts += t.contracts || 0; }
     if (t.status === "locked" && isNum(t.pnl)) { a.lockedUn += t.pnl; a.contracts += t.contracts || 0; }
     a.capital += (isNum(t.entry_cost) ? t.entry_cost : 0) + (isNum(t.lock_cost) ? t.lock_cost : 0);
   }
@@ -388,7 +398,7 @@ function ruleRow(name, sub, a, cls) {
 function paperRules(paper) {
   const rules = new Map(objs(paper.rules).map((r) => [r.id, r]));
   const trades = objs(paper.trades);
-  const byRule = objs(paper.by_rule);
+  const byRule = objs(paper.by_rule).filter((b) => !isCash(b) && !isCash(rules.get(b.rule)));
   const ids = byRule.map((b) => b.rule).filter(Boolean);
   const rows = [], startRows = [], head = [], start = [];
   let truncated = false;
@@ -411,7 +421,7 @@ function paperRules(paper) {
   else if (!truncated && ids.length > 1) rows.push(ruleRow("All rules", "excluding start-up entries", agg(head), "total"));
   if (startRows.length) {
     rows.push(el("tr", { class: "group" }, el("td", { colspan: 8 },
-      `Start-up entries (entered at the price when paper trading began, ${fmtDateTime(paper.since)}; excluded)`)));
+      `Start-up entries (entered at the price when paper trading began, ${fmtDateTime(ruleSince(paper, byRule[0] && byRule[0].rule))}; excluded)`)));
     rows.push(...startRows);
   }
   const out = [table("paper-rules", [["Rule"], ["Trades", 1], ["Open / locked / settled", 1], ["Lock rate", 1],
@@ -423,12 +433,98 @@ function paperRules(paper) {
   return out;
 }
 
+// ---- cash-out portfolio (C rules): C1/C2 against the hold-only control C0 on the same entries.
+const pairKey = (t) => `${t.match_id}|${t.side}|${t.entry_type}`;
+const isFinal = (t) => (t.status === "settled" || t.status === "exited") && isNum(t.pnl);
+
+// Δ per contract vs the control, on entries both rules hold and both have a final P&L.
+function deltaVsControl(ts, control) {
+  const ctl = new Map(control.filter(isFinal).map((t) => [pairKey(t), t]));
+  let d = 0, n = 0, pairs = 0;
+  for (const t of ts.filter(isFinal)) {
+    const c = ctl.get(pairKey(t));
+    if (!c || !(t.contracts > 0)) continue;
+    d += t.pnl - c.pnl * (t.contracts / (c.contracts || t.contracts));
+    n += t.contracts; pairs += 1;
+  }
+  return { delta: n > 0 ? d / n : null, pairs };
+}
+
+// Spread of outcomes: SD of P&L per contract over a rule's final trades, with the range below it.
+function spread(ts) {
+  const xs = ts.filter(isFinal).filter((t) => t.contracts > 0).map((t) => t.pnl / t.contracts);
+  if (xs.length < 2) return null;
+  const m = xs.reduce((a, b) => a + b, 0) / xs.length;
+  const sd = Math.sqrt(xs.reduce((a, x) => a + (x - m) ** 2, 0) / (xs.length - 1));
+  return { sd, min: Math.min(...xs), max: Math.max(...xs), n: xs.length };
+}
+const ctText = (x) => `${x > 0.0005 ? "+" : x < -0.0005 ? "−" : ""}${Math.abs(x * 100).toFixed(1)}¢`;
+
+function cashRow(name, sub, a, dv, sp, cls) {
+  return el("tr", { class: cls || "" },
+    el("td", { class: "match" }, el("div", { class: "players" }, name), sub ? el("div", { class: "sub" }, sub) : null),
+    td("Trades", qty(a.trades)),
+    td("Open / exited / final", `${qty(a.open)} / ${qty(a.exited)} / ${qty(a.settled + a.exited)}`),
+    td("Exit rate", pctText(a.trades ? a.exited / a.trades : null)),
+    td("Final P&L (settled + sold)", money(a.realized)),
+    td("P&L per contract", perCt(a.perContract)),
+    td("Δ vs C0 per contract", dv === "control" ? el("span", { class: "na" }, "control")
+      : dv ? [perCt(dv.delta), el("div", { class: "subline" }, `${dv.pairs} paired entr${dv.pairs === 1 ? "y" : "ies"}`)] : el("span", { class: "na" }, "—")),
+    td("Spread of outcomes", sp ? [`±${(sp.sd * 100).toFixed(1)}¢`, el("div", { class: "subline" }, `${ctText(sp.min)} to ${ctText(sp.max)}`)]
+      : el("span", { class: "na" }, "—")),
+    td("Capital", money(a.capital, false)));
+}
+
+function cashSection(paper) {
+  const rules = objs(paper.rules).filter(isCash);
+  if (!rules.length) return [];
+  const trades = objs(paper.trades);
+  const control = rules.find((r) => !isNum(r.level));
+  const head = (id) => trades.filter((t) => t.rule === id && !isStartup(paper, t));
+  const ctlTrades = control ? head(control.id) : [];
+  const rows = [], startRows = [];
+  for (const r of rules) {
+    const ts = trades.filter((t) => t.rule === r.id);
+    const h = ts.filter((t) => !isStartup(paper, t)), st = ts.filter((t) => isStartup(paper, t));
+    const dv = r === control ? "control" : control ? deltaVsControl(h, ctlTrades) : null;
+    rows.push(cashRow(r.id, ruleText(r), agg(h), dv, spread(h)));
+    if (st.length) {
+      const sdv = r === control ? "control" : control
+        ? deltaVsControl(st, trades.filter((t) => t.rule === control.id && isStartup(paper, t))) : null;
+      startRows.push(cashRow(r.id, "start-up entries (excluded)", agg(st), sdv, spread(st), "startup"));
+    }
+  }
+  if (startRows.length) {
+    rows.push(el("tr", { class: "group" }, el("td", { colspan: 9 },
+      `Start-up entries (entered at the price when the cash-out rules began, ${fmtDateTime(rules[0].since || paper.since)}; excluded)`)));
+    rows.push(...startRows);
+  }
+  const truncated = trades.length >= 200;
+  return [
+    el("div", { class: "sec-head" }, el("h2", {}, "Cash-out portfolio (pre-registered 2026-10-28)"),
+      el("span", { class: "hint" }, rules[0].since ? `since ${fmtDateTime(rules[0].since)}` : "")),
+    el("p", { class: "paper-note" },
+      el("b", {}, "Expected result (pre-registered): Δ (C1 vs C0) about −1 to −3¢ per contract; C1 and C2 negative. "),
+      "A clearly positive Δ over ≥ 30 settled C1 trades would be the surprise. C1 is the owner's DOG50."),
+    table("paper-cash", [["Rule"], ["Trades", 1], ["Open / exited / final", 1], ["Exit rate", 1],
+      ["Final P&L", 1], ["P&L / contract", 1], ["Δ vs C0 / contract", 1], ["Spread / contract", 1], ["Capital", 1]], rows),
+    el("p", { class: "meta-line" },
+      "Final P&L counts settled and sold trades. Δ vs C0 pairs each entry with the control's identical entry (same match, side and E1/E2) once both are final;"
+      + " C2's 20–30¢ entries have no C0 twin, so only its under-20¢ entries are paired. Spread = standard deviation of P&L per contract over final trades (range below)."
+      + (truncated ? " The trade list is capped at 200, so these figures may be incomplete." : "")),
+  ];
+}
+
 function tradeRow(paper, t) {
-  const st = ["open", "locked", "settled"].includes(t.status) ? t.status : "open";
+  const st = ["open", "locked", "settled", "exited"].includes(t.status) ? t.status : "open";
   const locked = isNum(t.lock_ask);
   const entry = [`${qty(t.contracts)} ${sideName(t)} @ ${centsText(t.entry_ask)}`,
     el("div", { class: "subline" }, `${fmtDateTime(t.entry_ts)} · ${t.entry_phase || "?"} · cost $${isNum(t.entry_cost) ? t.entry_cost.toFixed(2) : "—"}`)];
-  const lock = locked
+  const lock = st === "exited"
+    ? [`sold @ ${centsText(t.exit_bid)} bid`,
+       el("div", { class: "subline" }, `${fmtDateTime(t.exit_ts)} · $${isNum(t.exit_value) ? t.exit_value.toFixed(2) : "—"} after fee`)]
+    : isCash(t) ? el("span", { class: "na" }, "held")
+    : locked
     ? [`${qty(t.lock_contracts)} ${otherName(t)} @ ${centsText(t.lock_ask)}`,
        el("div", { class: "subline" }, `${fmtDateTime(t.lock_ts)} · cost $${isNum(t.lock_cost) ? t.lock_cost.toFixed(2) : "—"}`)]
     : el("span", { class: "na" }, "not locked");
@@ -438,28 +534,31 @@ function tradeRow(paper, t) {
       el("div", {}, el("span", { class: "na" }, `if ${t.player_b || "B"} `), money(t.pnl_if_b))];
   } else if (st === "locked") {
     result = [money(t.pnl), el("div", { class: "subline" }, "locked, pays at settlement")];
+  } else if (st === "exited") {
+    result = [money(t.pnl), el("div", { class: "subline" }, "sold at the bid")];
   } else {
     const won = t.settle_a === 1 ? t.player_a : t.settle_b === 1 ? t.player_b : null;
     result = [money(t.pnl), el("div", { class: "subline" },
       won ? `${won} won` : isNum(t.settle_a) ? `fair-price settle ${centsText(t.settle_a)} / ${centsText(t.settle_b)}` : "settled")];
   }
-  const badges = [el("span", { class: "badge " + (st === "locked" ? "lock" : st === "settled" ? "" : "live") }, st)];
+  const badges = [el("span", { class: "badge " + (st === "locked" || st === "exited" ? "lock" : st === "settled" ? "" : "live") }, st)];
+  if (t.entry_type) badges.push(el("span", { class: "badge", title: t.entry_type === "E1" ? "first look before the start" : "first look in play" }, t.entry_type));
   if (isStartup(paper, t)) badges.push(el("span", { class: "badge", title: "opened at the first poll; read separately" }, "start-up"));
   return el("tr", { class: st === "locked" ? "hot-lock" : "" },
     matchCell({ player_a: t.player_a, player_b: t.player_b, label: `${tierLabel(t)} · ${t.rule || "?"}`, phase: null, badges }),
-    td("Entry", entry), td("Lock", lock), td(st === "open" ? "If each player wins" : "P&L", result));
+    td("Entry", entry), td(isCash(t) ? "Exit" : "Lock", lock), td(st === "open" ? "If each player wins" : "P&L", result));
 }
 
 function paperTrades(paper) {
   const all = objs(paper.trades);
-  const counts = { all: all.length, open: 0, locked: 0, settled: 0 };
+  const counts = { all: all.length, open: 0, locked: 0, settled: 0, exited: 0 };
   for (const t of all) if (t.status in counts) counts[t.status] += 1;
   const ruleIds = [...new Set([...objs(paper.rules).map((r) => r.id), ...all.map((t) => t.rule)])].filter(Boolean);
   if (pfRule !== "all" && !ruleIds.includes(pfRule)) pfRule = "all";
   const shown = all.filter((t) => (pfStatus === "all" || t.status === pfStatus) && (pfRule === "all" || t.rule === pfRule));
   // Status chips are view filters only (read-only page).
   const chips = el("div", { class: "chips", role: "group", "aria-label": "Trade status" },
-    ["all", "open", "locked", "settled"].map((k) => el("button", {
+    ["all", "open", "locked", "exited", "settled"].filter((k) => k !== "exited" || counts.exited || pfStatus === "exited").map((k) => el("button", {
       class: "chip" + (k === pfStatus ? " on" : ""), "data-filter": k, "aria-pressed": String(k === pfStatus),
       onclick: () => { pfStatus = k; paperKey = ""; renderPaper(); },
     }, `${k === "all" ? "All" : k[0].toUpperCase() + k.slice(1)} ${counts[k]}`)));
@@ -472,7 +571,7 @@ function paperTrades(paper) {
   return [
     el("div", { class: "filters" }, chips, el("label", {}, "Rule ", ruleSel),
       el("span", { class: "hint" }, all.length >= 200 ? "newest 200" : "")),
-    table("paper-trades", [["Match"], ["Entry", 1], ["Lock", 1], ["P&L", 1]], rows),
+    table("paper-trades", [["Match"], ["Entry", 1], ["Lock / exit", 1], ["P&L", 1]], rows),
   ];
 }
 
@@ -541,7 +640,9 @@ function lookbackSection() {
     rows.get(b.rule)[b.slippage === 0 ? "s0" : "s1"] = b;
   }
   const rules = new Map(objs(L.rules).map((r) => [r.id, r]));
-  const trs = [...rows].map(([rule, { s0, s1 }]) => el("tr", {},
+  const cashIds = new Set([...rows.keys()].filter((id) => isCash(rules.get(id)) || isCash((rows.get(id).s0 || {}))));
+  const cashRows = [...rows].filter(([id]) => cashIds.has(id));
+  const trs = [...rows].filter(([id]) => !cashIds.has(id)).map(([rule, { s0, s1 }]) => el("tr", {},
     el("td", { class: "match" }, el("div", { class: "players" }, rule || "?"), el("div", { class: "sub" }, ruleText(rules.get(rule)))),
     td("Trades", qty(s0?.trades)),
     td("Locked", s0 ? `${qty(s0.locked)} (${pctText(s0.lock_rate)})` : "—"),
@@ -559,11 +660,42 @@ function lookbackSection() {
   if (objs(L.by_rule).length && !objs(L.by_rule).some((b) => isNum(b.contracts))) {
     out.push(el("p", { class: "meta-line" }, "Per contract needs a `contracts` total in the lookback's by_rule rows (scanner update phat-d0/Tennis_Model#119)."));
   }
+  const cashOut = [];
+  if (cashRows.length) {
+    // Cash-out rules in the lookback: per contract and the difference to the hold-only control C0.
+    const pc = (b) => (b && isNum(b.contracts) && b.contracts > 0 && isNum(b.pnl) ? b.pnl / b.contracts : null);
+    const ctlId = [...cashIds].find((id) => { const r = rules.get(id); return r && !isNum(r.level); });
+    const ctl = ctlId ? rows.get(ctlId) : null;
+    const dl = (b, c) => (pc(b) !== null && pc(c) !== null ? pc(b) - pc(c) : null);
+    cashOut.push(el("div", { class: "sec-head" }, el("h3", {}, "Cash-out rules in the lookback"),
+      el("span", { class: "hint" }, isNum(L.matches_processed_cashout) ? `${qty(L.matches_processed_cashout)} matches processed` : "")));
+    cashOut.push(table("lookback-cash", [["Rule"], ["Trades", 1], ["Exits", 1], ["P&L 0¢", 1], ["Per ct 0¢", 1], ["P&L 1¢", 1],
+      ["Per ct 1¢", 1], ["Δ vs C0 0¢", 1], ["Δ vs C0 1¢", 1], ["Win rate", 1]], cashRows.map(([rule, { s0, s1 }]) => {
+      const isCtl = rule === ctlId;
+      return el("tr", {},
+        el("td", { class: "match" }, el("div", { class: "players" }, rule || "?"), el("div", { class: "sub" }, ruleText(rules.get(rule)))),
+        td("Trades", qty(s0?.trades)),
+        td("Exits", s0 ? `${qty(s0.locked)} (${pctText(s0.lock_rate)})` : "—"),
+        td("P&L at 0¢", money(s0?.pnl)),
+        td("Per contract at 0¢", perCt(pc(s0))),
+        td("P&L at 1¢ slippage", money(s1?.pnl)),
+        td("Per contract at 1¢", perCt(pc(s1))),
+        td("Δ vs C0 at 0¢", isCtl ? el("span", { class: "na" }, "control") : perCt(ctl ? dl(s0, ctl.s0) : null)),
+        td("Δ vs C0 at 1¢", isCtl ? el("span", { class: "na" }, "control") : perCt(ctl ? dl(s1, ctl.s1) : null)),
+        td("Win rate", pctText(s0?.win_rate)));
+    })));
+    cashOut.push(el("p", { class: "meta-line" }, "Δ here is per-contract P&L minus C0's over each rule's own trades: exact for C1 (same entries as C0); C2 also holds 20–30¢ entries that C0 doesn't."));
+    const cashChart = dayChart(objs(L.by_day).filter((d) => cashIds.has(d.rule)));
+    if (cashChart) {
+      cashOut.push(el("div", { class: "sec-head" }, el("h3", {}, "Cash-out rules: cumulative P&L by settlement day"), el("span", { class: "hint" }, "0¢ slippage")));
+      cashOut.push(cashChart);
+    }
+  }
 
-  const days = objs(L.by_day);
+  const days = objs(L.by_day).filter((d) => !cashIds.has(d.rule));
   const chart = dayChart(days);
   if (chart) {
-    out.push(el("div", { class: "sec-head" }, el("h3", {}, "Cumulative P&L by settlement day"), el("span", { class: "hint" }, "0¢ slippage")));
+    out.push(el("div", { class: "sec-head" }, el("h3", {}, "Swing-lock rules: cumulative P&L by settlement day"), el("span", { class: "hint" }, "0¢ slippage")));
     out.push(chart);
     // The numbers behind the chart, last 14 days (a compact table even on phones).
     const dayList = [...new Set(days.map((d) => d.day).filter(Boolean))].sort().reverse().slice(0, 14);
@@ -581,6 +713,7 @@ function lookbackSection() {
           }))))),
       el("p", { class: "meta-line" }, ruleList.map((r) => `${short(r)} = ${r}`).join(" · "))));
   }
+  out.push(...cashOut);
   return out;
 }
 
@@ -597,9 +730,10 @@ function renderPaper() {
   if (!paper) {
     out.push(el("div", { class: "card-note" }, state ? "The scanner isn't paper trading (no `paper` in state.json; it may run with --no-paper)." : "Loading…"));
   } else {
-    out.push(el("div", { class: "sec-head" }, el("h2", {}, "P&L by rule"),
+    out.push(el("div", { class: "sec-head" }, el("h2", {}, "Swing-lock rules: P&L by rule"),
       el("span", { class: "hint" }, paper.since ? `since ${fmtDateTime(paper.since)}` : "no trades yet")));
     out.push(...paperRules(paper));
+    out.push(...cashSection(paper));
     out.push(el("div", { class: "sec-head" }, el("h2", {}, "Trades"), el("span", { class: "hint" }, "open and locked first")));
     out.push(...paperTrades(paper));
   }

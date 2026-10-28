@@ -62,6 +62,16 @@ const VIEWPORTS = { phone: { width: 390, height: 844 }, laptop: { width: 1280, h
           chartLines: box.querySelectorAll("svg.daychart path, svg.daychart circle").length,
           hypo: box.querySelector(".badge.hypo")?.textContent || "",
           intro: box.querySelector(".paper-note b")?.textContent || "",
+          cashRules: box.querySelectorAll("table.paper-cash tbody tr:not(.group):not(.startup)").length,
+          cashStartup: box.querySelectorAll("table.paper-cash tr.startup").length,
+          cashPerCt: [...box.querySelectorAll("table.paper-cash tbody tr:not(.group):not(.startup) td:nth-child(6)")].map((td) => td.textContent),
+          cashDelta: [...box.querySelectorAll("table.paper-cash tbody tr:not(.group):not(.startup) td:nth-child(7)")].map((td) => td.textContent),
+          cashSpread: [...box.querySelectorAll("table.paper-cash tbody tr:not(.group):not(.startup) td:nth-child(8)")].map((td) => td.textContent),
+          cashHead: [...box.querySelectorAll("h2")].map((h) => h.textContent).find((t) => t.startsWith("Cash-out")) || "",
+          sold: [...box.querySelectorAll("table.paper-trades td")].filter((td) => td.textContent.startsWith("sold @")).length,
+          lbCashRows: box.querySelectorAll("table.lookback-cash tbody tr").length,
+          lbCashDelta: [...box.querySelectorAll("table.lookback-cash tbody tr td:nth-child(8)")].map((td) => td.textContent),
+          charts: box.querySelectorAll("svg.daychart").length,
           lbPerCt: [...box.querySelectorAll("table.lookback tbody tr td:nth-child(8)")].map((td) => td.textContent),
           metaLines: [...box.querySelectorAll(".meta-line")].map((n) => n.textContent),
           trades: box.querySelectorAll("table.paper-trades tbody tr:not(:has(td.empty))").length,
@@ -80,6 +90,10 @@ const VIEWPORTS = { phone: { width: 390, height: 844 }, laptop: { width: 1280, h
       if (await page.$("#view-paper .chip[data-filter='settled']")) {
         await page.click("#view-paper .chip[data-filter='settled']");
         info.paperSettled = (await paperGrab()).trades;
+        if (await page.$("#view-paper .chip[data-filter='exited']")) {
+          await page.click("#view-paper .chip[data-filter='exited']");
+          info.paperExited = (await paperGrab()).trades;
+        }
         await page.click("#view-paper .chip[data-filter='all']");
       }
       await page.click('.views button[data-view="live"]');
