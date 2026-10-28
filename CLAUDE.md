@@ -514,7 +514,7 @@ Since phat-d0/Tennis_Model#116 also: `min_arb_profit_per_contract` (the alert th
   snapshots are cached apart (`data/raw/odds_api/inplay/`): mixed into the close cache they changed dk_history's closes.
   No outcomes read. Full pull waits on the Lead. 363 tests (pandas 2 and 3.1).
 - 2026-10-28: DK in-play full pull runs newest season first (2026 → 2023), so a cap stop loses the oldest seasons, and keeps
-  no snapshot bodies in memory outside the pilot (phat-d0/Tennis_Model#PRNUM). Code only, 0 credits. 364 tests (pandas 2 and 3.1).
+  no snapshot bodies in memory outside the pilot (phat-d0/Tennis_Model#161). Code only, 0 credits. 364 tests (pandas 2 and 3.1).
 - 2026-10-28 (Backtest): cash-out study code merged (phat-d0/Tennis_Model#125): `swinglock/backtest/cashout.py`, CLI
   `python -m swinglock.backtest.cashout --data <dir> [--sets <dir>/sets.parquet]`. Dated amendment (before any run):
   Level exits (12 gate rules), DOG50 fixed-rule gate on absolute P&L, DOG30 descriptive, set-end split (descriptive),
