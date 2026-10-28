@@ -224,6 +224,11 @@ Since phat-d0/Tennis_Model#116 also: `min_arb_profit_per_contract` (the alert th
   retirements before set 1 is complete. A sportsbook leg is a
   bet, not a contract: equal-payout sizing is stake = N / decimal_odds, and retirement/void rules
   differ from Kalshi's, so a "lock" across them isn't risk-free when a player retires.
+- The Odds API historical snapshots include **in-play** events with DraftKings and Pinnacle quoted (Upsets 2026-10-28,
+  from our 6,166 cached snapshots: 28,446 in-play event rows, DK quoted on 23,362, Pinnacle on 21,299; median quote age
+  0.8 min). The snapshot interval is 10 min in 2020–22 and 5 min from 2023; one snapshot = 10 credits for h2h with ≤ 10
+  bookmakers and covers every event of its key. The docs host isn't reachable from cloud sessions, so this rests on our
+  own data (docs/research/odds_api.md §4).
 - DraftKings Predictions: **no public/partner API**. ToU (2026-08-04) bans bots/scrapers and
   limits use to personal non-commercial. It's a broker (FCM) routing to CME / Crypto.com / DKeX /
   Bitnomial. Fee ≈ flat $0.02/contract between $0.30 and $0.94. → manual logging only.
@@ -492,6 +497,12 @@ Since phat-d0/Tennis_Model#116 also: `min_arb_profit_per_contract` (the alert th
   the real-draw fixture is still synthetic. `wiki_seeds` never retries a 429: it writes `wiki_backoff.json` (Retry-After,
   at least 10 min, at most 1 day) and skips every Wikipedia call until then, the rest of that build included. The seeds
   log says "no scored tournaments in view" when there is nothing to look up. 348 tests (pandas 2 and 3.1).
+- 2026-10-28 (owner: "make sure all these are for the app too, not just the Kalshi bets"): plan for DK in-play versions of
+  DOG50, the exit-level curve, MISMATCH50 and the new FAVDIP (favourite 60–80% / ≥ 80% at DK's close, bought at 50% in play
+  vs at the start). Pre-registered in `reports/upsets_dk_inplay.md` (phat-d0/Tennis_Model#PRNUM); a cash-out at DK = hedge to
+  equal payout. Credit dry run `python -m upsets.dk_inplay plan`: 2023–May 2026 (4,673 matches) costs 200k–239k credits at
+  10 min and 398k–476k at 5 min. Proposed cap 270k (10 min + 5-min refinement before triggers); live poll ≈ 5–7k/month at
+  10 min. **Nothing pulled; 0 credits; waits on the Lead.** 3 new tests; 351 tests (pandas 2 and 3.1).
 - 2026-10-28 (Backtest): cash-out study code merged (phat-d0/Tennis_Model#125): `swinglock/backtest/cashout.py`, CLI
   `python -m swinglock.backtest.cashout --data <dir> [--sets <dir>/sets.parquet]`. Dated amendment (before any run):
   Level exits (12 gate rules), DOG50 fixed-rule gate on absolute P&L, DOG30 descriptive, set-end split (descriptive),

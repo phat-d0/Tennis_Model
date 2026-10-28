@@ -50,8 +50,12 @@ conflict (git merges edits that touch different blocks).
   the cloud IP; a 429 now backs the builder off (#154). Now (owner
   2026-10-28, MISMATCH50): pre-match Elo rank export for Backtest (`upsets/elo_ranks.py`, #141/#142, unranked reasons #145;
   Data runs it), plus a live-rank table `current()` (#144; Lead: live loads from 2010, backtest stays on 1990, a known
-  gap of a median 2–4 places; Scanner owns the nightly job). Later: the line-shopping forward-test readout in Jan 2027.
-  Waiting on: a real draw fixture (Wikimedia 429s cloud IPs; the publish runner's log will show whether it gets through).
+  gap of a median 2–4 places; Scanner owns the nightly job). Now (owner 2026-10-28, "for the app too"): plan for DK
+  in-play DOG50 / exit curve / MISMATCH50 / FAVDIP, pre-registered in reports/upsets_dk_inplay.md (#PRNUM); dry run 200k–239k
+  credits (2023–May 2026, 10 min), proposed cap 270k; live poll plan ≈ 5–7k/month. Later: the line-shopping forward-test
+  readout in Jan 2027.
+  Waiting on: Lead's approval of the in-play credit number and live-poll plan; a real draw fixture (Wikimedia 429s cloud
+  IPs; the publish runner's log will show whether it gets through).
 
 
 ## Done
