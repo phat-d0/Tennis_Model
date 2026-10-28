@@ -378,3 +378,15 @@ def test_build_restores_then_trades_on(dirs):
     ids = {t["id"] for s in pf["strategies"] for t in s["trades"]}
     assert "model:old" in ids
     assert doc["credits"]["used_this_month"] == 12 + 2                   # restored spend + this build's odds calls
+
+
+def test_main_log_never_prints_the_balance(dirs, monkeypatch, capsys):
+    """The shared plan's balance stays private: Actions logs on a public repo are public."""
+    dirs["cache"].mkdir(parents=True)
+    (dirs["cache"] / "ledger.json").write_text(json.dumps({"month": "2026-10", "used": 7, "by_day": {}, "left": 4938958}))
+    monkeypatch.setattr(site, "build", lambda *a, **k: {"status": "ok", "matches": [],
+                                                       "credits": {"used_this_month": 7}})
+    site.main(["build", "--cache", str(dirs["cache"]), "--floor", "5000"])
+    out = capsys.readouterr().out
+    assert "4938958" not in out and "4,938,958" not in out and "balance above floor: yes" in out
+    assert site._above_floor(4000, 5000).endswith("no") and site._above_floor(None, 5000).endswith("unknown")

@@ -415,7 +415,8 @@ def build(out: Path, cache: Path, archive: Path, floor: int = 5000, month_cap: i
         "generated_at": _iso(now),
         "odds_fetched_at": _iso(snaps["snapshot_ts"].max()) if len(snaps) else None,
         "status": status,
-        # the balance stays private (shared plan): ledger.json and the log line only
+        # the balance stays private (shared plan): only in the build cache (ledger.json), never in the
+        # page or the public Actions log
         "credits": {"left": None,
                     "used_this_month": int(led["used"]), "month_cap": month_cap},
         "ratings_through": rt["through"] if rt else None,
@@ -454,6 +455,11 @@ def paper(cache: Path, matches: list[dict], now: pd.Timestamp, fetched_at: str |
     return trades
 
 
+def _above_floor(left, floor: int) -> str:
+    """The log's view of the balance: never the number (Actions logs are public on a public repo)."""
+    return "balance above floor: unknown" if left is None else f"balance above floor: {'yes' if left >= floor else 'no'}"
+
+
 def main(argv=None) -> None:
     ap = argparse.ArgumentParser(description=__doc__.split("\n\n")[0])
     ap.add_argument("cmd", choices=["build"])
@@ -472,7 +478,7 @@ def main(argv=None) -> None:
                          "so the live page and its ledger stay as they are]") from None
     print(f"[odds.json: status={doc['status']}, {len(doc['matches'])} matches, "
           f"credits used this month {doc['credits']['used_this_month']}/{a.month_cap}, "
-          f"balance {_read_json(a.cache / 'ledger.json', {}).get('left')}]")
+          f"{_above_floor(_read_json(a.cache / 'ledger.json', {}).get('left'), a.floor)}]")
 
 
 if __name__ == "__main__":
