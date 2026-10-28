@@ -343,7 +343,10 @@ def coverage(w: pd.DataFrame, minutes: pd.Series, step_min: int = 10, slack_min:
     cols = ["live", "live_close", "live_started", "live_minutes", "live_final"]
     m[cols] = m[cols].fillna(False).astype(bool)
     m["finished"] = m["finished_at"].notna()
-    m["postponed"] = m["final_start"].notna() & (m["final_start"] > m["last_ts"] - pd.Timedelta(minutes=LIVE_AFTER_MIN))
+    # postponed = the close's event was later listed for a start > 1 h after the close's and our pull ended before it
+    # (an event that simply stops being listed at the start is not postponed: DK offered no in-play market for it)
+    m["postponed"] = (m["final_start"].notna() & (m["final_start"] > m["commence"] + pd.Timedelta(hours=1))
+                      & (m["final_start"] > m["last_ts"] - pd.Timedelta(minutes=LIVE_AFTER_MIN)))
     L = ["| Season | Stopped (finish seen or event never found) | Matches | Event found | In play, rules (a)–(d) | "
          "(a)–(d) from the close's listed start | + Sackmann-minutes cut | + final-start cut (later info) | "
          "Postponed past our window |", "|---|---|---|---|---|---|---|---|---|"]
