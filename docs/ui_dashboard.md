@@ -49,6 +49,22 @@ an SSH tunnel (`ssh -L 8000:127.0.0.1:8000 vps`) or a VPN; there is no login on 
 - Theme: Auto (follows the device) / Light / Dark, remembered in localStorage.
 
 ## Paper tab
+**Layout (owner 2026-10-28, copied from the soccer app's Portfolio):** three levels, like folders.
+- **Home:** a "Portfolios" list with one full-width row per portfolio: **Swing-lock** (P1–P4) and **Cash-out** (C0–C4).
+  Each row shows the name, a "Pre-registered" pill, its strategies, and on the right its P&L (settled + sold + locked,
+  start-up entries left out) with "N final or locked · M open". Below: the hypothetical label and the nightly lookback's
+  run line.
+- **Portfolio** (tap a row; "‹ Paper" goes back): title and pill, a one-line description, the "Hypothetical, no orders" label
+  with the pre-registered expectation, then **Strategies**, one row per rule. A row shows its rule in words, its start-up
+  count, a "Lookback:" line (P&L, per contract, trades at 0¢), and on the right its live P&L with per contract and trades
+  (cash-out: Δ vs C0, or "control"). Below them, everything the old single page had, for that portfolio: the summary
+  table (totals and start-up rows), all its trades with status chips and a rule filter, and its nightly lookback table,
+  chart and daily numbers.
+- **Strategy** (tap a rule; "Paper › <portfolio>" goes back): the rule's id and rule in words, then a **Live paper /
+  Backtest** toggle. Live paper shows that rule's summary row and start-up row, and its trades. Backtest shows that rule's
+  lookback rows (0¢ and 1¢) and its chart line.
+- Tapping the Paper tab again from a deeper level returns home. The Live tab is unchanged.
+
 A "Live | Paper" switch under the header (`#paper` in the URL). The Paper view reads `state.paper` and `/lookback.json`
 (both from Scanner; contract approved with phat-d0/Tennis_Model#116, docs/scanner_paper.md):
 - **Banner:** a "Hypothetical, no orders" label and "Expected result (pre-registered): about −3 to −5¢ per contract. A rule

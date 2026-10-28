@@ -359,6 +359,18 @@ def test_page_in_browser(serve, tmp_path, fresh):
         assert p["cashDelta"] == want["delta"]
         assert want["delta"][1] == "+1.3¢2 paired entries" and want["delta"][4] == "−14.7¢2 paired entries"
         assert p["cashSpread"] == want["spread"] and want["spread"][1].startswith("±0.1¢")
+        # folder layout (owner 2026-10-28): home › portfolio › strategy, crumbs back up, tab tap returns home
+        lv = res["paperLevels"]
+        assert lv["home"]["level"] == "home" and lv["home"]["folders"] == ["Swing-lock", "Cash-out"]
+        assert lv["tapAgain"] == "home"
+        for g, first in (("swing", "P1-x20-y90"), ("cashout", "C0-dog20-hold")):
+            port, live, bt = lv[g], lv[g]["strategyLive"], lv[g]["strategyBacktest"]
+            assert port["level"] == "portfolio" and port["backToPortfolio"] == "portfolio"
+            assert live["level"] == "strategy" and live["title"] == first and live["toggle"] == ["Live paper", "Backtest"]
+            assert live["crumbs"] == ["Paper", "Swing-lock" if g == "swing" else "Cash-out"]
+            assert live["trades"] == sum(t["rule"] == first for t in s["paper"]["trades"])
+            assert (live["rules"] if g == "swing" else live["cashRules"]) == 1
+            assert bt["trades"] == 0 and any("No lookback yet" in n for n in bt["notes"])
         assert any("No lookback yet" in n for n in p["notes"])
         assert p["hypo"] == "Hypothetical, no orders"
         # headline excludes the two start-up entries (entry_ts == paper.since); P4's other trade is still open
@@ -436,6 +448,9 @@ def test_paper_tab_with_lookback(serve, tmp_path):
         want = ["control"] + [f"{'+' if d > 0 else '−'}{abs(d * 100):.1f}¢" for d in
                               (b["pnl"] / b["contracts"] - c0 for r, b in cash.items() if r != "C0-dog20-hold")]
         assert p["lbCashRows"] == len(cash) == 5 and p["lbCashDelta"] == want
+        lv = res["paperLevels"]   # a strategy's Backtest view = its own lookback rows and chart line
+        assert lv["swing"]["strategyBacktest"]["lookbackRows"] == 1 and lv["swing"]["strategyBacktest"]["chartLines"] == 1
+        assert lv["cashout"]["strategyBacktest"]["lbCashRows"] == 1 and lv["cashout"]["strategyBacktest"]["chartLines"] == 1
         assert "—" not in p["lbPerCt"] and not any("needs a `contracts` total" in m for m in p["metaLines"])
     want = [f"{'+' if b['pnl'] > 0 else '−'}{abs(b['pnl'] / b['contracts'] * 100):.1f}¢"
             for b in lb["by_rule"] if b["slippage"] == 0.0 and b["group"] == "swing"]
