@@ -35,6 +35,12 @@ no CDN, and no request to any other origin. Links to reports and the licence are
   read it) and open and settled trades. A Backtest view (`site/portfolio_backtest.json`, static aggregates) shows the
   same rules on past seasons. Data: `data/portfolio.json` from the builder; when it's missing, the tab shows a
   message and the other tabs are unaffected.
+  **Layout (owner, 2026-10-28, copied from the soccer app):** three levels. Home lists the portfolios like folders: Elo
+  model, DK vs Pinnacle, Underdogs, Seed loses early (any unknown strategy id gets its own folder, so nothing becomes
+  unreachable). Each row shows "not proven", a one-line description, the backtest ROI and bets, and live realized profit
+  and trades. A one-strategy portfolio opens its strategy directly; Seed loses early opens a portfolio level with "All
+  seeded matches" and "Qualifiers and lucky losers". The strategy page has crumbs, the rule card ("not proven"), and the
+  Live paper trades / Backtest switch with the views above. Tapping the Portfolio tab again returns home.
 - **Findings:** the "Every test so far: no edge after fees" line, then one card per entry with its verdict tag
   and a "Read the report" link to `github.com/.../blob/main/<report>`. Only `reports/...` paths become links.
 - **Footer:** odds age and build age, credits this month against the cap, the ratings date, "Refreshes every

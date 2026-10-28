@@ -35,8 +35,8 @@ conflict (git merges edits that touch different blocks).
   built and pre-registered, PR #132. Next: after merge the owner updates the server; watch 429s, the 04:00 UTC lookback and
   the C rules' first exits. Waiting on: Dashboard's contract-test update for the new keys; the owner's health-check paste.
 
-- **Dashboard.** Now: Paper tab in the folder layout (home › portfolio › strategy), PR open; next the same layout for the
-  public page's Portfolio tab. Next: check both against the owner's screenshots. Waiting on: Lead review; owner screenshots.
+- **Dashboard.** Now: public page Portfolio tab in the folder layout (home › portfolio › strategy), PR open; the Paper tab's
+  folder layout merged (#149). Next: check both against the owner's screenshots. Waiting on: Lead review; owner screenshots.
 
 - **Upsets.** Now: page builder + Portfolio upkeep (Polymarket Challengers #111, power de-vig #112 live). The Portfolio ledger
   and month's spend are restored from the live page when the cache is evicted (#129). Now (owner 2026-10-28): "seed loses

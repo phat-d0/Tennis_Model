@@ -1,7 +1,7 @@
 // Offline support: the app shell is cached; everything is network-first, so you get the
 // latest odds when online and the last ones you saw when not. Bump CACHE on shell changes;
 // activate deletes every other cache.
-const CACHE = "tennis-odds-v5";
+const CACHE = "tennis-odds-v6";
 const SHELL = ["./", "index.html", "style.css", "app.js", "manifest.webmanifest", "icons/icon-192.png"];
 
 self.addEventListener("install", (e) => {

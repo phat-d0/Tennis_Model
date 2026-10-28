@@ -538,6 +538,10 @@ Since phat-d0/Tennis_Model#116 also: `min_arb_profit_per_contract` (the alert th
   "Lookback:" line) plus its summary table, trades and lookback; a strategy has Live paper / Backtest. Everything on the old
   page stays reachable. The browser check walks every level; it now writes its result before exiting (a large result was
   cut at 64 KB). 323 tests passing.
+- 2026-10-28 (Dashboard): public page Portfolio tab in the soccer app's folder layout (owner request; phat-d0/Tennis_Model#150):
+  home lists 4 portfolios (Elo model, DK vs Pinnacle, Underdogs, Seed loses early), Seed loses early holds 2 strategies
+  (all / qualifiers), the strategy page keeps "not proven", the rule and Live paper / Backtest. A second tap on the tab
+  goes home. Nothing removed; no Kalshi data. Service-worker cache v6. 14 site tests passing.
 - 2026-10-28 (Scanner): paper C rules checked against Kalshi's placeholder listing books (combined ask ≈ $1.84): no rule
   opens on them, but **E1 is effectively consumed by the placeholder listing book; live C entries are E2 apart from the
   start-up batch**. P1–P4 unaffected. No rule change (Lead); dated note in docs/scanner_paper.md.
