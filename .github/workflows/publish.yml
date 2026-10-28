@@ -10,7 +10,7 @@ on:
   workflow_dispatch:
   push:
     branches: [main]
-    paths: ["site/**", "upsets/site.py", "upsets/portfolio.py", "upsets/names.py", "upsets/elo.py", "upsets/elo_plus.py", "upsets/model.py", "upsets/polymarket.py", ".github/workflows/publish.yml"]
+    paths: ["site/**", "upsets/site.py", "upsets/portfolio.py", "upsets/names.py", "upsets/elo.py", "upsets/elo_plus.py", "upsets/model.py", "upsets/polymarket.py", "upsets/wiki_seeds.py", "upsets/portfolio_backtest.py", ".github/workflows/publish.yml"]
 
 permissions:
   contents: read
