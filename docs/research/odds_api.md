@@ -71,6 +71,22 @@ Confidence tags: **[confirmed: url]** means I read it in that official page.
 - Featured markets from **2020-06-06**, in **10-min snapshots, then 5-min snapshots from Sept 2022**. Additional markets from 2023-05-03, in 5-min snapshots. **Paid plans only** (`HISTORICAL_UNAVAILABLE_ON_FREE_USAGE_PLAN`). [confirmed: https://the-odds-api.com/historical-odds-data/; G/api-error-codes.html]
 - Earliest snapshot per tennis key (historical page table): Slams from 2020–21 (e.g. `tennis_atp_us_open` 2020-08-28, `tennis_atp_aus_open_singles` 2021-02-06). Most 1000s start in 2024–25 (e.g. `tennis_atp_paris_masters` 2024-10-28). Several 250/500s start only in 2026. [confirmed: https://the-odds-api.com/historical-odds-data/]
 - Historical odds before 2022-09-18 were captured as decimal only. [confirmed: G/#get-historical-odds]
+- **In-play events are in historical snapshots** (Upsets, 2026-10-28, from our own cached responses, 0 credits).
+  The docs host (the-odds-api.com) isn't reachable from cloud sessions, so this rests on our data, not on the docs
+  text. The cache holds 6,166 `/historical/sports/{key}/odds` snapshots, all tennis keys we pulled for the DK studies,
+  with `bookmakers=draftkings,pinnacle`.
+  - 28,446 event rows have `commence_time` before the snapshot `timestamp`. DraftKings is quoted on 23,362 of them and
+    Pinnacle on 21,299.
+  - 42,527 bookmaker quotes have `last_update` after the start.
+  - In-play quotes are fresh: at snapshots at least 10 min after the start, the quote age (snapshot − `last_update`) is
+    a median of 0.8 min for DK (p75 4.7, p90 6.1) and 0.7 min for Pinnacle.
+  - Prices move like live prices: the max of the two odds has a median of 4.3 and a p99 of 67, and 23% are over 10.
+  - **So DK and Pinnacle are both quoted in play** in the historical archive.
+- **Snapshot interval, measured** from each response's `next_timestamp − timestamp`: 10 min in 2020–2022 and 5 min from
+  2023. One 2026 gap was 1.4 min. This matches the docs line above (5-min from Sept 2022).
+- Cost per historical snapshot: 10 × markets × regions [confirmed, §2]. h2h with draftkings + pinnacle (≤ 10
+  bookmakers = 1 region block) = **10 credits**. One snapshot covers every event of that key at that moment.
+- DK in-play dry run for the cash-out/FAVDIP studies: reports/upsets_dk_inplay.md (`python -m upsets.dk_inplay plan`).
 - Cost example: one 5-min snapshot of one key, h2h, with ≤10 bookmakers costs 10 credits. A 14-day tournament at 5-min resolution is 4,032 snapshots ≈ **40k credits**. Pull only windows around Kalshi matches. [inference from the confirmed cost rule]
 
 ## 5. Rate limits and freshness
