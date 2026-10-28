@@ -76,10 +76,11 @@ def round_monotone(s: pd.DataFrame, eps: pd.Timedelta = pd.Timedelta(microsecond
     return s["time"].where(floor.isna() | (s["time"] >= floor), floor)
 
 
-def kalshi_matches(matches: pd.DataFrame, players: pd.DataFrame) -> pd.DataFrame:
-    """ATP/WTA Kalshi matches with player ids and the result (a_won: 1/0, NaN if fair-price)."""
-    m = matches[matches["series"].isin(TOURS)].dropna(subset=["scheduled_start"]).copy()
-    m["tour"] = m["series"].map(TOURS)
+def kalshi_matches(matches: pd.DataFrame, players: pd.DataFrame, tours: dict = TOURS) -> pd.DataFrame:
+    """Kalshi matches of the `tours` series (series -> "atp"/"wta"; ATP/WTA tour-level by default) with
+    player ids and the result (a_won: 1/0, NaN if fair-price)."""
+    m = matches[matches["series"].isin(tours)].dropna(subset=["scheduled_start"]).copy()
+    m["tour"] = m["series"].map(tours)
     since = m["scheduled_start"].min().tz_localize(None) - pd.Timedelta(days=730) if len(m) else None
     for side in ("a", "b"):
         r = match_names(m[f"player_{side}"], m["tour"], players, since)
