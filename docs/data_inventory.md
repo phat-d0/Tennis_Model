@@ -147,5 +147,7 @@ phat-d0/Tennis_Model#157). Staged: pilot ≤ 2,000 first, full pull only after t
 | | **Season 2025 done:** 1,753 matches, 79,530 credits = 45.4/match (plan 53.5); event found 1,735, seen in play 1,735, finish detected 1,678 | | | | |
 | 2026-10-28 21:04–21:59 | Upsets, in-play stage 3, season 2024 (`pull --season 2024`, from main 9c8c243) | `/historical/sports/{key}/odds` | 4,199 | 41,990 | 4,435,245 |
 | | **Season 2024 done:** 1,056 matches, 41,990 credits = 39.8/match (plan 46.7); event found 1,032, seen in play 1,032, finish detected 775 (2024 events often stay listed after the match, so their windows ran to the slack) | | | | |
-| | **In-play job total (its spend log)** | | 18,226 | **182,260** | 4,435,245 |
+| 2026-10-28 22:00–22:32 | Upsets, in-play stage 4, season 2023 (`pull --season 2023`, from main 9c8c243) | `/historical/sports/{key}/odds` | 2,367 | 23,670 | 4,411,572 |
+| | **Season 2023 done:** 733 matches (Slams), 23,670 credits = 32.3/match (plan 38.0); event found 712, seen in play 712, finish detected 385 | | | | |
+| | **In-play job total, pull complete (its spend log)** | | 20,593 | **205,930** of the 270,000 cap | 4,411,572 |
 
