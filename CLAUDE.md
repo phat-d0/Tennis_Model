@@ -468,6 +468,12 @@ Since phat-d0/Tennis_Model#116 also: `min_arb_profit_per_contract` (the alert th
   parse is strict (4/8/16/32 linked seeds, else skipped and logged). Rounds 1–2 use a proxy: the seed's first or second
   listed match in that event. Backtest rows from Sackmann seeds: seed 3,100 bets −10.4%, seed_q 535 −9.7%. The parser is
   tested on a **synthetic** fixture, since en.wikipedia.org isn't reachable from cloud sessions. 0 credits. 320 tests.
+- 2026-10-28: Pre-match Elo rank export for MISMATCH50 (phat-d0/Tennis_Model#—, `upsets/elo_ranks.py`, CLI
+  `python -m upsets.elo_ranks --data <dir> [--data <dir>] --sackmann <archive> --out <parquet>`): match_id, rank_a, rank_b
+  (+ elo, n, matched, pool) for Kalshi ATP/WTA tour + Challenger/WTA 125 matches. It uses phase B's timeline (guards
+  intact), ranks among each tour's active players (≥ 10 rated matches, played in the last 365 days) at the start of the
+  match's day, and leaves unmatched names blank. Synthetic check on the real archive: ~99.6% of names matched, 31 s per
+  3,000 matches; 2026-06 ranks Sinner #1, Alcaraz #2. Data runs it; nothing committed. 336 tests (pandas 2 and 3.1).
 - 2026-10-28 (Backtest): cash-out study code merged (phat-d0/Tennis_Model#125): `swinglock/backtest/cashout.py`, CLI
   `python -m swinglock.backtest.cashout --data <dir> [--sets <dir>/sets.parquet]`. Dated amendment (before any run):
   Level exits (12 gate rules), DOG50 fixed-rule gate on absolute P&L, DOG30 descriptive, set-end split (descriptive),
