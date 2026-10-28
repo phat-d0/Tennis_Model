@@ -284,6 +284,11 @@ Since phat-d0/Tennis_Model#116 also: `min_arb_profit_per_contract` (the alert th
 - 2026-10-26: Challenger / WTA 125 tier on the page = Sackmann level-C names ("Brest CH", "Queretaro 125"; cities that
   also host a tour-level event of that tour dropped) plus the curated `EXTRA` list in `upsets/polymarket.py`. Unknown
   events are left out and logged, never guessed (phat-d0/Tennis_Model#111).
+- 2026-10-28 (Backtest): on Kalshi's paired markets bid(A) = 1 − ask(B) by construction (the normalizer builds both
+  from the same two market quotes) and the taker fee is symmetric, so a take-profit at T is the swing lock at
+  Y = 1 − T. The cash-out study's new content is Δ vs hold on selection-neutral entries (docs/edge_cashout.md).
+  Level exits apply only to entries below L (take-profit only). Set end = a Kalshi set-winner close_time ±3 min
+  (ATP/WTA, descriptive). An exit bid's age = the other side's ask age.
 
 ## Changelog
 - 2026-10-24: Project scaffold, core math + tests (12 passing), config, schema, CLAUDE.md.
@@ -430,6 +435,10 @@ Since phat-d0/Tennis_Model#116 also: `min_arb_profit_per_contract` (the alert th
   own row of WORK_PLAN's new **Master plan** (Team rule 7); the Lead keeps the plan's priority order and the owner rules.
   Cash-out study pre-registered (phat-d0/Tennis_Model#123, docs/edge_cashout.md): take-profit Δ vs hold on
   selection-neutral entries, plus the owner's DOG50 (dog < 20¢, cash out at 50¢); expected FAIL.
+- 2026-10-28 (Backtest): cash-out study code merged (phat-d0/Tennis_Model#125): `swinglock/backtest/cashout.py`, CLI
+  `python -m swinglock.backtest.cashout --data <dir> [--sets <dir>/sets.parquet]`. Dated amendment (before any run):
+  Level exits (12 gate rules), DOG50 fixed-rule gate on absolute P&L, DOG30 descriptive, set-end split (descriptive),
+  stale-bid share. Output is aggregates only. Not yet run on data (Data runs it on groups 0 and 1). 295 tests passing.
 - 2026-10-27: Paper trading live on the server from 17:34 UTC. Owner deleted `team/scanner`; no ref holds ae08bf5 now (an orphaned
   commit can still be fetched by full SHA until GitHub's GC; GitHub Support can purge it).
 - 2026-10-26: **Tennis Odds page live** at https://phat-d0.github.io/Tennis_Model/ (GitHub Pages, `.github/workflows/publish.yml`,

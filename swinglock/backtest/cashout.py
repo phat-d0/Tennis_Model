@@ -60,7 +60,8 @@ SLIPPAGES = (0.0, 0.01)
 
 POSITION_COLUMNS = ["match_id", "tier", "mode", "x", "y", "rule", "side", "band", "entry_ts", "entry_phase",
                     "entry_ask", "contracts", "entry_cost", "settle_ts", "settle_side", "hold_pnl", "locked",
-                    "exit_ts", "exit_phase", "exit_bid", "exit_value", "minutes_to_exit", "rule_pnl", "pnl"]
+                    "exit_ts", "exit_phase", "exit_bid", "exit_bid_age_s", "exit_value", "minutes_to_exit",
+                    "rule_pnl", "pnl"]
 
 
 def rule_label(kind: float, value: float) -> str:
@@ -89,6 +90,7 @@ class CashPath:
     ask_size: dict[str, np.ndarray]
     bid: dict[str, np.ndarray]
     bid_size: dict[str, np.ndarray]
+    bid_age: dict[str, np.ndarray]     # seconds the bid's source quote has been unchanged
 
     @property
     def settle_ts(self) -> pd.Timestamp:
@@ -108,7 +110,10 @@ def cash_paths(aligned: pd.DataFrame, matches: pd.DataFrame, cfg: dict[str, Any]
         col = lambda name: {s: g[f"{name}_{s.lower()}"].to_numpy(float) for s in SIDES}   # noqa: E731
         out.append(CashPath(str(mid), tier if isinstance(tier, str) else "unknown", dict(zip(SIDES, pay)),
                             fees[mid], pd.DatetimeIndex(g["ts"]), g["phase"].to_numpy(object),
-                            col("ask"), col("size"), col("bid"), col("bsize")))
+                            col("ask"), col("size"), col("bid"), col("bsize"),
+                            # bid(A) = 1 - ask(B) from the same two market quotes, so A's bid is as
+                            # old as B's ask (align's age_b), and vice versa
+                            {"A": g["age_b"].to_numpy(float), "B": g["age_a"].to_numpy(float)}))
     return out
 
 
@@ -145,10 +150,11 @@ def _positions(p: CashPath, entry: str, contracts: float, slip: float) -> list[d
                       else v if all_in < v else np.inf)                 # level: take-profit only
             hit = np.flatnonzero(net >= target - 1e-12)
             r = dict(base, x=kind, y=v, rule=rule_label(kind, v), locked=bool(hit.size), exit_ts=pd.NaT,
-                     exit_phase=None, exit_bid=np.nan, exit_value=np.nan, minutes_to_exit=np.nan, rule_pnl=hold)
+                     exit_phase=None, exit_bid=np.nan, exit_bid_age_s=np.nan, exit_value=np.nan, minutes_to_exit=np.nan, rule_pnl=hold)
             if hit.size:
                 j = i + 1 + int(hit[0])
                 r.update(exit_ts=p.ts[j], exit_phase=str(p.phase[j]), exit_bid=float(p.bid[side][j]),
+                         exit_bid_age_s=float(p.bid_age[side][j]),
                          exit_value=float(value[j - i - 1]),
                          minutes_to_exit=(p.ts[j] - p.ts[i]).total_seconds() / 60,
                          rule_pnl=float(value[j - i - 1]) - entry_cost)
@@ -170,8 +176,10 @@ def simulate_cashout(paths: Sequence[CashPath], cfg: dict[str, Any], slippage: f
 
 # ---- metrics -----------------------------------------------------------------
 
+STALE_BID_S = 60.0
 SUMMARY_COLUMNS = ["entries", "triggers", "trigger_rate", "delta_trig_pc", "ci_lo", "ci_hi", "delta_all_pc",
-                   "sd_hold_pc", "sd_rule_pc", "p10_hold_pc", "p10_rule_pc", "frac_exit_live", "median_min_to_exit"]
+                   "sd_hold_pc", "sd_rule_pc", "p10_hold_pc", "p10_rule_pc", "frac_exit_live", "median_min_to_exit",
+                   "frac_stale_bid"]
 
 
 def _stats(g: pd.DataFrame, st: dict[str, Any]) -> dict[str, float]:
@@ -186,7 +194,14 @@ def _stats(g: pd.DataFrame, st: dict[str, Any]) -> dict[str, float]:
                 sd_hold_pc=q(hold, np.std), sd_rule_pc=q(rule, np.std),
                 p10_hold_pc=q(hold, lambda a: np.quantile(a, 0.1)), p10_rule_pc=q(rule, lambda a: np.quantile(a, 0.1)),
                 frac_exit_live=float((g.loc[trig, "exit_phase"] == "live").mean()) if trig.any() else np.nan,
-                median_min_to_exit=float(g.loc[trig, "minutes_to_exit"].median()) if trig.any() else np.nan)
+                median_min_to_exit=float(g.loc[trig, "minutes_to_exit"].median()) if trig.any() else np.nan,
+                frac_stale_bid=_stale_share(g.loc[trig, "exit_bid_age_s"]))
+
+
+def _stale_share(age: pd.Series) -> float:
+    """Share of triggers (with a known age) whose exit bid was unchanged for > STALE_BID_S."""
+    a = age.dropna().to_numpy(float)
+    return float((a > STALE_BID_S).mean()) if a.size else np.nan
 
 
 def summarize(positions: pd.DataFrame, by: Sequence[str] = ("mode", "rule"), st: dict[str, Any] | None = None
@@ -364,7 +379,9 @@ def report_md(data_dir, aligned, ident, summary, bands, gates: dict[str, WalkFor
              "## Identity check: bid(A) = 1 - ask(B)",
              f"- rows {ident['rows']}, max |gap| {ident['max_abs_gap']:.2g}, "
              f"share within 1e-6: {ident['share_within_tol']:.4%}", "",
-             "## By entry type and rule", "", fmt(summary), "",
+             "## By entry type and rule",
+             f"frac_stale_bid = share of triggers whose exit bid had not changed for > {STALE_BID_S:g} s "
+             "(carried candle; less reliable).", "", fmt(summary), "",
              "## By entry band (rule x band, 1c slippage)", "", fmt(bands), ""]
     for entry, wf in gates.items():
         verdict = "PASS" if wf.passed else "FAIL: " + "; ".join(wf.reasons)

@@ -232,3 +232,15 @@ def test_dog50_fixed_rule_gate():
     assert not bad.passed and any("0 of 5 months" in r for r in bad.reasons)
     few = fixed_rule_gate({s: d.iloc[:10] for s, d in by.items()}, match_months(paths), wf_settings({}))
     assert any("triggers; need >= 30" in r for r in few.reasons)
+
+
+def test_exit_bid_age_from_the_other_sides_ask():
+    # B's ask (the source of A's bid) is unchanged from t=60; A exits at t=130 on a 70 s old bid.
+    stale = [(0, 0.40, 0.38, 0.62, 0.60), (60, 0.50, 0.48, 0.51, 0.49), (130, 0.51, 0.49, 0.51, 0.49)]
+    df = positions(book(stale), matches("M1"))
+    r = pick(df)
+    assert r["exit_ts"] == t(130) and r["exit_bid_age_s"] == 70.0
+    s = summarize(df)
+    assert s.loc[(s["mode"] == "E1") & (s["rule"] == "T=5c"), "frac_stale_bid"].iloc[0] == 1.0
+    fresh = pick(positions(book(PATH), matches("M1")))
+    assert fresh["exit_bid_age_s"] == 0.0                                # B's ask moved at t=90

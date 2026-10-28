@@ -149,3 +149,7 @@ Asked for by the Lead and the owner after registration. No cash-out number had b
      - Δ vs hold small, of either sign.
 
      **Expected verdict: FAIL.**
+4. **Bid staleness** (reported, not gated): the share of triggers whose exit bid had not changed for
+   more than 60 s, read off a carried candle (`frac_stale_bid`). A trigger on an old bid is less
+   reliable. bid(A) is built from the same two market quotes as ask(B), so its age is align's `age_b`
+   (and bid(B)'s is `age_a`).
