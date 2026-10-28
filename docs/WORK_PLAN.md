@@ -1,7 +1,32 @@
 # Work plan
 
-Status for the swing-lock / arbitrage project. Only the Lead edits this file; roles propose
-updates in their PR descriptions. Durable rules and facts are in `CLAUDE.md`.
+Status for every project. Each role updates its own row of the Master plan and its own status lines, in
+the same PR as the work (CLAUDE.md, Team rule 7). The Lead keeps the priority order and merges. Durable rules
+and facts are in `CLAUDE.md`.
+
+## Master plan (read first; updated 2026-10-28)
+**Where we stand:** no edge found anywhere after fees. That covers Kalshi true arbs and swing locks, early-round
+underdogs at Kalshi and DraftKings, Elo models against Pinnacle, and the penultimate-set and decider prices. Line
+shopping is a thin, unproven edge. What's running now: live forward tests on real order books (paper trading) and
+answers to the owner's open questions.
+
+**Priority order (owner sets it; the Lead records it):**
+1. **Cash-out study** (owner 2026-10-28): when to cash out, including the owner's DOG50. Design: docs/edge_cashout.md.
+2. **Paper trading forward test** on the VPS: 4 frozen rules, live ledger + nightly lookback. Read monthly, with
+   ≥ 30 settled trades per rule before any verdict.
+3. **Public Tennis Odds page + Portfolio** upkeep. Line-shopping forward test via the Portfolio (readout Jan 2027).
+4. **Open on the owner:** `ODDSPAPI_KEY` + allow oddspapi.io / api.oddspapi.io (DK Challenger lines test). Optional:
+   ask GitHub Support to purge the orphaned commit ae08bf5.
+
+| Role | Now | Next | Waiting on |
+|---|---|---|---|
+| Lead | Review/merge; Odds API budget; owner reports; read the first paper lookback (owner screenshot) | Consolidate the scanner and collector clients; README | Owner screenshot |
+| Data | Inputs ready for the cash-out run (kalshi_g0 + sets, kalshi_g12) | Run cashout locally → aggregates to Backtest; OddsPapi test | Backtest's cashout PR; owner's OddsPapi key |
+| Backtest | `swinglock/backtest/cashout.py` + CLI + tests, with the Level/DOG50 amendment | `reports/backtest_cashout.md` from Data's aggregates | — |
+| Scanner | Paper trading live on the VPS since 2026-10-27 17:34 UTC | Watch 429s and the 04:00 UTC lookback; fixes only | — |
+| Dashboard | Paper tab live (#118) | Check it against the owner's screenshots | Owner screenshots |
+| Upsets | Page builder + Portfolio upkeep | Next idea needs the owner | — |
+
 
 ## Done
 | # | What | Result | Where |
@@ -61,22 +86,9 @@ observations, 12% live; 161 fair-price settlements included via settle_a/b):**
   true arbs nor swing locks have an edge after fees and the ask spread. The gate fails on sign in every
   fold and variant, not just sample size. Order-book history (recorder on the VPS) is the remaining test.
 
-## Next steps (in order)
-0. Kalshi history work is done (groups 0+1, cleaned; group 2 descoped). Data is paused until the VPS
-   recorder runs; data stays in the Data container (kalshi_g0, kalshi_g12, raw cache). Backtest: swap
-   the cleaned arb counts into the findings report.
-1. Data: backfill the most recent ~6 months of ATP + WTA first (batch candles for post-cutoff
-   markets), then Challenger/ITF/older; re-normalize with the carry cap; publish to `data-store`
-   once the repo is private. Restarted 10:20 UTC in the new order; recent ATP+WTA slice (~4–5k
-   matches) ETA ~13:00–13:30 UTC.
-2. Backtest: arb scan + swing grid on the backfill; then walk-forward gate; then findings report.
-3. Data: The Odds API (DraftKings Sportsbook tennis
-   h2h) + Polymarket US collectors for the cross-venue check.
-4. Scanner: cross-venue alerts once Data's Odds API / Polymarket US collectors exist. A
-   WebSocket upgrade needs a read-scope Kalshi API key from the owner.
-5. Lead: consolidate the scanner's GET-only client (`swinglock/scanner/client.py`) with Data's
-   collector client once it lands.
-6. Lead: README covering how to run each part.
+## Next steps
+Superseded by the Master plan above (2026-10-28). The earlier list (backfill, backtest, collectors) is done; its remaining
+Lead items, client consolidation and README, are in the Lead's row.
 
 ## Second project: early-round upsets (ATP + WTA)
 Plan, method, gate and data blockers: `docs/upsets_plan.md`. Code: `upsets/` (Lead).
