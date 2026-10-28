@@ -27,8 +27,8 @@ from ..config import kalshi_fees
 from ..fees import FeeModel
 
 DEFAULT_STALENESS_S = 60.0
-ALIGNED_COLUMNS = ["match_id", "ts", "ask_a", "ask_b", "size_a", "size_b", "bid_a", "bid_b", "phase",
-                   "age_a", "age_b"]
+ALIGNED_COLUMNS = ["match_id", "ts", "ask_a", "ask_b", "size_a", "size_b", "bid_a", "bid_b", "bsize_a",
+                   "bsize_b", "phase", "age_a", "age_b"]
 
 
 def staleness_s(cfg: dict[str, Any]) -> float:
@@ -47,7 +47,8 @@ def match_fees(matches: pd.DataFrame, cfg: dict[str, Any]) -> dict[str, FeeModel
 
 def _side(q: pd.DataFrame, side: str) -> pd.DataFrame:
     s = side.lower()
-    cols = {"ask": f"ask_{s}", "ask_size": f"size_{s}", "bid": f"bid_{s}", "since": f"since_{s}"}
+    cols = {"ask": f"ask_{s}", "ask_size": f"size_{s}", "bid": f"bid_{s}", "bid_size": f"bsize_{s}",
+            "since": f"since_{s}"}
     return q.loc[q["side"] == side, ["match_id", "ts", *cols]].rename(columns=cols)
 
 
