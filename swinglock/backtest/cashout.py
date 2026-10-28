@@ -39,7 +39,7 @@ from typing import Any, Sequence
 import numpy as np
 import pandas as pd
 
-from ..config import load_config
+from ..config import kalshi_fees, load_config
 from ..fees import _EPS, FeeModel
 from ..locks import SIDES
 from .align import align, match_fees, staleness_s
@@ -428,6 +428,89 @@ def dogl_walk_forward(by_slip: dict[float, pd.DataFrame], months: pd.Series, st:
     return FixedGate(folds, gate, not reasons, reasons)
 
 
+# ---- MISMATCH50: buy the much worse-ranked player, sell at 50c (addendum 3) --------
+
+RATIO_EDGES = (1.0, 2.0, 4.0, 8.0, np.inf)
+RATIO_LABELS = ("<2", "2-4", "4-8", ">=8")
+MISMATCH_RATIO, MISMATCH_BEST = 4.0, 100
+MISMATCH_COLUMNS = ["reach_eligible", "reach_rate", "implied_rate", "frac_under_20c"]
+
+
+def load_ranks(path: Path | None) -> pd.DataFrame | None:
+    """Pre-match rank table (match_id, rank_a, rank_b); a proxy from results before each match."""
+    if path is None or not path.exists():
+        return None
+    r = pd.read_parquet(path)[["match_id", "rank_a", "rank_b"]].dropna()
+    return r.assign(match_id=r["match_id"].astype(str)).drop_duplicates("match_id", keep="last")
+
+
+def ranked_positions(positions: pd.DataFrame, ranks: pd.DataFrame | None, rule: str = DOG_RULE) -> pd.DataFrame:
+    """The worse-ranked player's positions under `rule` (sell at 50c by default), tagged with the rank
+    ratio (worse / better), its bucket and the better player's rank. Ties and unranked matches drop."""
+    cols = [*positions.columns, "better_rank", "rank_ratio", "ratio_bucket"]
+    if ranks is None or ranks.empty or positions.empty:
+        return pd.DataFrame(columns=cols)
+    d = positions[positions["rule"] == rule].astype({"match_id": str}).merge(ranks, on="match_id")
+    worse = np.where(d["rank_a"] > d["rank_b"], "A", np.where(d["rank_b"] > d["rank_a"], "B", ""))
+    d = d[d["side"].to_numpy() == worse]
+    better = np.minimum(d["rank_a"], d["rank_b"]).astype(float)
+    ratio = np.maximum(d["rank_a"], d["rank_b"]).astype(float) / better
+    bucket = np.searchsorted(RATIO_EDGES, ratio.to_numpy(), side="right") - 1
+    return d.assign(better_rank=better, rank_ratio=ratio, ratio_bucket=[RATIO_LABELS[min(i, 3)] for i in bucket])[cols]
+
+
+def mismatch_positions(ranked: pd.DataFrame, min_ratio: float = MISMATCH_RATIO,
+                       max_better: float = MISMATCH_BEST) -> pd.DataFrame:
+    """MISMATCH50 entries: worse rank >= min_ratio x the better one's, better ranked <= max_better."""
+    return ranked[(ranked["rank_ratio"] >= min_ratio) & (ranked["better_rank"] <= max_better)]
+
+
+def target_bid(fm: FeeModel, n: float, level: float = 0.50) -> float:
+    """Smallest whole-cent bid whose net (bid - fee / n) clears `level`."""
+    grid = np.round(np.arange(level, 1.0001, 0.01), 2)
+    ok = grid - fee_vec(fm, grid, n) / n >= level - 1e-12
+    return float(grid[np.argmax(ok)]) if ok.any() else np.nan
+
+
+def _reach_stats(g: pd.DataFrame, slip: float, fm: FeeModel) -> dict[str, float]:
+    """Reach-50 rate vs the price-implied rate (martingale: P(reach b*) = p0 / b*, p0 = entry ask) over
+    entries bought below 50c all-in (the only ones the level rule can sell)."""
+    elig = g[g["entry_cost"] / g["contracts"] < 0.50]
+    if elig.empty:
+        return dict(reach_eligible=0, reach_rate=np.nan, implied_rate=np.nan,
+                    frac_under_20c=float((g["entry_ask"] < 0.20).mean()) if len(g) else np.nan)
+    tb = np.array([target_bid(fm, n) for n in elig["contracts"]]) + slip
+    implied = np.minimum(elig["entry_ask"].to_numpy(float) / tb, 1.0)
+    return dict(reach_eligible=len(elig), reach_rate=float(elig["locked"].mean()), implied_rate=float(implied.mean()),
+                frac_under_20c=float((g["entry_ask"] < 0.20).mean()))
+
+
+def mismatch_summary(d: pd.DataFrame, by: Sequence[str], fm: FeeModel, st: dict[str, Any] | None = None
+                     ) -> pd.DataFrame:
+    """DOG_COLUMNS (P&L, ROI, delta, SD, P10, CIs) plus the reach-50 test per group (needs `slippage` in d)."""
+    st = st or wf_settings({})
+    by = list(by)
+    rows = [{**dict(zip(by, k if isinstance(k, tuple) else (k,))), **_dog_stats(g, st),
+             **_reach_stats(g, float(g["slippage"].iloc[0]), fm)}
+            for k, g in d.groupby(by, sort=True)] if len(d) else []
+    return pd.DataFrame(rows, columns=[*by, *DOG_COLUMNS, *MISMATCH_COLUMNS])
+
+
+def mismatch_md(mm: dict[str, pd.DataFrame], gate: FixedGate) -> list[str]:
+    fmt = lambda df: md_table(df.round(4))                               # noqa: E731
+    verdict = "PASS" if gate.passed else "FAIL: " + "; ".join(gate.reasons)
+    return ["## MISMATCH50: buy the worse-ranked player (rank >= 4x, better <= 100), sell at net bid >= 50c",
+            "Rank = pre-match Elo rank (a PROXY computed from earlier results, not the official ranking). "
+            "reach_rate vs implied_rate (entry ask / bid needed for a 50c net) is the test of 'goes to 50-50 often'; "
+            "frac_under_20c = overlap with DOG50.", "",
+            f"- Gate (fixed rule, absolute P&L, monthly): **{verdict}**", "",
+            fmt(gate.gate.assign(slippage=gate.gate["slippage"].map(slip_label))), "", fmt(gate.folds), "",
+            "Overall, by entry type and by tour level:", "", fmt(mm["mm50"]), "", fmt(mm["mm50_mode"]), "",
+            fmt(mm["mm50_tier"]), "",
+            "All worse-ranked players (any ratio, any better rank), by rank-ratio bucket and tour level:", "",
+            fmt(mm["ratio_bucket"]), "", fmt(mm["ratio_tier"]), ""]
+
+
 # ---- walk-forward gate ---------------------------------------------------------
 
 def match_months(paths: Sequence[CashPath]) -> pd.Series:
@@ -493,6 +576,8 @@ def main(argv: list[str] | None = None) -> int:
     ap = argparse.ArgumentParser(description="Cash-out (take-profit) study, docs/edge_cashout.md")
     ap.add_argument("--data", default="data/processed/kalshi", type=Path)
     ap.add_argument("--sets", default=None, type=Path, help="set-winner table (default <data>/sets.parquet)")
+    ap.add_argument("--ranks", default=None, type=Path,
+                    help="pre-match rank proxy (match_id, rank_a, rank_b) for MISMATCH50; skipped if absent")
     ap.add_argument("--out", default="reports", type=Path)
     ap.add_argument("--config", default=None)
     args = ap.parse_args(argv)
@@ -533,8 +618,23 @@ def main(argv: list[str] | None = None) -> int:
         dog[f"curve{cap}"] = dog_summary(pd.concat(src.values(), ignore_index=True), ("slippage", "rule"), st)
     dogl = dogl_walk_forward(curve20, months, st)
 
+    ranks, mm_tables = load_ranks(args.ranks), []
+    if ranks is not None:
+        fm = kalshi_fees(cfg)
+        ranked = {s: ranked_positions(d, ranks) for s, d in by_slip.items()}
+        mm_by = {s: mismatch_positions(d) for s, d in ranked.items()}
+        mm_all, rk_all = (pd.concat(x.values(), ignore_index=True) for x in (mm_by, ranked))
+        mm = {"mm50": mismatch_summary(mm_all, ("slippage",), fm, st),
+              "mm50_mode": mismatch_summary(mm_all, ("slippage", "mode"), fm, st),
+              "mm50_tier": mismatch_summary(mm_all, ("slippage", "tier"), fm, st),
+              "ratio_bucket": mismatch_summary(rk_all, ("slippage", "ratio_bucket"), fm, st),
+              "ratio_tier": mismatch_summary(rk_all, ("slippage", "tier", "ratio_bucket"), fm, st)}
+        mm_gate = fixed_rule_gate(mm_by, months, st)
+        mm_tables = [*((f"cashout_{k}", v) for k, v in mm.items()), ("cashout_mm50_gate", mm_gate.gate),
+                     ("cashout_mm50_months", mm_gate.folds)]
+
     args.out.mkdir(parents=True, exist_ok=True)
-    for name, df in [("cashout_summary", summary), ("cashout_bands", bands), ("cashout_exit_phase", phases),
+    for name, df in [*mm_tables, ("cashout_summary", summary), ("cashout_bands", bands), ("cashout_exit_phase", phases),
                      ("cashout_set_split", set_split),
                      *((f"cashout_{k}", v) for k, v in dog.items()), ("cashout_dog50_gate", dog_gate.gate),
                      ("cashout_dog50_months", dog_gate.folds), ("cashout_dogl_gate", dogl.gate),
@@ -545,6 +645,8 @@ def main(argv: list[str] | None = None) -> int:
         wf.gate.to_csv(args.out / f"cashout_wf_gate_{e}.csv", index=False)
     md = report_md(args.data, aligned, identity_check(aligned), summary, bands, gates, set_split, dog, dog_gate,
                    dogl)
+    if ranks is not None:
+        md += "\n" + "\n".join(mismatch_md(mm, mm_gate))
     (args.out / "cashout_summary.md").write_text(md)
     print(md)
     return 0
