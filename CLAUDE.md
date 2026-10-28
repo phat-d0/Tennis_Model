@@ -520,6 +520,9 @@ Since phat-d0/Tennis_Model#116 also: `min_arb_profit_per_contract` (the alert th
 - 2026-10-28 (Dashboard): public page labels Upsets' new Portfolio strategies ("Seed loses early", "Seed loses early
   (qualifiers)", phat-d0/Tennis_Model#137) and credits their seed source in the footer: "Seeds and qualifiers for the 'Seed
   loses early' strategies: Wikipedia (CC BY-SA)". Service-worker cache v5. 14 site tests passing.
+- 2026-10-28 (Scanner): paper C rules checked against Kalshi's placeholder listing books (combined ask ≈ $1.84): no rule
+  opens on them, but **E1 is effectively consumed by the placeholder listing book; live C entries are E2 apart from the
+  start-up batch**. P1–P4 unaffected. No rule change (Lead); dated note in docs/scanner_paper.md.
 - 2026-10-27: Paper trading live on the server from 17:34 UTC. Owner deleted `team/scanner`; no ref holds ae08bf5 now (an orphaned
   commit can still be fetched by full SHA until GitHub's GC; GitHub Support can purge it).
 - 2026-10-26: **Tennis Odds page live** at https://phat-d0.github.io/Tennis_Model/ (GitHub Pages, `.github/workflows/publish.yml`,
