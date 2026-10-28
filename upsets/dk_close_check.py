@@ -3,9 +3,10 @@
     python -m upsets.dk_close_check [--sackmann PATH] [--out reports/upsets_dk_close_check.md]
 
 dk_history.collect takes each match's close as the last snapshot >= 5 min before the start listed in the close
-studies' cache. The DK in-play pull (reports/upsets_dk_inplay.md) later saw many events' listed start move,
-often by about a day (rescheduled order of play), so for those matches the "close" may be a day-early price.
-Here, per priced match: final listed start = the event's commence_time in the latest snapshot of either cache;
+studies' cache. The DK in-play pull (reports/upsets_dk_inplay.md) showed that a listed start can move after that
+snapshot; this measures how often (2–4% of matches per season in 2023–26, median 1.5 h) and whether it matters.
+It also checks pairings DK listed as more than one event (a placeholder later re-listed): which event the close
+came from. Here, per priced match: final listed start = the event's commence_time in the latest snapshot of either cache;
 moved = final start more than MOVED_MIN after the start the close used. The in-play cache covers 2023 - May 2026
 only, so earlier seasons are "unknown". Then the existing headlines (#86, #99, #134, the Portfolio backtest) are
 re-stated without the moved matches, with the same code on the same Sackmann-span data. 0 credits; aggregates only.
@@ -25,15 +26,32 @@ from . import dk_inplay as di
 MOVED_MIN = 60
 
 
-def event_ids(t: pd.DataFrame, sack: pd.DataFrame, root: Path = dh.CACHE) -> pd.DataFrame:
-    """sack_row -> key, event_id, the start the close used (as dk_history.collect builds it)."""
+def _need(t: pd.DataFrame, sack: pd.DataFrame, root: Path = dh.CACHE) -> tuple[pd.DataFrame, pd.DataFrame]:
+    """(events joined to rounds 1-2 Sackmann rows, all of them, as dk_history.collect builds them; snapshots)."""
     snaps = dh.all_snapshots(root)
     ev = pd.concat([dh.load_events(dh.events_schedule(t, 24.0), root), dh.snapshot_events(snaps, t)],
                    ignore_index=True)
     ev = ev.sort_values("listed").drop_duplicates(["key", "event_id"], keep="last")
     j = dh.join_events(ev, sack)
-    need = j[(j["sack_row"] >= 0) & (j["round_idx"] <= 2)]
-    return need.drop_duplicates("sack_row")[["sack_row", "key", "event_id", "commence"]]
+    return j[(j["sack_row"] >= 0) & (j["round_idx"] <= 2)], snaps
+
+
+def close_events(need: pd.DataFrame, snaps: pd.DataFrame) -> pd.DataFrame:
+    """sack_row -> key, event_id, commence, snapshot_ts of the event the DK close was read from: as
+    dk_history.prices, the latest DK snapshot >= 5 min before the listed start of its own event, over all the
+    events joined to that match (a pairing DK listed twice has two)."""
+    dk = snaps[snaps["book"] == "draftkings"]
+    m = need[["key", "event_id", "sack_row", "commence"]].merge(dk[["key", "event_id", "snapshot_ts"]],
+                                                                 on=["key", "event_id"])
+    m = m[m["snapshot_ts"] <= m["commence"] - pd.Timedelta(minutes=5)]
+    return m.sort_values("snapshot_ts").drop_duplicates("sack_row", keep="last")[
+        ["sack_row", "key", "event_id", "commence", "snapshot_ts"]]
+
+
+def event_ids(t: pd.DataFrame, sack: pd.DataFrame, root: Path = dh.CACHE) -> pd.DataFrame:
+    """sack_row -> key, event_id, the start the close used: the event the DK close was actually read from."""
+    need, snaps = _need(t, sack, root)
+    return close_events(need, snaps)[["sack_row", "key", "event_id", "commence"]]
 
 
 def final_starts(roots=(dh.CACHE, di.INPLAY_CACHE)) -> pd.DataFrame:
@@ -56,50 +74,45 @@ def flag(ids: pd.DataFrame, finals: pd.DataFrame, inplay_from: int = 2023, seaso
     return d
 
 
-def duplicates(t: pd.DataFrame, sack: pd.DataFrame, priced: pd.DataFrame, root: Path = dh.CACHE) -> str:
-    """When DK lists more than one event for a pairing, which one gives the close? (as dk_history.prices: the latest
-    snapshot >= 5 min before each event's own listed start, over all the pairing's events). Reads prices, not results."""
-    snaps = dh.all_snapshots(root)
-    ev = pd.concat([dh.load_events(dh.events_schedule(t, 24.0), root), dh.snapshot_events(snaps, t)], ignore_index=True)
-    ev = ev.sort_values("listed").drop_duplicates(["key", "event_id"], keep="last")
-    j = dh.join_events(ev, sack)
-    need = j[(j["sack_row"] >= 0) & (j["round_idx"] <= 2)]
+def duplicates(t: pd.DataFrame, sack: pd.DataFrame, priced: pd.DataFrame, root: Path = dh.CACHE) -> tuple[str, set]:
+    """Pairings DK listed as more than one event: does the close come from the event still listed at the latest
+    snapshot of the pairing (the real one) or from a stale duplicate? Reads prices and listings, not results.
+    -> (report section, sack_rows whose close came from a stale duplicate)."""
+    need, snaps = _need(t, sack, root)
+    close = close_events(need, snaps)
     n_ev = need.groupby("sack_row")["event_id"].nunique()
-    dk = snaps[snaps["book"] == "draftkings"]
-    m = need[["key", "event_id", "sack_row", "commence"]].merge(dk, on=["key", "event_id"])
-    m = m[m["snapshot_ts"] <= m["commence"] - pd.Timedelta(minutes=5)]
-    close = m.sort_values("snapshot_ts").drop_duplicates("sack_row", keep="last").copy()
-    first = need.groupby("sack_row")["commence"].min()
-    close["later_listing"] = (n_ev.reindex(close["sack_row"]).to_numpy() > 1) & \
-        (close["commence"].to_numpy() > close["sack_row"].map(first).to_numpy() + np.timedelta64(60, "m"))
+    dup = close[close["sack_row"].isin(n_ev[n_ev > 1].index)].copy()
+    seen = snaps.groupby(["key", "event_id"])["snapshot_ts"].max().rename("last_seen").reset_index()
+    pair = need[need["sack_row"].isin(dup["sack_row"])][["sack_row", "key", "event_id", "commence"]].merge(
+        seen, on=["key", "event_id"], how="left")
+    real = pair.sort_values("last_seen").drop_duplicates("sack_row", keep="last").set_index("sack_row")["event_id"]
+    dup["stale"] = dup["event_id"].to_numpy() != real.reindex(dup["sack_row"]).to_numpy()
     close["season"] = sack.loc[close["sack_row"], "season"].to_numpy()
-    # the earliest listing of each duplicated pairing: when does DK stop quoting it, relative to its own listed start?
-    early = need[need["sack_row"].isin(n_ev[n_ev > 1].index)].sort_values("commence").drop_duplicates("sack_row")
-    last_q = dk.groupby(["key", "event_id"])["snapshot_ts"].max()
-    rel = (pd.Series(last_q.reindex(pd.MultiIndex.from_frame(early[["key", "event_id"]])).to_numpy()) -
-           early["commence"].reset_index(drop=True)).dt.total_seconds() / 3600
+    dup["season"] = sack.loc[dup["sack_row"], "season"].to_numpy()
+    first = pair.sort_values("commence").drop_duplicates("sack_row")
+    early_rel = ((first["last_seen"] - first["commence"]).dt.total_seconds() / 3600)[
+        first["event_id"].to_numpy() != real.reindex(first["sack_row"]).to_numpy()]
     p = priced.set_index("sack_row")
     lo = p[["odds_w_draftkings", "odds_l_draftkings"]].min(axis=1)
     ovr = 1 / p["odds_w_draftkings"] + 1 / p["odds_l_draftkings"] - 1
     L = ["", "### Duplicate DK listings at close time", "",
-         "| Season | Priced | Pairing listed as > 1 event | Close taken from a later re-listing |", "|---|---|---|---|"]
+         "| Season | Priced | Pairing listed as > 1 event | Close from the event still listed last (real) | "
+         "Close from a stale duplicate |", "|---|---|---|---|---|"]
     for s_, g in close.groupby("season"):
-        L.append(f"| {int(s_)} | {len(g):,} | {int((n_ev.reindex(g['sack_row']) > 1).sum()):,} | "
-                 f"{int(g['later_listing'].sum()):,} ({g['later_listing'].mean():.0%}) |")
-    later = close.loc[close["later_listing"], "sack_row"]
-    other = close.loc[~close["later_listing"], "sack_row"]
-    L += ["", f"- The earliest listing of a duplicated pairing stops being quoted by DK a median of "
-          f"{-rel.median():.1f} h **before** its own listed start ({rel.notna().sum():,} with quotes), so it is a "
-          "placeholder that DK withdraws and re-lists with a new id and the real time; the close then comes from the "
-          "re-listing (dk_history.prices only takes snapshots >= 5 min before the listed start of the event they "
-          "belong to).",
-          f"- Closes from a re-listing look like ordinary pre-match prices: median overround {ovr.reindex(later).median():.3f} "
-          f"vs {ovr.reindex(other).median():.3f}, min odds <= 1.05 in {np.mean(lo.reindex(later) <= 1.05):.1%} vs "
-          f"{np.mean(lo.reindex(other) <= 1.05):.1%} (settled or in-play prices would show far more extremes).",
-          "- So, on this evidence, a close does not come from after the real match: it always predates the start listed "
-          "by the event it was read from, and that event is the re-listing DK kept quoting, not the withdrawn "
-          "placeholder. No re-statement is needed for this."]
-    return "\n".join(L) + "\n"
+        d = dup[dup["season"] == s_]
+        L.append(f"| {int(s_)} | {len(g):,} | {len(d):,} | {int((~d['stale']).sum()):,} | {int(d['stale'].sum()):,} |")
+    stale = set(dup.loc[dup["stale"], "sack_row"])
+    real_dup = dup.loc[~dup["stale"], "sack_row"]
+    others = close.loc[~close["sack_row"].isin(dup["sack_row"]), "sack_row"]
+    L += ["", f"- The real event = the one still listed at the latest snapshot of the pairing; the other listing is a "
+          f"placeholder that DK stops listing a median {-early_rel.median():.1f} h before its own listed start "
+          f"({early_rel.notna().sum():,} placeholders seen in snapshots), then re-lists the match with a new id.",
+          f"- Closes from the real event of a duplicated pairing look like ordinary pre-match prices: median overround "
+          f"{ovr.reindex(real_dup).median():.3f} vs {ovr.reindex(others).median():.3f} for other matches, min odds <= 1.05 "
+          f"in {np.mean(lo.reindex(real_dup) <= 1.05):.1%} vs {np.mean(lo.reindex(others) <= 1.05):.1%}.",
+          ("- **No close came from a stale duplicate.** No re-statement is needed for this." if not stale else
+           f"- **{len(stale):,} closes came from a stale duplicate**; they are an excluded group in the headline table.")]
+    return "\n".join(L) + "\n", stale
 
 
 def _pct(x) -> str:
@@ -139,7 +152,8 @@ def run(root: Path, cache: Path = dh.CACHE) -> str:
     t = dh.tournaments(sack, dh._keys(), hist_start={**dh.HIST_START, "other": pd.Timestamp("2024-01-01")})
     priced = dh.collect(t, sack_elo, 24.0, root=cache)
     d = flag(event_ids(t, sack, cache), final_starts((cache, di.INPLAY_CACHE)), season=sack["season"])
-    moved = set(d.loc[d["status"] == "moved", "sack_row"])
+    dup_text, stale = duplicates(t, sack, priced, cache)
+    moved = set(d.loc[d["status"] == "moved", "sack_row"]) | stale     # a stale-duplicate close is excluded too
     parts = {"all": priced, "kept": priced[~priced["sack_row"].isin(moved)],
              "moved": priced[priced["sack_row"].isin(moved)]}
     rows = []
@@ -174,7 +188,7 @@ def run(root: Path, cache: Path = dh.CACHE) -> str:
             vals.append(f"{a.get('bets', 0):,} bets, {_pct(a.get('roi'))} vs {_pct(a.get('expected_roi'))} expected"
                         if a.get("bets") else "—")
         rows.append((f"Portfolio backtest: {sid}", *vals))
-    return report(d, rows) + duplicates(t, sack, priced, cache)
+    return report(d, rows) + dup_text
 
 
 def main(argv=None) -> None:
