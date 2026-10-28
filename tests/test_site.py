@@ -149,7 +149,7 @@ def test_site_is_static_and_self_contained():
     js = (SITE / "app.js").read_text()
     # the only absolute URLs in the app are plain links (reports, attribution), never fetched
     for url in re.findall(r"https?://[^\s\"'`)]+", js):
-        assert url.startswith(("https://github.com/", "https://creativecommons.org/")), url
+        assert url.startswith(("https://github.com/", "https://creativecommons.org/", "https://en.wikipedia.org")), url
     assert set(re.findall(r"""fetch\(\s*([A-Za-z_]+|["'][^"']+["'])""", js)) == {"url"}
     assert re.findall(r'_URL = "([^"]+)"', js) == ["data/odds.json", "findings.json", "data/portfolio.json",
                                                    "portfolio_backtest.json"]
@@ -335,6 +335,7 @@ def _common(res: dict) -> None:
     assert f["lead"] == "Every test so far: no edge after fees"
     assert f["cards"] == len(_findings())
     assert "CC BY-NC-SA" in res["footer"] and "non-commercial" in res["footer"]
+    assert "Seed loses early" in res["footer"] and "Wikipedia (CC BY-SA)" in res["footer"]
     assert "Refreshes every 3 h, often late" in res["footer"]
 
 
