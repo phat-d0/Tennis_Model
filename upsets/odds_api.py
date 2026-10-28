@@ -66,7 +66,10 @@ class OddsApi:
             if self.remaining - expected_cost < self.floor:
                 raise BudgetError(f"{path}: {expected_cost} credits would go below floor {self.floor} "
                                   f"(remaining {self.remaining:.0f})")
-        r = self.session.get(f"{BASE}{path}", params={**(params or {}), "apiKey": self.key}, timeout=30)
+        try:
+            r = self.session.get(f"{BASE}{path}", params={**(params or {}), "apiKey": self.key}, timeout=30)
+        except requests.RequestException as e:   # its text holds the request URL, key included: never re-raise it
+            raise type(e)(f"{type(e).__name__} on {path}") from None
         last = float(r.headers.get("x-requests-last", 0) or 0)
         if "x-requests-remaining" in r.headers:
             self.remaining = float(r.headers["x-requests-remaining"])
@@ -76,7 +79,10 @@ class OddsApi:
             with open(self.spend_log, "a") as f:
                 rem = "?" if self.remaining is None else f"{self.remaining:.0f}"
                 f.write(f"{dt.datetime.now(dt.UTC).isoformat(timespec='seconds')}\t{path}\t{last:.0f}\t{rem}\n")
-        r.raise_for_status()
+        try:
+            r.raise_for_status()
+        except requests.HTTPError:                 # requests' own message holds the URL, key included
+            raise requests.HTTPError(f"HTTP {getattr(r, 'status_code', '?')} on {path}", response=r) from None
         return r.json()
 
     def sports(self, all_sports: bool = False) -> list[dict]:
