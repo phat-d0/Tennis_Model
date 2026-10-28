@@ -100,3 +100,26 @@ def test_full_pull_goes_newest_season_first_and_stops_at_the_cap():
         return None if len(order) > 4 else {"timestamp": when, "data": []}
     res = di.walk_recent_first(pd.concat([older, newer], ignore_index=True), fetch)
     assert order[0] == "2024" and set(order[:4]) == {"2024"} and res["stopped"]   # 2023 never reached
+
+
+def test_make_fetch_stops_at_the_job_cap_and_the_drift_budget(tmp_path, monkeypatch):
+    from upsets import dk_history as dh
+    monkeypatch.setattr(di, "INPLAY_CACHE", tmp_path / "inplay")
+    monkeypatch.setattr(dh, "CACHE", tmp_path / "close")
+    log = tmp_path / "spend.log"
+
+    class Api:
+        calls = 0
+
+        def historical_odds(self, key, when, bookmakers=None):
+            Api.calls += 1
+            with open(log, "a") as f:
+                f.write("t\t/x\t10\t0\n")                    # what OddsApi logs for a 10-credit call
+            return {"timestamp": when, "data": []}
+    log.write_text("t\t/x\t100\t0\n")                                           # the job has spent 100 so far
+    f = di.make_fetch(Api(), log, cap=1000, stage_budget=25, pause_s=0)
+    assert f("k", "2024-01-15T10:00:00Z") and f("k", "2024-01-15T10:10:00Z")   # 20 of the 25 budget
+    assert f("k", "2024-01-15T10:20:00Z") is None and f.why == "per-match drift budget"
+    assert f("k", "2024-01-15T10:00:00Z") is not None and Api.calls == 2         # cached: free, still allowed
+    g = di.make_fetch(Api(), log, cap=125, pause_s=0)                            # job total is 120 now
+    assert g("k", "2024-01-15T11:00:00Z") is None and g.why == "job cap" and Api.calls == 2
