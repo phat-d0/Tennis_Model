@@ -21,6 +21,10 @@ rank_b, plus elo/n/matched columns) and prints the match rate. Nothing here is c
 - Left blank, never guessed: a player whose Kalshi name doesn't match one Sackmann player
   (upsets/names.py), or one with fewer than MIN_N rated matches. An unmatched player still counts in the
   pool once rated from Kalshi results (he is a real player); he just gets no rank himself.
+- reason_a / reason_b say why a rank is blank (null when ranked): `unmatched` (name not found),
+  `few_matches` (under min_n rated matches; elo/n still give his provisional rating), `inactive` (nobody of
+  that tour is in the active pool on the match day). The player's own activity is not required for a rank
+  (he is playing this match), so `inactive` only shows up when the whole pool is empty.
 - Staleness: after May 2026 only Kalshi-listed matches (tour, Challenger, WTA 125) update ratings;
   ITF-only players keep frozen ratings until they fall out of the active window.
 """
@@ -108,7 +112,8 @@ def _pool_ranks(rows: pd.DataFrame, active_days: int = ACTIVE_DAYS, min_n: int =
 
 def ranks(matches: pd.DataFrame, sack: pd.DataFrame, active_days: int = ACTIVE_DAYS, min_n: int = MIN_N) -> pd.DataFrame:
     """One row per Kalshi match of SERIES: match_id, series, tour, start, rank_a, rank_b, elo_a, elo_b,
-    n_a, n_b, matched_a, matched_b, pool. Ranks are NaN for unmatched names or players with < min_n matches."""
+    n_a, n_b, matched_a, matched_b, pool, reason_a, reason_b. Ranks are NaN for unmatched names or players
+    with < min_n matches; reason_x says why (null when rank_x is set)."""
     players = player_table(sack)
     km = ke.kalshi_matches(matches, players, tours=SERIES)
     rows, km = ke.timeline(sack, km)
@@ -128,6 +133,9 @@ def ranks(matches: pd.DataFrame, sack: pd.DataFrame, active_days: int = ACTIVE_D
     for s in ("a", "b"):   # unmatched names: blank, never guessed
         out.loc[~out[f"matched_{s}"], [f"rank_{s}", f"elo_{s}", f"n_{s}"]] = np.nan
         out[f"rank_{s}"] = out[f"rank_{s}"].round().astype("Int64")   # integer, lower = better; <NA> = blank
+        few = out[f"n_{s}"] < min_n
+        out[f"reason_{s}"] = pd.Series(np.select([~out[f"matched_{s}"], few], ["unmatched", "few_matches"],
+                                                 "inactive"), index=out.index).where(out[f"rank_{s}"].isna())
     return out.reset_index(drop=True)
 
 
@@ -183,6 +191,8 @@ def summary(r: pd.DataFrame) -> str:
         names = pd.concat([g["matched_a"], g["matched_b"]])
         lines.append(f"  {series}: {len(g):,} matches; names matched {names.mean():.1%}; both ranked {both.mean():.1%}; "
                      f"median pool {g['pool'].median():,.0f}")
+    why = pd.concat([r["reason_a"], r["reason_b"]]).value_counts()
+    lines.append("  unranked players: " + (", ".join(f"{k} {v:,}" for k, v in why.items()) or "none"))
     return "\n".join(lines)
 
 
