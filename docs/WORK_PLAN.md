@@ -16,10 +16,14 @@ incl. Seed loses early).
 1. **Paper trading forward test** on the VPS: swing P1–P4 and cash-out C0–C4, live ledger + nightly lookback over
    recorded books. Read monthly, with ≥ 30 settled trades per rule before any verdict. Cash-out study itself: **done**.
 2. **Public Tennis Odds page + Portfolio** upkeep (folder layout #150). Forward tests read out in Jan 2027.
-3. **Not built (owner can ask):** a live MISMATCH50 rule (backtest FAIL; the Elo-rank feed `upsets.elo_ranks.current()`
+3. **DK in-play studies** (owner 2026-10-28: "all these for the app too"): cash-out / MISMATCH50 / fallen favourite on DraftKings
+   in-play odds via The Odds API historical snapshots. **Owner-approved cap: 300,000 credits** (floor 5,000; pilot ≤ 2,000 first;
+   every spend logged). Upsets runs it; live in-play tracking in the app is plan-only until the backtest is in.
+4. **Fallen favourite on Kalshi** (owner 2026-10-28, docs/edge_favdip.md): favourite 60–80% / ≥ 80% at the last formed pre-match book;
+   buy at the start vs buy when it drops to 50¢ in play. Backtest builds it, Data runs it.
+5. **Not built (owner can ask):** a live MISMATCH50 rule (backtest FAIL; the Elo-rank feed `upsets.elo_ranks.current()`
    exists, a VPS job doesn't).
-4. **Open on the owner:** `ODDSPAPI_KEY` + allow oddspapi.io / api.oddspapi.io (DK Challenger lines test); allow
-   en.wikipedia.org (seed parser test on a real draw). Optional: GitHub Support purge of the orphaned commit ae08bf5.
+6. **Open on the owner:** `ODDSPAPI_KEY` + allow oddspapi.io / api.oddspapi.io (DK Challenger lines test); en.wikipedia.org is allowed (2026-10-28) but Wikimedia rate-limits cloud IPs (429). Optional: GitHub Support purge of the orphaned commit ae08bf5.
 
 **Roles.** Each role edits only its own block. The blocks are kept apart by blank lines so that two PRs don't
 conflict (git merges edits that touch different blocks).
