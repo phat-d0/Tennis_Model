@@ -450,7 +450,7 @@ Since phat-d0/Tennis_Model#116 also: `min_arb_profit_per_contract` (the alert th
   Gate: ≥ 30 bets, P&L > 0, ≥ 3 of the last 4 seasons positive. Expected negative. The Explorer's seeded-favourite slice
   (2,894 bets, ≈ −11%) was already seen, and the doc says so. Live seeds will come from Wikipedia (MediaWiki API, CC BY-SA;
   Lead's choice) and R1/R2 from a labelled proxy. No code yet; 0 credits.
-- 2026-10-28: "Seed loses early" backtest (phat-d0/Tennis_Model#—, `upsets/seed_portfolio.py`, `reports/upsets_seed_portfolio.md`):
+- 2026-10-28: "Seed loses early" backtest (phat-d0/Tennis_Model#134, `upsets/seed_portfolio.py`, `reports/upsets_seed_portfolio.md`):
   **gate FAIL for all 3 pre-registered sub-rules.** All: 3,123 bets, −10.3% at DK vs −14.2% expected at Pinnacle-fair.
   Qualifiers/LL: 538 bets, −8.2% (3 of 4 recent seasons positive, but −44u in total). Unseeded DK favourites: 269 bets,
   −1.7%. Seeds 1–4: −30%. 0 credits; identical output under pandas 3.1; 311 tests.
