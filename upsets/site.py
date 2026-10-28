@@ -44,6 +44,7 @@ from .names import match_names, player_table
 from .odds_api import KEY_NAMES, BudgetError, OddsApi, parse_h2h
 
 BOOKS = ("draftkings", "pinnacle")
+PAGE_DATA = "https://phat-d0.github.io/Tennis_Model/data"   # the live page: backup of the paper ledger and spend
 HORIZON_H = 36.0
 SHOW_PAST_H = 3.0       # keep a match on the page this long after its listed start
 MIN_RATED = 20          # model_p1 is null below this many rated matches for either player
@@ -85,6 +86,59 @@ def load_ledger(cache: Path, now: pd.Timestamp) -> dict:
     if led.get("month") != month:
         led = {"month": month, "used": 0, "by_day": {}, "left": led.get("left")}
     return led
+
+
+class RestoreError(RuntimeError):
+    """The build cache is cold and the live page's copy can't be read: stop before deploying, so the
+    live page (and the ledger it carries) is never replaced by an empty one."""
+
+
+def _page_json(session, url: str):
+    """The live page's JSON at url; None on a 404 (nothing published yet). Raises RestoreError otherwise."""
+    try:
+        r = session.get(url, timeout=30)
+        if r.status_code == 404:
+            return None
+        r.raise_for_status()
+        return r.json()
+    except Exception as e:   # never str(e)
+        code = getattr(getattr(e, "response", None), "status_code", None)
+        raise RestoreError(f"{type(e).__name__}{f' {code}' if code else ''}") from None
+
+
+def restore(cache: Path, now: pd.Timestamp, session, base: str = PAGE_DATA) -> str:
+    """Merge the live page's paper ledger (portfolio.json) and this month's spend (odds.json) into the
+    build cache, which GitHub can evict. Trades are merged by id, the cache's copy winning; the month's
+    spend is the larger of the two when the page's odds.json is from this calendar month.
+    With a warm cache a failed fetch only logs. With a cold cache (no portfolio.json) it raises
+    RestoreError, except a 404, which means nothing has been published yet. -> a log line."""
+    path = cache / "portfolio.json"
+    cold = not path.exists()
+    try:
+        pf = _page_json(session, f"{base}/portfolio.json")
+        odds = _page_json(session, f"{base}/odds.json")
+    except RestoreError as e:
+        if cold:
+            raise
+        return f"[ledger: cache only; page copy unreadable ({e})]"
+    mine = _read_json(path, [])
+    page = [t for s in (pf or {}).get("strategies") or [] for t in s.get("trades") or []
+            if isinstance(t, dict) and t.get("id")]
+    merged = {t["id"]: t for t in page}
+    merged.update({t["id"]: t for t in mine})
+    _write_json(path, sorted(merged.values(), key=lambda t: (t.get("commence_time") or "", t["id"])))
+    led = load_ledger(cache, now)
+    gen, used = (odds or {}).get("generated_at"), ((odds or {}).get("credits") or {}).get("used_this_month")
+    if gen and used is not None and pd.Timestamp(gen).strftime("%Y-%m") == led["month"] and used > led["used"]:
+        led["used"] = int(used)
+        _write_json(cache / "ledger.json", led)
+    src = "cache + page" if mine and page else "page" if page else "cache" if mine else "empty"
+    msg = f"[ledger: {src}; {len(merged)} trades ({len(mine)} cached, {len(page)} on the page); " \
+          f"credits used this month {led['used']}]"
+    if pf is None:
+        msg += "\n[ledger: WARNING the page has no portfolio.json (404): starting an empty ledger. Expected only on " \
+               "the very first build.]"
+    return msg
 
 
 def run_allowance(led: dict, cap: int, now: pd.Timestamp, run_every_h: float = 3.0) -> int:
@@ -301,10 +355,14 @@ def page_matches(snaps: pd.DataFrame, titles: dict, rt: dict | None, now: pd.Tim
 
 def build(out: Path, cache: Path, archive: Path, floor: int = 5000, month_cap: int = 3000,
           now: pd.Timestamp | None = None, key: str | None = None, session=None,
-          run_every_h: float = 3.0, pm_session=None) -> dict:
-    """pm_session: an HTTP session for Polymarket's public APIs; None leaves the Challengers block out."""
+          run_every_h: float = 3.0, pm_session=None, page_session=None, page_base: str = PAGE_DATA) -> dict:
+    """pm_session: an HTTP session for Polymarket's public APIs; None leaves the Challengers block out.
+    page_session: an HTTP session for the live page, to restore the paper ledger and the month's spend
+    when the cache was evicted (`restore`); None skips it. Raises RestoreError when that can't be done."""
     now = now or utcnow()
     cache.mkdir(parents=True, exist_ok=True)
+    if page_session is not None:
+        print(restore(cache, now, page_session, page_base))
     led = load_ledger(cache, now)
     titles = _read_json(cache / "sports.json", {})
     status, new_rows = "ok", []
@@ -357,7 +415,8 @@ def build(out: Path, cache: Path, archive: Path, floor: int = 5000, month_cap: i
         "generated_at": _iso(now),
         "odds_fetched_at": _iso(snaps["snapshot_ts"].max()) if len(snaps) else None,
         "status": status,
-        # the balance stays private (shared plan): ledger.json and the log line only
+        # the balance stays private (shared plan): only in the build cache (ledger.json), never in the
+        # page or the public Actions log
         "credits": {"left": None,
                     "used_this_month": int(led["used"]), "month_cap": month_cap},
         "ratings_through": rt["through"] if rt else None,
@@ -396,6 +455,11 @@ def paper(cache: Path, matches: list[dict], now: pd.Timestamp, fetched_at: str |
     return trades
 
 
+def _above_floor(left, floor: int) -> str:
+    """The log's view of the balance: never the number (Actions logs are public on a public repo)."""
+    return "balance above floor: unknown" if left is None else f"balance above floor: {'yes' if left >= floor else 'no'}"
+
+
 def main(argv=None) -> None:
     ap = argparse.ArgumentParser(description=__doc__.split("\n\n")[0])
     ap.add_argument("cmd", choices=["build"])
@@ -406,11 +470,15 @@ def main(argv=None) -> None:
     ap.add_argument("--month-cap", type=int, default=3000)
     ap.add_argument("--run-every-h", type=float, default=3.0)
     a = ap.parse_args(argv)
-    doc = build(a.out, a.cache, a.archive, a.floor, a.month_cap, run_every_h=a.run_every_h,
-                pm_session=requests.Session())
+    try:
+        doc = build(a.out, a.cache, a.archive, a.floor, a.month_cap, run_every_h=a.run_every_h,
+                    pm_session=requests.Session(), page_session=requests.Session())
+    except RestoreError as e:
+        raise SystemExit(f"[ledger: cache is empty and the live page's copy can't be read ({e}); stopping "
+                         "so the live page and its ledger stay as they are]") from None
     print(f"[odds.json: status={doc['status']}, {len(doc['matches'])} matches, "
           f"credits used this month {doc['credits']['used_this_month']}/{a.month_cap}, "
-          f"balance {_read_json(a.cache / 'ledger.json', {}).get('left')}]")
+          f"{_above_floor(_read_json(a.cache / 'ledger.json', {}).get('left'), a.floor)}]")
 
 
 if __name__ == "__main__":

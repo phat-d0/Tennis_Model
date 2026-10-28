@@ -431,14 +431,25 @@ Since phat-d0/Tennis_Model#116 also: `min_arb_profit_per_contract` (the alert th
   `team/scanner` (ae08bf5, public); the file is removed and the branch is to be deleted. Always stage explicit paths.
 - 2026-10-27: Dashboard Paper tab merged (phat-d0/Tennis_Model#118, #119 adds `contracts` to by_rule): per-contract P&L,
   start-up split, lookback panel; served `/lookback.json` (204 until the first nightly run). 281 tests passing.
+- 2026-10-27: Dashboard (Dashboard role): "Arbs open" counts only arbs with profit/contract ≥ `min_arb_profit_per_contract`
+  (from state.json, else 0.005); smaller ones get a muted "break-even" tag; tier labels come from `series` (ATP Challenger /
+  WTA 125 instead of "challenger") (phat-d0/Tennis_Model#115). Paper contract test made exact against Scanner's own output
+  (phat-d0/Tennis_Model#121). Live Paper tab checked on the owner's screenshot at 17:34 UTC start: 9 headline trades
+  (8 open, 1 locked), start-up block separate, renders as designed. 281 tests passing.
 - 2026-10-28 (owner): memory rule changed. Every role now records its own Changelog/facts/decisions in CLAUDE.md and its
   own row of WORK_PLAN's new **Master plan** (Team rule 7); the Lead keeps the plan's priority order and the owner rules.
   Cash-out study pre-registered (phat-d0/Tennis_Model#123, docs/edge_cashout.md): take-profit Δ vs hold on
   selection-neutral entries, plus the owner's DOG50 (dog < 20¢, cash out at 50¢); expected FAIL.
+- 2026-10-28: Portfolio ledger restore (phat-d0/Tennis_Model#129, `upsets/site.py` `restore`, Lead-approved). The paper ledger
+  and the month's page spend lived only in the Actions cache. Each build now merges the live page's `portfolio.json` (by
+  trade id; the cache's copy wins) and takes this month's `used_this_month` from its `odds.json`, keeping the larger value.
+  A cold cache plus an unreadable page stops the build, so nothing deploys; a 404 starts an empty ledger with a loud log
+  line. Nothing is committed. 290 tests (pandas 2 and 3.1).
 - 2026-10-28 (Backtest): cash-out study code merged (phat-d0/Tennis_Model#125): `swinglock/backtest/cashout.py`, CLI
   `python -m swinglock.backtest.cashout --data <dir> [--sets <dir>/sets.parquet]`. Dated amendment (before any run):
   Level exits (12 gate rules), DOG50 fixed-rule gate on absolute P&L, DOG30 descriptive, set-end split (descriptive),
-  stale-bid share. Output is aggregates only. Not yet run on data (Data runs it on groups 0 and 1). 295 tests passing.
+  stale-bid share; pandas 3.1 Period fix in walk-forward. Output is aggregates only. Not yet run on data (Data runs it
+  on groups 0 and 1). 305 tests passing (pandas 3.0.5 and 3.1.0).
 - 2026-10-27: Paper trading live on the server from 17:34 UTC. Owner deleted `team/scanner`; no ref holds ae08bf5 now (an orphaned
   commit can still be fetched by full SHA until GitHub's GC; GitHub Support can purge it).
 - 2026-10-26: **Tennis Odds page live** at https://phat-d0.github.io/Tennis_Model/ (GitHub Pages, `.github/workflows/publish.yml`,
