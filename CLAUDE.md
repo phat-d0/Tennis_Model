@@ -459,6 +459,10 @@ Since phat-d0/Tennis_Model#116 also: `min_arb_profit_per_contract` (the alert th
   curve (L 0.40–0.90 + hold; P&L, ROI, Δ, SD, P10, stale-bid share, for < 20¢ and < 30¢) and the DOGL walk-forward on L
   (hold always eligible; ≥ 30 OOS positions). Pre-registered expectation: every L loses, holding is cheapest, FAIL. Not run yet.
   308 tests passing (pandas 3.0.5 and 3.1.0).
+- 2026-10-28 (Data): cash-out study run locally on main e41c055 (with #130); 0 Kalshi requests, 308 tests passing.
+  g0 (4,695 ATP/WTA) and g12 (8,349 Challenger/WTA 125): every gate FAILs. DOG50 at 1¢: g0 −$226.07 (ROI −18.8%, 2/7 months +),
+  g12 −$641.46 (−28.7%, 0/7); DOGL g0 1/6, g12 0/6 folds +; E1/E2 FAIL on both. bid(A) = 1 − ask(B) exactly (max gap 0).
+  Aggregates sent to Backtest verbatim with sha256 per section; outputs stay in gitignored `data/reports/`.
 - 2026-10-27: Paper trading live on the server from 17:34 UTC. Owner deleted `team/scanner`; no ref holds ae08bf5 now (an orphaned
   commit can still be fetched by full SHA until GitHub's GC; GitHub Support can purge it).
 - 2026-10-26: **Tennis Odds page live** at https://phat-d0.github.io/Tennis_Model/ (GitHub Pages, `.github/workflows/publish.yml`,
