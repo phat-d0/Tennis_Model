@@ -25,7 +25,7 @@ All tagged `tennis-team`. Message a role with `send_message` to its session ID.
    with fees, never mid or last; check that the write-up's numbers add up.
 4. Scanner PRs: the read-only test passes, and no order or write endpoints are used.
 5. Dashboard PRs: take the screenshots yourself (390×844 and 1280×800, light and dark).
-6. Check that the PR records itself: a CLAUDE.md Changelog line and the role's Master plan row (Team rule 7).
+6. Check that the PR records itself: a CLAUDE.md Changelog line and the role's Master plan block (Team rule 7).
    After merging anything that changes the plan, message every role the new Master plan.
 
 ## Merge policy
