@@ -141,5 +141,13 @@ phat-d0/Tennis_Model#157). Staged: pilot ≤ 2,000 first, full pull only after t
 |---|---|---|---|---|---|
 | 2026-10-28 17:09–17:11 | Upsets, in-play **pilot**, ATP Qatar 2025 (24 R1–R2 matches), 10-min, `bookmakers=draftkings,pinnacle` | `/historical/sports/{key}/odds` | 175 | 1,750 | 4,652,408 |
 | 2026-10-28 17:37–18:00 | Upsets, in-play stage 1, season 2026 (1,131 R1–R2 matches; stopped by an HTTP 502 in tennis_atp_italian_open; 6 of 23 keys done, 304 matches at 53.4 credits each vs 63.2 planned; resumes after #163) | `/historical/sports/{key}/odds` | 1,667 | 16,670 | 4,624,936 |
-| | **In-play job total (its spend log)** | | 1,842 | **18,420** | 4,624,936 |
+| 2026-10-28 18:15–19:13 | Upsets, in-play stage 1 resumed from main (`pull --season 2026`, after #163); cached snapshots re-read free | `/historical/sports/{key}/odds` | 4,232 | 42,320 | 4,561,316 |
+| | **Season 2026 done:** 1,131 matches, 58,990 credits = 52.2/match (plan 60.5); event found 1,107, seen in play 1,107, finish detected 1,096 | | 5,899 | 58,990 | |
+| 2026-10-28 19:15–21:03 | Upsets, in-play stage 2, season 2025 (`pull --season 2025`, from main 9c8c243) | `/historical/sports/{key}/odds` | 7,953 | 79,530 | 4,477,245 |
+| | **Season 2025 done:** 1,753 matches, 79,530 credits = 45.4/match (plan 53.5); event found 1,735, seen in play 1,735, finish detected 1,678 | | | | |
+| 2026-10-28 21:04–21:59 | Upsets, in-play stage 3, season 2024 (`pull --season 2024`, from main 9c8c243) | `/historical/sports/{key}/odds` | 4,199 | 41,990 | 4,435,245 |
+| | **Season 2024 done:** 1,056 matches, 41,990 credits = 39.8/match (plan 46.7); event found 1,032, seen in play 1,032, finish detected 775 (2024 events often stay listed after the match, so their windows ran to the slack) | | | | |
+| 2026-10-28 22:00–22:32 | Upsets, in-play stage 4, season 2023 (`pull --season 2023`, from main 9c8c243) | `/historical/sports/{key}/odds` | 2,367 | 23,670 | 4,411,572 |
+| | **Season 2023 done:** 733 matches (Slams), 23,670 credits = 32.3/match (plan 38.0); event found 712, seen in play 712, finish detected 385 | | | | |
+| | **In-play job total, pull complete (its spend log)** | | 20,593 | **205,930** of the 270,000 cap | 4,411,572 |
 
