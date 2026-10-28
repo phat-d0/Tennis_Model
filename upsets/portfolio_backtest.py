@@ -20,6 +20,7 @@ import pandas as pd
 from . import dk_history as dh
 from . import dk_study as ds
 from . import elo, elo_plus, sackmann
+from . import seed_portfolio
 from .odds import devig_power
 from .portfolio import MAX_BOOK_GAP, STRATEGIES
 
@@ -43,6 +44,8 @@ def bets(f: pd.DataFrame) -> dict[str, pd.DataFrame]:
     long["model_edge"] = long["odds"] * long["p_model"] - 1
     out = {}
     for s in STRATEGIES:
+        if s["id"] in ("seed", "seed_q"):   # built from seeds and rounds instead: seed_bets
+            continue
         if s["id"] == "dogs":
             b = long[long["side"] == "dog"]
         else:
@@ -52,6 +55,19 @@ def bets(f: pd.DataFrame) -> dict[str, pd.DataFrame]:
         b = b.assign(pnl=np.where(b["win"] == 1, b["odds"] - 1, -1.0))
         out[s["id"]] = b.sort_values("date")
     return out
+
+
+def seed_bets(priced: pd.DataFrame, sack: pd.DataFrame) -> dict[str, pd.DataFrame]:
+    """The "seed" strategies: upsets.seed_portfolio's pre-registered bets (Sackmann seeds and rounds), plus the
+    live rule's 10-point quote-error filter, dated by the listed start."""
+    b = seed_portfolio.bets(priced, sack)
+    if not len(b):
+        return {"seed": b, "seed_q": b}
+    p_dk = devig_power(b["odds"].to_numpy(float), b["odds_seed"].to_numpy(float))
+    b = b[np.abs(p_dk - b["p_fair"].to_numpy()) <= MAX_BOOK_GAP].copy()
+    b["date"] = pd.to_datetime(priced.set_index("sack_row").loc[b["sack_row"], "commence"].to_numpy())
+    b = b.sort_values("date")
+    return {"seed": b, "seed_q": b[b["qual"]]}
 
 
 def aggregate(b: pd.DataFrame, rule: str, n_boot: int = 2000) -> dict:
@@ -88,6 +104,7 @@ def build(root: Path, cache: Path, other_from: str = "2024-01-01") -> dict:
     f["p_model"] = elo_plus.walk_forward(sack, f, only=("+serve",))[0]["+serve"]
     f["date"] = pd.to_datetime(priced.set_index("sack_row").loc[f["sack_row"], "commence"].to_numpy())
     by = bets(f)
+    by.update(seed_bets(priced, sack))
     return {
         "note": ("Backtest of the same rules on past seasons: DraftKings and Pinnacle at the last snapshot "
                  "at least 5 minutes before the start (one price per match, so not the live rule's first "
@@ -99,7 +116,9 @@ def build(root: Path, cache: Path, other_from: str = "2024-01-01") -> dict:
                  "since 2026-10-26 (before that, proportional: the DraftKings-vs-Pinnacle rule then showed "
                  "+9.3% expected and +9.2% realized). The model is the page's Elo + "
                  "serve/return model since 2026-10-26 (before that, a plain Elo), refitted before each "
-                 "season on earlier seasons only."),
+                 "season on earlier seasons only. The two \"seed loses early\" rows use Sackmann's real seeds, entry "
+                 "types and rounds (reports/upsets_seed_portfolio.md, gate FAIL); live, seeds come from Wikipedia "
+                 "and rounds 1–2 from a proxy."),
         "strategies": {s["id"]: aggregate(by[s["id"]], s["rule"]) for s in STRATEGIES},
     }
 

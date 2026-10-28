@@ -43,6 +43,13 @@ STRATEGIES = [
              "(line shopping)."},
     {"id": "dogs", "name": "Every underdog (control)", "min_edge": None,
      "rule": "Bet the longer DraftKings price in every match. Expect to lose about DraftKings' margin."},
+    # owner request 2026-10-28; pre-registered and backtested in reports/upsets_seed_portfolio.md (gate FAIL)
+    {"id": "seed", "name": "Seed loses early (backtest: −10.3%, not proven)", "min_edge": None,
+     "rule": "In rounds 1–2, when exactly one player is seeded, bet the unseeded player at DraftKings. Seeds come from "
+             "Wikipedia; \"rounds 1–2\" is a proxy: the seed's first or second match listed in the event."},
+    {"id": "seed_q", "name": "Seed loses early: qualifiers only (sub-line)", "min_edge": None,
+     "rule": "The same bets, only when the unseeded player is a qualifier or lucky loser (from Wikipedia's draw). "
+             "The one split the backtest showed positive in some seasons; −8.2% overall."},
 ]
 
 
@@ -78,6 +85,12 @@ def pick(strategy: dict, m: dict) -> tuple[int, float] | None:
     if dk1 is not None and pin1 is not None and abs(dk1 - pin1) > MAX_BOOK_GAP:
         return None
     sid = strategy["id"]
+    if sid in ("seed", "seed_q"):
+        sd = m.get("_seed") or {}   # {"seed_side": 1|2, "seed": n, "qual": bool, "round_ok": bool}, see upsets.site
+        if sd.get("seed_side") not in (1, 2) or not sd.get("round_ok") or (sid == "seed_q" and not sd.get("qual")):
+            return None
+        side = 3 - sd["seed_side"]
+        return side, 0.0
     if sid == "dogs":
         if o[0] == o[1]:
             return None
@@ -103,10 +116,14 @@ def _side_fair(m: dict, side: int) -> tuple[float | None, str]:
     return None, ""
 
 
-def update(trades: list[dict], matches: list[dict], now: pd.Timestamp, fetched_at: str | None) -> list[dict]:
-    """Open new trades and refresh closes from this build's matches (odds.json rows)."""
+def update(trades: list[dict], matches: list[dict], now: pd.Timestamp, fetched_at: str | None,
+           seeds: dict | None = None) -> list[dict]:
+    """Open new trades and refresh closes from this build's matches (odds.json rows). seeds: event_id ->
+    the seed facts the "seed" strategies need (upsets.site.seed_facts); missing means no seed bet."""
     by_id = {t["id"]: t for t in trades}
     for m in matches:
+        if seeds and m.get("event_id") in seeds:
+            m = {**m, "_seed": seeds[m["event_id"]]}
         if m.get("sport_key") not in SCORED_KEYS:
             continue
         start = pd.Timestamp(m.get("commence_time"))
@@ -134,6 +151,9 @@ def update(trades: list[dict], matches: list[dict], now: pd.Timestamp, fetched_a
                     "p_model": None if pm is None else round(pm if side == 1 else 1 - pm, 4),
                     "status": "open", "profit": None, "close": None, "clv": None,
                 }
+                if s["id"] in ("seed", "seed_q"):
+                    t["opponent_seed"] = m["_seed"].get("seed")
+                    t["qualifier"] = bool(m["_seed"].get("qual"))
                 trades.append(t)
                 by_id[tid] = t
             if t["status"] == "open":

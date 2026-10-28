@@ -50,7 +50,7 @@ def bets(priced: pd.DataFrame, sack: pd.DataFrame) -> pd.DataFrame:
         "season": s["season"].to_numpy(), "tour": s["tour"].to_numpy(), "tier": s["level_group"].to_numpy(),
         "entry": pd.Series(pick(s["w_entry"], s["l_entry"])).fillna("").astype(str).str.upper().to_numpy(),
         "seed": pd.to_numeric(pd.Series(other(s["w_seed"], s["l_seed"])), errors="coerce").to_numpy(),
-        "odds": odds, "dk_dog": odds > odds_o, "win": u_is_w.astype(int),
+        "odds": odds, "odds_seed": odds_o, "dk_dog": odds > odds_o, "win": u_is_w.astype(int),
         "p_fair": devig_power(pin_u, pin_o)})
     b["qual"] = b["entry"].isin(QUAL)
     b["pnl"] = np.where(b["win"] == 1, b["odds"] - 1, -1.0)
