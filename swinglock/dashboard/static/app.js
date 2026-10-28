@@ -450,7 +450,17 @@ function deltaVsControl(ts, control) {
   return { delta: n > 0 ? d / n : null, pairs };
 }
 
-function cashRow(name, sub, a, dv, cls) {
+// Spread of outcomes: SD of P&L per contract over a rule's final trades, with the range below it.
+function spread(ts) {
+  const xs = ts.filter(isFinal).filter((t) => t.contracts > 0).map((t) => t.pnl / t.contracts);
+  if (xs.length < 2) return null;
+  const m = xs.reduce((a, b) => a + b, 0) / xs.length;
+  const sd = Math.sqrt(xs.reduce((a, x) => a + (x - m) ** 2, 0) / (xs.length - 1));
+  return { sd, min: Math.min(...xs), max: Math.max(...xs), n: xs.length };
+}
+const ctText = (x) => `${x > 0.0005 ? "+" : x < -0.0005 ? "−" : ""}${Math.abs(x * 100).toFixed(1)}¢`;
+
+function cashRow(name, sub, a, dv, sp, cls) {
   return el("tr", { class: cls || "" },
     el("td", { class: "match" }, el("div", { class: "players" }, name), sub ? el("div", { class: "sub" }, sub) : null),
     td("Trades", qty(a.trades)),
@@ -460,6 +470,8 @@ function cashRow(name, sub, a, dv, cls) {
     td("P&L per contract", perCt(a.perContract)),
     td("Δ vs C0 per contract", dv === "control" ? el("span", { class: "na" }, "control")
       : dv ? [perCt(dv.delta), el("div", { class: "subline" }, `${dv.pairs} paired entr${dv.pairs === 1 ? "y" : "ies"}`)] : el("span", { class: "na" }, "—")),
+    td("Spread of outcomes", sp ? [`±${(sp.sd * 100).toFixed(1)}¢`, el("div", { class: "subline" }, `${ctText(sp.min)} to ${ctText(sp.max)}`)]
+      : el("span", { class: "na" }, "—")),
     td("Capital", money(a.capital, false)));
 }
 
@@ -475,15 +487,15 @@ function cashSection(paper) {
     const ts = trades.filter((t) => t.rule === r.id);
     const h = ts.filter((t) => !isStartup(paper, t)), st = ts.filter((t) => isStartup(paper, t));
     const dv = r === control ? "control" : control ? deltaVsControl(h, ctlTrades) : null;
-    rows.push(cashRow(r.id, ruleText(r), agg(h), dv));
+    rows.push(cashRow(r.id, ruleText(r), agg(h), dv, spread(h)));
     if (st.length) {
       const sdv = r === control ? "control" : control
         ? deltaVsControl(st, trades.filter((t) => t.rule === control.id && isStartup(paper, t))) : null;
-      startRows.push(cashRow(r.id, "start-up entries (excluded)", agg(st), sdv, "startup"));
+      startRows.push(cashRow(r.id, "start-up entries (excluded)", agg(st), sdv, spread(st), "startup"));
     }
   }
   if (startRows.length) {
-    rows.push(el("tr", { class: "group" }, el("td", { colspan: 8 },
+    rows.push(el("tr", { class: "group" }, el("td", { colspan: 9 },
       `Start-up entries (entered at the price when the cash-out rules began, ${fmtDateTime(rules[0].since || paper.since)}; excluded)`)));
     rows.push(...startRows);
   }
@@ -495,10 +507,10 @@ function cashSection(paper) {
       el("b", {}, "Expected result (pre-registered): Δ (C1 vs C0) about −1 to −3¢ per contract; C1 and C2 negative. "),
       "A clearly positive Δ over ≥ 30 settled C1 trades would be the surprise. C1 is the owner's DOG50."),
     table("paper-cash", [["Rule"], ["Trades", 1], ["Open / exited / final", 1], ["Exit rate", 1],
-      ["Final P&L", 1], ["P&L / contract", 1], ["Δ vs C0 / contract", 1], ["Capital", 1]], rows),
+      ["Final P&L", 1], ["P&L / contract", 1], ["Δ vs C0 / contract", 1], ["Spread / contract", 1], ["Capital", 1]], rows),
     el("p", { class: "meta-line" },
       "Final P&L counts settled and sold trades. Δ vs C0 pairs each entry with the control's identical entry (same match, side and E1/E2) once both are final;"
-      + " C2's 20–30¢ entries have no C0 twin, so only its under-20¢ entries are paired."
+      + " C2's 20–30¢ entries have no C0 twin, so only its under-20¢ entries are paired. Spread = standard deviation of P&L per contract over final trades (range below)."
       + (truncated ? " The trade list is capped at 200, so these figures may be incomplete." : "")),
   ];
 }

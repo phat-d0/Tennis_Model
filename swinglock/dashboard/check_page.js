@@ -66,6 +66,7 @@ const VIEWPORTS = { phone: { width: 390, height: 844 }, laptop: { width: 1280, h
           cashStartup: box.querySelectorAll("table.paper-cash tr.startup").length,
           cashPerCt: [...box.querySelectorAll("table.paper-cash tbody tr:not(.group):not(.startup) td:nth-child(6)")].map((td) => td.textContent),
           cashDelta: [...box.querySelectorAll("table.paper-cash tbody tr:not(.group):not(.startup) td:nth-child(7)")].map((td) => td.textContent),
+          cashSpread: [...box.querySelectorAll("table.paper-cash tbody tr:not(.group):not(.startup) td:nth-child(8)")].map((td) => td.textContent),
           cashHead: [...box.querySelectorAll("h2")].map((h) => h.textContent).find((t) => t.startsWith("Cash-out")) || "",
           sold: [...box.querySelectorAll("table.paper-trades td")].filter((td) => td.textContent.startsWith("sold @")).length,
           lbCashRows: box.querySelectorAll("table.lookback-cash tbody tr").length,

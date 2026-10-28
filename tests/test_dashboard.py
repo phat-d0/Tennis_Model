@@ -177,6 +177,36 @@ def test_sample_paper_matches_contract(sample):
     assert {t["status"] for t in paper["trades"]} == {"open", "locked", "settled", "exited"}
 
 
+def _ct(x: float) -> str:
+    return f"{'+' if x > 0.0005 else '−' if x < -0.0005 else ''}{abs(x * 100):.1f}¢"
+
+
+def _cash_expected(paper: dict) -> dict:
+    """What the cash-out table should show, computed the same way as the page: headline = non-start-up trades;
+    Δ vs C0 pairs identical entries (match, side, E1/E2) that are final for both; spread = sample SD per contract."""
+    import statistics
+    since = {r["id"]: r.get("since") or paper["since"] for r in paper["rules"]}
+    rules = [r for r in paper["rules"] if r.get("group") == "cashout"]
+    head = {r["id"]: [t for t in paper["trades"] if t["rule"] == r["id"] and t["entry_ts"] != since[r["id"]]] for r in rules}
+    final = {k: [t for t in v if t["status"] in FINAL] for k, v in head.items()}
+    ctl = next(r["id"] for r in rules if r["level"] is None)
+    key = lambda t: (t["match_id"], t["side"], t["entry_type"])  # noqa: E731
+    c0 = {key(t): t for t in final[ctl]}
+    out = {"per_ct": [], "delta": [], "spread": []}
+    for r in rules:
+        fs = final[r["id"]]
+        out["per_ct"].append(_ct(sum(t["pnl"] for t in fs) / sum(t["contracts"] for t in fs)) if fs else "—")
+        if r["id"] == ctl:
+            out["delta"].append("control")
+        else:
+            pairs = [(t, c0[key(t)]) for t in fs if key(t) in c0]
+            d = sum(t["pnl"] - c["pnl"] for t, c in pairs) / sum(t["contracts"] for t, _ in pairs)
+            out["delta"].append(f"{_ct(d)}{len(pairs)} paired entr{'y' if len(pairs) == 1 else 'ies'}")
+        xs = [t["pnl"] / t["contracts"] for t in fs]
+        out["spread"].append(f"±{statistics.stdev(xs) * 100:.1f}¢{_ct(min(xs))} to {_ct(max(xs))}" if len(xs) > 1 else "—")
+    return out
+
+
 def test_sample_paper_trades_priced_with_core_math(sample):
     """Entry cost = ask x contracts + Kalshi taker fee; a locked trade's P&L = lock_quote's locked P&L;
     a sale's cash = bid x contracts - the taker fee on the sale."""
@@ -318,19 +348,22 @@ def test_page_in_browser(serve, tmp_path, fresh):
         assert res["breakEven"] == 1 and res["arbTile"] == "1"     # the $0.09 / 19.34 ct arb doesn't count
         assert res["tierLabels"] == ["ATP", "ATP Challenger", "WTA", "WTA 125"]
         p = res["paper"]
-        assert p["liveHidden"] and p["rules"] == 4 and p["trades"] == 17 and p["locked"] == 1
-        assert res["paperSettled"] == 6 and res["paperExited"] == 4 and p["sold"] == 4
+        assert p["liveHidden"] and p["rules"] == 4 and p["trades"] == 23 and p["locked"] == 1
+        assert res["paperSettled"] == 7 and res["paperExited"] == 7 and p["sold"] == 7
         assert p["lookbackRows"] == 0 and not p["chart"]
         # cash-out portfolio: C0 is the control; C1/C2 vs C0 on the 2 paired final entries; 3 start-up entries apart
         assert p["cashHead"] == "Cash-out portfolio (pre-registered 2026-10-28)"
-        assert p["cashRules"] == 3 and p["cashStartup"] == 3
-        assert p["cashPerCt"] == ["+35.2¢", "+36.4¢", "+36.4¢"]
-        assert p["cashDelta"] == ["control", "+1.3¢2 paired entries", "+1.3¢2 paired entries"]
+        want = _cash_expected(s["paper"])
+        assert p["cashRules"] == 5 and p["cashStartup"] == 5
+        assert p["cashPerCt"] == want["per_ct"] == ["+35.2¢", "+36.4¢", "+36.4¢", "+45.0¢", "+20.4¢"]
+        assert p["cashDelta"] == want["delta"]
+        assert want["delta"][1] == "+1.3¢2 paired entries" and want["delta"][4] == "−14.7¢2 paired entries"
+        assert p["cashSpread"] == want["spread"] and want["spread"][1].startswith("±0.1¢")
         assert any("No lookback yet" in n for n in p["notes"])
         assert p["hypo"] == "Hypothetical, no orders"
         # headline excludes the two start-up entries (entry_ts == paper.since); P4's other trade is still open
         assert p["perContract"] == ["+82.0¢", "+6.6¢", "+8.0¢", "—"] and p["total"] == "+35.9¢"
-        assert p["startup"] == 2 and p["startupBadges"] == 5        # 2 swing + 3 cash-out start-up entries
+        assert p["startup"] == 2 and p["startupBadges"] == 7        # 2 swing + 5 cash-out start-up entries
         assert p["intro"].startswith("Expected result (pre-registered): about −3 to −5¢ per contract.")
         assert res["firstMarket"] == "Jaime Faria vs Nicolas Brunold"   # sorted by combined + fees
         f = res["filters"]
@@ -402,7 +435,7 @@ def test_paper_tab_with_lookback(serve, tmp_path):
         c0 = cash["C0-dog20-hold"]["pnl"] / cash["C0-dog20-hold"]["contracts"]
         want = ["control"] + [f"{'+' if d > 0 else '−'}{abs(d * 100):.1f}¢" for d in
                               (b["pnl"] / b["contracts"] - c0 for r, b in cash.items() if r != "C0-dog20-hold")]
-        assert p["lbCashRows"] == 3 and p["lbCashDelta"] == want
+        assert p["lbCashRows"] == len(cash) == 5 and p["lbCashDelta"] == want
         assert "—" not in p["lbPerCt"] and not any("needs a `contracts` total" in m for m in p["metaLines"])
     want = [f"{'+' if b['pnl'] > 0 else '−'}{abs(b['pnl'] / b['contracts'] * 100):.1f}¢"
             for b in lb["by_rule"] if b["slippage"] == 0.0 and b["group"] == "swing"]
@@ -559,5 +592,7 @@ def test_cash_section_on_scanner_output(serve, tmp_path):
     exited = sum(t["status"] == "exited" for t in paper["trades"])
     for res in _run_check(serve(state, lbf)):
         p = res["paper"]
-        assert p["cashRules"] == 3 and p["sold"] == exited and res["paperExited"] == exited
-        assert p["lbCashRows"] == 3 and p["lbCashDelta"][0] == "control"
+        n_cash = sum(r.get("group") == "cashout" for r in paper["rules"])
+        assert p["cashRules"] == n_cash and p["sold"] == exited and res["paperExited"] == exited
+        assert p["lbCashRows"] == sum(r.get("group") == "cashout" for r in lb["rules"]) == n_cash
+        assert p["lbCashDelta"][0] == "control"
