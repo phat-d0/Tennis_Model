@@ -107,8 +107,8 @@ def duplicates(t: pd.DataFrame, sack: pd.DataFrame, priced: pd.DataFrame, root: 
         q = live[(live["key"] == r.key) & (live["event_id"] == eid)]
         return bool(((q["snapshot_ts"] >= r.commence + pd.Timedelta(minutes=15)) &
                      (q["snapshot_ts"] <= r.commence + pd.Timedelta(hours=4))).any())
-    dup["close_in_play"] = np.nan
-    dup["other_in_play"] = np.nan
+    dup["close_in_play"] = pd.Series([None] * len(dup), index=dup.index, dtype=object)
+    dup["other_in_play"] = pd.Series([None] * len(dup), index=dup.index, dtype=object)
     for i, r in dup[dup["disc_all"] & (dup["season"] >= 2023)].iterrows():
         others = pair.loc[(pair["sack_row"] == r.sack_row) & (pair["event_id"] != r.event_id), "event_id"]
         dup.at[i, "close_in_play"] = quoted_in_play(r, r.event_id)
@@ -127,12 +127,14 @@ def duplicates(t: pd.DataFrame, sack: pd.DataFrame, priced: pd.DataFrame, root: 
                     f"{int((chk['other_in_play'] == True).sum())} | {int(d['stale'].sum())} |"  # noqa: E712
                     if s_ >= 2023 else "not checkable (no later snapshots) | — | — |"))
     stale = set(dup.loc[dup["stale"], "sack_row"])
-    L += ["", "- **\"Latest listed\" depends on how late the snapshots go.** With the close studies' cache alone, a "
-          "placeholder listed for a later start (a day later, often 00:00) outlives the real match, so the test flags "
-          "most duplicated pairings. With the in-play pull's later snapshots (2023 on), the close's event is the latest "
-          "listed in all but a handful.",
-          "- **For that handful, the in-play snapshots decide**: the event quoted in play after the close's listed start "
-          "is the match DK ran.",
+    L += ["", "- **\"Latest listed\" is not evidence of staleness.** A placeholder listed for a later start (a day later, often "
+          "00:00) can outlive the real match in any cache, so the test flags most duplicated pairings, with or without "
+          "the in-play pull's later snapshots.",
+          "- **The in-play snapshots decide** (2023 on): where the close's event and the latest-listed one differ, the "
+          "close's event was quoted in play after its listed start in most cases and the other one almost never (table). "
+          "A close counts as stale only if its event was never quoted in play while another of the pairing's events was.",
+          "- **One bet per pairing:** the priced table has one row per Sackmann match (dk_history.prices pivots on "
+          "sack_row), so a pairing listed twice still gives one bet.",
           ("- **No close came from a stale duplicate** where it can be checked (2023–26); 2020–22 can't be checked, and "
            "the 2023–24 comparison above shows the close-cache-only flag is not evidence of staleness. No re-statement "
            "is needed for this." if not stale else

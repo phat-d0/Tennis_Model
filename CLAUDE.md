@@ -532,13 +532,13 @@ Since phat-d0/Tennis_Model#116 also: `min_arb_profit_per_contract` (the alert th
   duplicate DK listings of the same pairing; it is not postponement (corrected the same day, see the next line and the
   in-play window amendment). No outcomes read; snapshots stay in data/raw/odds_api/inplay/ (gitignored).
 - 2026-10-28: DK close-timing check (phat-d0/Tennis_Model#165, `upsets/dk_close_check.py`, reports/upsets_dk_close_check.md;
-  Lead-approved re-statement, 0 credits, no rule search). Matches whose listed start moved > 1 h after the close: 2023 17
-  (2%), 2024 38 (4%), 2025 75 (4%), 2026 26 (2%), median move 1.5 h; 2020–22 unknown (no later snapshots). Without them:
-  every DK dog −9.6% → −9.1% (Pinnacle −6.4% → −6.0%), seed all −10.3% → −9.9%, Portfolio model −12.7% → −12.3%, line
-  +9.2% → +9.6%, dogs −10.4% → −9.9%; DK vs Pinnacle margin unchanged (5.12% vs 2.70%). No verdict changes. Duplicate DK
-  listings at close time (Lead's check): in 2020–24, 27–51% of pairings were listed twice; the earliest listing is a
-  placeholder DK stops quoting a median 14.4 h before its own start, and the close comes from the re-listing (ordinary
-  pre-match prices: overround 0.049 vs 0.051), so no close comes from after the match. 367 tests (pandas 2 and 3.1).
+  Lead-approved re-statement, 0 credits, no rule search). Matches whose listed start moved > 1 h after the close (on the
+  event the close came from): 2023 7 (1%), 2024 50 (5%), 2025 69 (4%), 2026 25 (2%), median 1.4–1.6 h; 2020–22 unknown.
+  Duplicate DK listings (2020–24: 27–52% of pairings) are placeholders re-listed with a new id; in-play quotes show the
+  close's event is the one played (2023: quoted in play 199 vs 1 for the latest-listed one); 3 stale-duplicate closes.
+  Without moved + stale: every DK dog −9.6% → −8.9% (Pinnacle −6.4% → −5.7%), seed all −10.3% → −9.6%, Portfolio model
+  −12.7% → −12.4%, line +9.2% → +9.0%, dogs −10.4% → −9.7%; DK vs Pinnacle margin unchanged (5.12% vs 2.70%). No verdict
+  changes. One bet per pairing (6,319 rows = 6,319 matches). 367 tests (pandas 2 and 3.1).
 - 2026-10-28 (Backtest): cash-out study code merged (phat-d0/Tennis_Model#125): `swinglock/backtest/cashout.py`, CLI
   `python -m swinglock.backtest.cashout --data <dir> [--sets <dir>/sets.parquet]`. Dated amendment (before any run):
   Level exits (12 gate rules), DOG50 fixed-rule gate on absolute P&L, DOG30 descriptive, set-end split (descriptive),
