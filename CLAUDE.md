@@ -38,7 +38,7 @@ Session IDs are in `docs/team/lead.md`.
 
 | Role | Job | Owns | Branch |
 |---|---|---|---|
-| **Lead / Reviewer** | Coordinates, reviews and merges every PR, keeps the memory docs current, watches the API budget, reports to the owner | `CLAUDE.md`, `docs/WORK_PLAN.md`, `docs/team/*`, shared core (`fees.py`, `locks.py`, `schema.py`, `config.py`, `positions.py`, `config.yaml`, `pyproject.toml`) | `team/lead` |
+| **Lead / Reviewer** | Coordinates, reviews and merges every PR, keeps one master plan (priority order + owner rules), watches the API budget, reports to the owner | Owner rules, Team rules and the Master plan order in `CLAUDE.md` / `docs/WORK_PLAN.md` (each role records its own lines, rule 7), `docs/team/*`, shared core (`fees.py`, `locks.py`, `schema.py`, `config.py`, `positions.py`, `config.yaml`, `pyproject.toml`) | `team/lead` |
 | **Data** | Kalshi, then The Odds API and Polymarket US collectors, normalizers, order-book recorder, historical backfill. **Only role that bulk-pulls history or spends Odds API credits** | `swinglock/collectors/`, `tests/fixtures/`, `docs/research/kalshi_api.md`, `docs/data_*.md`, branch `data-store` | `team/data` |
 | **Backtest** | True-arb scan, swing-lock grid, walk-forward gate, findings report | `swinglock/backtest/`, `reports/`, `docs/edge_*.md` | `team/backtest` |
 | **Scanner** | Live scan loop, alerts, positions → lock quotes, `state.json`, VPS deploy (Docker/systemd) | `swinglock/scanner/`, `deploy/`, `docs/scanner_*.md` | `team/scanner` |
@@ -61,9 +61,21 @@ Each role also owns its own `tests/test_<area>*.py`.
    balance after) in `docs/data_inventory.md`. The key comes from the env var `ODDS_API_KEY`; never commit it.
 5. **Results go in `docs/` or `reports/`** with numbers, bad ones included.
 6. **Update your branch by merging `main` in, never by rebasing.**
-7. **Memory rule:** only the Lead edits `CLAUDE.md` and `docs/WORK_PLAN.md`. Others put
-   proposed changes (new facts, decisions, status) in their PR description; the Lead folds
-   them in, in the same merge round.
+7. **Memory rule (owner 2026-10-28): every role records its own work.**
+   - **In the same PR as the work,** add your own lines to `CLAUDE.md`:
+     - a Changelog entry: date, what changed, PR number, the key numbers and tests passing;
+     - any new *verified* Key fact or Decision. Mark owner decisions "(owner)".
+   - **Update your role's row** in the Master plan at the top of `docs/WORK_PLAN.md`, and your own status
+     lines further down.
+   - **Append or edit your own lines only;** never rewrite another role's.
+   - **Owner rules, team rules and plan order stay with the Lead.** The Owner's standing rules, these Team
+     rules and the Master plan's priority order change only on an owner decision, which the Lead records.
+     If the owner gives you a decision or a new request directly, record it and tell the Lead the same day
+     (`send_message` to the Lead session in `docs/team/lead.md`), so there is one master plan.
+   - **Start of every session:** merge or pull `main`, then read `CLAUDE.md` and the Master plan before
+     working.
+   - **Before a PR:** merge `main` in. On a conflict in these two files, keep both sides' lines.
+     Changelog entries stay in date order.
 
 ### The gate (when a backtest result counts)
 A strategy rule (entry X, lock Y) is "real" only if: fills are at ask/bid with fees, and it stays
@@ -391,6 +403,10 @@ Since phat-d0/Tennis_Model#116 also: `min_arb_profit_per_contract` (the alert th
   `team/scanner` (ae08bf5, public); the file is removed and the branch is to be deleted. Always stage explicit paths.
 - 2026-10-27: Dashboard Paper tab merged (phat-d0/Tennis_Model#118, #119 adds `contracts` to by_rule): per-contract P&L,
   start-up split, lookback panel; served `/lookback.json` (204 until the first nightly run). 281 tests passing.
+- 2026-10-28 (owner): memory rule changed. Every role now records its own Changelog/facts/decisions in CLAUDE.md and its
+  own row of WORK_PLAN's new **Master plan** (Team rule 7); the Lead keeps the plan's priority order and the owner rules.
+  Cash-out study pre-registered (phat-d0/Tennis_Model#123, docs/edge_cashout.md): take-profit Δ vs hold on
+  selection-neutral entries, plus the owner's DOG50 (dog < 20¢, cash out at 50¢); expected FAIL.
 - 2026-10-27: Paper trading live on the server from 17:34 UTC. Owner deleted `team/scanner`; no ref holds ae08bf5 now (an orphaned
   commit can still be fetched by full SHA until GitHub's GC; GitHub Support can purge it).
 - 2026-10-26: **Tennis Odds page live** at https://phat-d0.github.io/Tennis_Model/ (GitHub Pages, `.github/workflows/publish.yml`,
