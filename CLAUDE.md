@@ -499,7 +499,7 @@ Since phat-d0/Tennis_Model#116 also: `min_arb_profit_per_contract` (the alert th
   log says "no scored tournaments in view" when there is nothing to look up. 348 tests (pandas 2 and 3.1).
 - 2026-10-28 (owner: "make sure all these are for the app too, not just the Kalshi bets"): plan for DK in-play versions of
   DOG50, the exit-level curve, MISMATCH50 and the new FAVDIP (favourite 60–80% / ≥ 80% at DK's close, bought at 50% in play
-  vs at the start). Pre-registered in `reports/upsets_dk_inplay.md` (phat-d0/Tennis_Model#PRNUM); a cash-out at DK = hedge to
+  vs at the start). Pre-registered in `reports/upsets_dk_inplay.md` (phat-d0/Tennis_Model#157); a cash-out at DK = hedge to
   equal payout. Credit dry run `python -m upsets.dk_inplay plan`: 2023–May 2026 (4,673 matches) costs 200k–239k credits at
   10 min and 398k–476k at 5 min. Proposed cap 270k (10 min + 5-min refinement before triggers); live poll ≈ 5–7k/month at
   10 min. **Nothing pulled; 0 credits; waits on the Lead.** 3 new tests; 351 tests (pandas 2 and 3.1).
