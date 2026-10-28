@@ -531,7 +531,7 @@ Since phat-d0/Tennis_Model#116 also: `min_arb_profit_per_contract` (the alert th
   detected less often in 2024 (775 of 1,032) and 2023 (385 of 712). The cause is name matching that followed stale
   duplicate DK listings of the same pairing; it is not postponement (corrected the same day, see the next line and the
   in-play window amendment). No outcomes read; snapshots stay in data/raw/odds_api/inplay/ (gitignored).
-- 2026-10-28: DK close-timing check (phat-d0/Tennis_Model#PRNUM, `upsets/dk_close_check.py`, reports/upsets_dk_close_check.md;
+- 2026-10-28: DK close-timing check (phat-d0/Tennis_Model#165, `upsets/dk_close_check.py`, reports/upsets_dk_close_check.md;
   Lead-approved re-statement, 0 credits, no rule search). Matches whose listed start moved > 1 h after the close: 2023 17
   (2%), 2024 38 (4%), 2025 75 (4%), 2026 26 (2%), median move 1.5 h; 2020–22 unknown (no later snapshots). Without them:
   every DK dog −9.6% → −9.1% (Pinnacle −6.4% → −6.0%), seed all −10.3% → −9.9%, Portfolio model −12.7% → −12.3%, line

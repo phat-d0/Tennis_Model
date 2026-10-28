@@ -62,7 +62,7 @@ conflict (git merges edits that touch different blocks).
   docs/data_inventory.md, balance never in a public log. Live in-play tracking stays plan-only until the backtest is in. Later: the line-shopping forward-test
   readout in Jan 2027.
   Pilot done (#160); **full pull done: 205,930 credits** (2023–May 2026, 4,673 matches; #164). Next: the in-play window
-  amendment (no outcomes read before it merges), then the four studies. Close-timing check (#PRNUM): 2–4% of closes
+  amendment (no outcomes read before it merges), then the four studies. Close-timing check (#165): 2–4% of closes
   taken before a start moved > 1 h; no headline verdict changes without them.
   Waiting on: Lead review of the window amendment; a real draw fixture (Wikimedia 429s cloud
   IPs; the publish runner's log will show whether it gets through).
