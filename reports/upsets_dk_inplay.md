@@ -58,6 +58,46 @@ Using DraftKings' own prices, through The Odds API's historical snapshots:
 - **Caveat:** DraftKings may reject or re-price in-play bets, and limits differ by account. A 5- or 10-min snapshot is
   the price shown then, not a guaranteed fill. These are paper results at displayed prices.
 
+## Amendment 2026-10-28 (2): the in-play window (written before any outcome is read)
+**Why.** An audit of the pulled snapshots found two problems. It read only quote ages, price levels and listed start times,
+never a result.
+- **Postponed matches.** In 2024, 281 matches never dropped out of the snapshots. For those, DraftKings later moved the
+  listed start by a median of about 29 hours, so the match was played the next day. Their quotes in our window are
+  pre-match prices, not in-play ones.
+- **Lookahead risk.** Any snapshot taken after a match ended could show settled or near-settled odds. Those odds would give
+  away the winner, so they could fake a "dog reached 50%" trigger or a hedge fill.
+
+**Rule (replaces "in-play snapshot" everywhere above; `upsets.dk_inplay.window`).** A snapshot counts as in play for a
+match only if all of these hold:
+- (a) its timestamp is at least 15 min after the start listed **in that same snapshot**. This is causal: it is what
+  anyone could see at that moment.
+- (b) the match's DK quote in it was updated within the last 15 min. A frozen quote means the market was suspended or the
+  match was finished.
+- (c) neither it nor any earlier in-play snapshot of the match shows a DK price ≤ 1.01 or ≥ 50. That snapshot counts as
+  settled and ends the window: it and every later snapshot are out.
+- (d) it is no later than the listed start + 6 h.
+
+**Matches with no in-play snapshot left are dropped from the in-play rules.** The counts are reported per season,
+together with whether the pull saw the match finish. "Stopped" = the event dropped out of the snapshots, or was never
+found by player names.
+
+**Reported alongside, never as gate inputs:**
+- **Sackmann-minutes cut:** also require timestamp ≤ listed start + Sackmann `minutes` + 30 min. This uses the match's
+  real length, so it is labelled a robustness check.
+- **Final-start cut:** also require timestamp ≥ the match's final listed start + 15 min. This uses later information.
+  It removes pre-match quotes of a match whose postponement wasn't announced yet when the snapshot was taken. Those
+  prices were tradable at the time, so this isn't P&L lookahead, but it blurs "first in-play price". Descriptive only.
+- **Every rule split by stopped (finish seen) vs not.**
+
+**Test:** a synthetic post-finish snapshot (settled price, or a stale quote) and every later snapshot are never in play
+(`tests/test_upsets_dk_inplay.py`).
+
+**Refinement for postponed matches (plan only, needs the Lead's approval):**
+- **Which matches:** those whose final listed start lies past the last snapshot we pulled.
+- **What:** re-walk them from their final listed start, at 10 min, with the same stop rules.
+- **Budget:** inside the ≤ 30,000 refinement allowance and the 270,000 cap.
+- **Counts and credits:** given by `python -m upsets.dk_inplay window` and in the PR.
+
 ## Rules (fixed now)
 1. **DK-DOG50.**
    - Entry: back the pre-match dog with DK close p < 20% (also reported for < 30%), at DK's close.

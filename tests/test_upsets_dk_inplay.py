@@ -175,3 +175,36 @@ def test_api_errors_never_carry_the_key_and_5xx_is_retried(tmp_path, monkeypatch
     gone = di.make_fetch(OddsApi(floor=0, key="K", session=S([502, 503, 502]), spend_log=tmp_path / "s3.log"),
                          tmp_path / "s3.log", cap=1e9, pause_s=0, retry_waits_s=(0, 0))
     assert gone("k", "2024-01-15T12:00:00Z") is None and gone.why == "API error (HTTPError 502)"
+
+
+def qrow(ts, start="2024-01-15 10:00", dk=(1.8, 2.0), age_min=0.5, match=0):
+    t = pd.Timestamp(ts, tz="UTC")
+    return {"match": match, "ts": t, "listed_start": pd.Timestamp(start, tz="UTC"), "draftkings_home": dk[0],
+            "draftkings_away": dk[1], "draftkings_updated": t - pd.Timedelta(minutes=age_min),
+            "pinnacle_home": dk[0], "pinnacle_away": dk[1], "pinnacle_updated": t}
+
+
+def test_window_never_admits_post_finish_or_settled_prices():
+    q = pd.DataFrame([
+        qrow("2024-01-15 10:00"),                            # pre-match (before start + 15 min): out
+        qrow("2024-01-15 10:30"),                            # in play: in
+        qrow("2024-01-15 11:00", dk=(1.3, 3.4)),             # in
+        qrow("2024-01-15 11:10", dk=(1.01, 34.0)),           # settled-looking: out, and ends the window
+        qrow("2024-01-15 11:20", dk=(1.7, 2.1)),             # fresh, ordinary-looking after that: still out
+        qrow("2024-01-15 16:30"),                            # past start + 6 h: out
+    ])
+    w = di.window(q)
+    assert list(w["live"]) == [False, True, True, False, False, False]
+    stale = pd.DataFrame([qrow("2024-01-15 10:30"), qrow("2024-01-15 11:30", dk=(1.5, 2.6), age_min=40)])
+    assert list(di.window(stale)["live"]) == [True, False]          # a frozen quote (suspended/finished): out
+
+
+def test_window_postponed_match_and_the_sensitivity_cuts():
+    # listed at 10:00, moved to the next day in the 11:00 snapshot: 10:30 still passes (a) (old start shown then)
+    q = pd.DataFrame([qrow("2024-01-15 10:30"), qrow("2024-01-15 11:00", start="2024-01-16 12:00"),
+                      qrow("2024-01-16 12:30", start="2024-01-16 12:00"),
+                      qrow("2024-01-16 14:30", start="2024-01-16 12:00")])
+    w = di.window(q, minutes=pd.Series({0: 100.0}))
+    assert list(w["live"]) == [True, False, True, True]
+    assert list(w["live_final"]) == [False, False, True, True]         # later information: drops the 10:30 row
+    assert list(w["live_minutes"]) == [True, False, True, False]       # 12:00 + 100 + 30 min = 14:10
