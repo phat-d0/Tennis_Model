@@ -5,9 +5,10 @@ import pandas as pd
 import pytest
 
 from swinglock.backtest.align import align
-from swinglock.backtest.cashout import (RULES, cash_paths, dog_positions, dog_summary, fee_vec, fixed_rule_gate,
-                                        identity_check, main, match_months, simulate_cashout, summarize,
-                                        tag_set_split, walk_forward_cashout)
+from swinglock.backtest.cashout import (DOG_CURVE_RULES, RULES, cash_paths, dog_positions, dog_summary,
+                                        dogl_walk_forward, fee_vec, fixed_rule_gate, identity_check, main,
+                                        match_months, simulate_cashout, summarize, tag_set_split,
+                                        walk_forward_cashout)
 from swinglock.backtest.walkforward import wf_settings
 from swinglock.fees import FeeModel
 from swinglock.schema import MATCH_COLUMNS, QUOTE_COLUMNS, conform
@@ -164,11 +165,13 @@ def test_cli_end_to_end(tmp_path):
     assert main(["--data", str(data), "--out", str(out)]) == 0
     for f in ("cashout_summary.csv", "cashout_bands.csv", "cashout_exit_phase.csv", "cashout_set_split.csv",
               "cashout_dog50.csv", "cashout_dog30_band.csv", "cashout_dog50_gate.csv", "cashout_wf_gate_E1.csv",
-              "cashout_wf_folds_E2.csv", "cashout_summary.md"):
+              "cashout_wf_folds_E2.csv", "cashout_curve20.csv", "cashout_curve30.csv", "cashout_dogl_gate.csv",
+              "cashout_dogl_folds.csv", "cashout_summary.md"):
         assert (out / f).exists()
     assert not (out / "cashout_positions.csv").exists()                  # aggregates only
     md = (out / "cashout_summary.md").read_text()
     assert "Identity check" in md and "Walk-forward gate, E1" in md and "DOG50" in md and "Set end" in md
+    assert "exit-level curve" in md and "DOGL gate" in md
     assert main(["--data", str(tmp_path / "none"), "--out", str(out)]) == 0
 
 
@@ -245,3 +248,52 @@ def test_exit_bid_age_from_the_other_sides_ask():
     assert s.loc[(s["mode"] == "E1") & (s["rule"] == "T=5c"), "frac_stale_bid"].iloc[0] == 1.0
     fresh = pick(positions(book(PATH), matches("M1")))
     assert fresh["exit_bid_age_s"] == 0.0                                # B's ask moved at t=90
+
+
+# ---- addendum 2: dog exit-level curve and DOGL -----------------------------------
+
+def curve(q, m, slip=0.0, cap=0.20):
+    return dog_positions(simulate_cashout(cash_paths(align(q, m), m, CFG), CFG, slip, rules=DOG_CURVE_RULES),
+                         cap, rule=None)
+
+
+def test_dog_exit_level_curve():
+    c = curve(book(DOG), matches("M1")).set_index("rule")
+    assert list(c.index) == [f"L={v}c" for v in (40, 45, 50, 55, 60, 65, 70, 80, 90)] + ["hold"]
+    # entry 1.07 (0.107 all-in); bids 0.08, 0.28, 0.55: net 0.28 - 0.015 = 0.265, 0.55 - 0.018 = 0.532
+    assert c.loc[["L=40c", "L=45c", "L=50c"], "locked"].all() and not c.loc[["L=55c", "hold"], "locked"].any()
+    assert c.loc["L=50c", "rule_pnl"] == pytest.approx(5.32 - 1.07)
+    assert c.loc["hold", "rule_pnl"] == pytest.approx(-1.07) and c.loc["hold", "pnl"] == 0     # B wins
+    s = dog_summary(c.reset_index(), ("rule",)).set_index("rule")
+    assert s.loc["hold", "trigger_rate"] == 0 and s.loc["hold", "sd_pc"] == 0
+    assert s.loc["hold", "p10_pc"] == pytest.approx(-0.107)
+
+
+def dog_months(n_per_month=12, n_months=5):
+    qs, ms = [], []
+    for k in range(n_months):
+        for i in range(n_per_month):
+            base = pd.Timestamp(f"2026-0{k + 1}-{i + 1:02d} 12:00", tz="UTC")
+            qs.append(book(DOG, f"M{k}-{i}", base))
+            ms.append(matches(f"M{k}-{i}", start=base + pd.Timedelta(seconds=100)))
+    m, q = pd.concat(ms, ignore_index=True), pd.concat(qs, ignore_index=True)
+    paths = cash_paths(align(q, m), m, CFG)
+    by = {s: dog_positions(simulate_cashout(paths, CFG, s, rules=DOG_CURVE_RULES), 0.20, rule=None)
+          for s in (0.0, 0.01)}
+    return by, match_months(paths)
+
+
+def test_dogl_walk_forward_picks_a_level_on_past_months():
+    by, months = dog_months()
+    g = dogl_walk_forward(by, months, wf_settings({}))
+    assert g.passed, g.reasons
+    # L=40c..50c all exit at the 0.55 bid and tie on P&L: the lowest level in the list wins the tie
+    assert list(g.folds["rule"]) == ["L=40c"] * 4
+    assert list(g.gate["positions"]) == [48, 48] and list(g.gate["triggers"]) == [48, 48]
+
+
+def test_dogl_hold_is_always_eligible_and_counts_positions():
+    by, months = dog_months()
+    g = dogl_walk_forward(by, months, {**wf_settings({}), "min_train_trades": 99})
+    assert list(g.folds["rule"]) == ["hold"] * 4 and list(g.gate["triggers"]) == [0, 0]
+    assert not g.passed and any("0 of 4 folds positive" in r for r in g.reasons)   # B always wins

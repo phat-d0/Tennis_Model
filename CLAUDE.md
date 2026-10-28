@@ -450,6 +450,10 @@ Since phat-d0/Tennis_Model#116 also: `min_arb_profit_per_contract` (the alert th
   Level exits (12 gate rules), DOG50 fixed-rule gate on absolute P&L, DOG30 descriptive, set-end split (descriptive),
   stale-bid share; pandas 3.1 Period fix in walk-forward. Output is aggregates only. Not yet run on data (Data runs it
   on groups 0 and 1). 305 tests passing (pandas 3.0.5 and 3.1.0).
+- 2026-10-28 (Backtest): cash-out amendment 2 (owner: "cash out a heavy dog at 50-50 or better"): a dog exit-level
+  curve (L 0.40–0.90 + hold; P&L, ROI, Δ, SD, P10, stale-bid share, for < 20¢ and < 30¢) and the DOGL walk-forward on L
+  (hold always eligible; ≥ 30 OOS positions). Pre-registered expectation: every L loses, holding is cheapest, FAIL. Not run yet.
+  308 tests passing (pandas 3.0.5 and 3.1.0).
 - 2026-10-27: Paper trading live on the server from 17:34 UTC. Owner deleted `team/scanner`; no ref holds ae08bf5 now (an orphaned
   commit can still be fetched by full SHA until GitHub's GC; GitHub Support can purge it).
 - 2026-10-26: **Tennis Odds page live** at https://phat-d0.github.io/Tennis_Model/ (GitHub Pages, `.github/workflows/publish.yml`,
