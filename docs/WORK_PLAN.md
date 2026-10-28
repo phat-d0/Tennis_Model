@@ -27,10 +27,9 @@ conflict (git merges edits that touch different blocks).
 - **Data.** Now: inputs ready for the cash-out run (kalshi_g0 + sets, kalshi_g12). Next: run cashout locally and send
   aggregates to Backtest; the OddsPapi test. Waiting on: Backtest's cashout PR (#125); the owner's OddsPapi key.
 
-- **Backtest.** Now: cash-out study code + CLI + 14 tests (#125): Level exits, DOG50 fixed-rule gate, set-end split,
-  stale-bid share; aggregates-only output. Next: `reports/backtest_cashout.md` from Data's aggregates, against the
-  pre-registered expectation (Δ ≈ −1 to −3¢/contract, DOG50 negative ROI, both FAIL). Waiting on: #125 merge,
-  then Data's runs on groups 0 and 1.
+- **Backtest.** Now: cash-out amendment 2 (dog exit-level curve + DOGL gate) PR; #125 (cash-out code) is merged.
+  Next: `reports/backtest_cashout.md` from Data's aggregates, against the pre-registered expectations (Δ ≈ −1 to −3¢,
+  DOG50 / DOGL negative, FAIL). Waiting on: this PR's merge, then Data's single run on groups 0 and 1.
 
 - **Scanner.** Now: paper trading live on the VPS since 2026-10-27 17:34 UTC. Next: watch 429s and the 04:00 UTC lookback;
   fixes only. Waiting on: the owner's health-check paste.

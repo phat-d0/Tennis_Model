@@ -153,3 +153,40 @@ Asked for by the Lead and the owner after registration. No cash-out number had b
    more than 60 s, read off a carried candle (`frac_stale_bid`). A trigger on an old bid is less
    reliable. bid(A) is built from the same two market quotes as ask(B), so its age is align's `age_b`
    (and bid(B)'s is `age_a`).
+
+### 2026-10-28, second amendment (before any run): dog exit-level curve and DOGL
+The owner wants to cash out a heavy dog "when it's breaking even (50-50) or even winning", and to see the
+risk trade-off of that choice. No cash-out number had been computed.
+
+1. **Exit-level curve.**
+   - **Positions:** dog entries, i.e. E1 + E2 sides with ask < 20¢ (and separately < 30¢).
+   - **Exits:** sell at net bid ≥ L, L ∈ {0.40, 0.45, 0.50, 0.55, 0.60, 0.65, 0.70, 0.80, 0.90}, or
+     **hold** (never sell). As before, a level applies only when it is above the all-in entry.
+   - **Report, per L, at 0¢ and 1¢:**
+     - trigger rate;
+     - absolute P&L per contract and ROI, with match-clustered CIs;
+     - Δ vs hold;
+     - **SD and P10 of P&L per contract** (the risk side of the trade-off);
+     - `frac_stale_bid`.
+
+     The table reads as "the cost and risk of each exit level". Descriptive.
+2. **DOGL gate** (dogs < 20¢): walk-forward over the 10 choices (9 levels + hold).
+   - **Selection:** on earlier months only (positions settled before the test month), by **total absolute
+     P&L at 1¢**. A level is eligible only with ≥ 10 training triggers. **"Hold" has no exit, so it is always
+     eligible.**
+   - **Test:** the choice runs unchanged on the next month.
+   - **PASS rule:** the same as DOG50: ≥ 4 folds; P&L > 0 in ≥ ⌈0.75 × folds⌉ folds at 1¢; total > 0 at 0¢
+     and 1¢; sample ≥ 30. Because a fold may pick "hold", the sample check counts **≥ 30 OOS positions**
+     (OOS triggers are reported alongside).
+   - DOG50 stays a fixed rule, unchanged.
+3. **Expectation.**
+   - By optional stopping, if prices are a martingale every L has the same EV before costs, ≈ the entry
+     price.
+   - A higher L triggers less often (≈ p0 / L), so it pays the exit spread and fee less often. **Holding is
+     cheapest.**
+   - A lower L reduces variance: higher P10, lower SD.
+   - Expected result:
+     - every L loses, mostly from dog overpricing;
+     - Δ vs hold is slightly negative and shrinks toward 0 as L rises;
+     - **DOGL FAIL**.
+   - A clearly positive Δ at L ≈ 0.5–0.6 would mean comebacks are overpriced, i.e. the owner's idea works.
