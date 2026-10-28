@@ -48,6 +48,9 @@ from .swing import settlement
 from .walkforward import WalkForward, cluster_mean_ci, evaluate, slip_label, wf_settings
 
 ENTRY_TYPES = {"E1": "pre", "E2": "live"}
+# addendum 5 (post hoc, descriptive only, never gated): E1 at the first pre row with a formed book. The
+# first pre row is usually the listing-time placeholder book (median ask_a + ask_b $1.84 / $1.88).
+E1R, E1R_MAX_COMBINED = "E1r", 1.05
 ABS_T = (0.03, 0.05, 0.10, 0.15, 0.20, 0.30)
 REL_K = (1.5, 2.0, 3.0)
 LEVEL_L = (0.40, 0.50, 0.60)
@@ -126,7 +129,10 @@ def _band(ask: float) -> str:
 def _positions(p: CashPath, entry: str, contracts: float, slip: float,
                rules: Sequence[tuple[float, float]] = RULES) -> list[dict]:
     """Rows (one per side x rule) for one match and entry type; [] if there is no such entry."""
-    idx = np.flatnonzero(p.phase == ENTRY_TYPES[entry])
+    if entry == E1R:
+        idx = np.flatnonzero((p.phase == "pre") & (p.ask["A"] + p.ask["B"] <= E1R_MAX_COMBINED + 1e-9))
+    else:
+        idx = np.flatnonzero(p.phase == ENTRY_TYPES[entry])
     if not idx.size:
         return []
     i, rows = int(idx[0]), []
@@ -217,6 +223,17 @@ def summarize(positions: pd.DataFrame, by: Sequence[str] = ("mode", "rule"), st:
     rows = [{**dict(zip(by, k if isinstance(k, tuple) else (k,))), **_stats(g, st)}
             for k, g in positions.groupby(by, sort=True)] if len(positions) else []
     return pd.DataFrame(rows, columns=[*by, *SUMMARY_COLUMNS])
+
+
+def formed_book_coverage(paths: Sequence[CashPath], max_combined: float = E1R_MAX_COMBINED) -> dict[str, float]:
+    """How many matches have a pre-match row at all, and how many ever show a formed pre-match book
+    (ask_a + ask_b <= max_combined); plus the median combined ask at the first pre row (the E1 book)."""
+    pre = [p for p in paths if (p.phase == "pre").any()]
+    first = [float(p.ask["A"][i] + p.ask["B"][i]) for p in pre for i in [int(np.flatnonzero(p.phase == "pre")[0])]]
+    formed = sum(bool(((p.phase == "pre") & (p.ask["A"] + p.ask["B"] <= max_combined + 1e-9)).any()) for p in pre)
+    return dict(matches=len(paths), with_pre=len(pre), with_formed_pre=formed,
+                frac_formed=formed / len(pre) if pre else np.nan,
+                median_first_pre_combined=float(np.median(first)) if first else np.nan)
 
 
 def identity_check(aligned: pd.DataFrame, tol: float = 1e-6) -> dict[str, float]:
@@ -626,6 +643,21 @@ def report_md(data_dir, aligned, ident, summary, bands, gates: dict[str, WalkFor
     return "\n".join(lines)
 
 
+def e1r_md(t: dict[str, pd.DataFrame], cov: dict[str, float]) -> list[str]:
+    fmt = lambda df: md_table(df.round(4))                               # noqa: E731
+    lines = ["## E1r robustness check (addendum 5: POST HOC, descriptive only, never gated)",
+             f"E1 buys at the first pre-match row, which is usually the listing-time placeholder book (median "
+             f"ask_a + ask_b there: ${cov['median_first_pre_combined']:.2f}), so E1 results above are an artefact. "
+             f"E1r = the first pre-match row with ask_a + ask_b <= ${E1R_MAX_COMBINED:.2f}. Matches with a pre-match "
+             f"row: {cov['with_pre']}; with a formed pre-match book: {cov['with_formed_pre']} "
+             f"({cov['frac_formed']:.1%}). Gate verdicts above are unchanged.", "",
+             "DOG50 at E1r:", "", fmt(t["e1r_dog50"]), "", "All rules at E1r:", "", fmt(t["e1r_summary"]), ""]
+    for k, title in (("e1r_mm50", "MISMATCH50 at E1r"), ("e1r_u50", "MISMATCH50-U at E1r")):
+        if k in t:
+            lines += [f"{title}:", "", fmt(t[k]), ""]
+    return lines
+
+
 def load_sets(path: Path | None) -> pd.DataFrame | None:
     return pd.read_parquet(path) if path is not None and path.exists() else None
 
@@ -710,10 +742,27 @@ def main(argv: list[str] | None = None) -> int:
     for e, wf in gates.items():
         wf.folds.to_csv(args.out / f"cashout_wf_folds_{e}.csv", index=False)
         wf.gate.to_csv(args.out / f"cashout_wf_gate_{e}.csv", index=False)
+    # addendum 5: E1r robustness check (post hoc, descriptive only, never gated)
+    cov = formed_book_coverage(paths)
+    e1r = {s: simulate_cashout(paths, cfg, s, entries=(E1R,)).assign(slippage=s) for s in SLIPPAGES}
+    e1r_all = pd.concat(e1r.values(), ignore_index=True)
+    e1r_tables = {"e1r_dog50": dog_summary(dog_positions(e1r_all), ("slippage",), st),
+                  "e1r_summary": summarize(e1r_all, ("rule", "slippage"), st)}
+    if ranks is not None:
+        e1r_tables["e1r_mm50"] = mismatch_summary(mismatch_positions(ranked_positions(e1r_all, ranks)),
+                                                  ("slippage",), fm, st)
+        e1r_tables["e1r_u50"] = mismatch_summary(
+            pd.concat([unranked_positions(d, ranks).assign(slippage=s) for s, d in e1r.items()], ignore_index=True),
+            ("slippage",), fm, st)
+    for k, v in e1r_tables.items():
+        v.to_csv(args.out / f"cashout_{k}.csv", index=False)
+    pd.DataFrame([cov]).to_csv(args.out / "cashout_e1r_coverage.csv", index=False)
+
     md = report_md(args.data, aligned, identity_check(aligned), summary, bands, gates, set_split, dog, dog_gate,
                    dogl)
     if ranks is not None:
         md += "\n" + "\n".join([*mismatch_md(mm, mm_gate), *unranked_md(u, u_gate)])
+    md += "\n" + "\n".join(e1r_md(e1r_tables, cov))
     (args.out / "cashout_summary.md").write_text(md)
     print(md)
     return 0

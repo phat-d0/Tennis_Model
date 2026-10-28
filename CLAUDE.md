@@ -507,6 +507,13 @@ Since phat-d0/Tennis_Model#116 also: `min_arb_profit_per_contract` (the alert th
   ≥ 50¢. Reported apart from MISMATCH50, by unranked reason (`reason_a`/`reason_b`: few matches / inactive / unmatched)
   with an entry-price distribution per reason; same fixed-rule gate. Expected FAIL. Not run yet.
   341 tests passing (pandas 3.0.5 and 3.1.0).
+- 2026-10-28 (Backtest): **MISMATCH50 result** (`reports/backtest_cashout.md` §6; Data's run at c018be0, sections
+  sha256-checked): **FAIL** in both groups (0/7 months). The worse-ranked player reaches 50¢ less often than the price
+  implies, in every rank-ratio bucket (ATP/WTA 34.1% vs 38.4% at 1¢). In-play ROI −16.0% (ATP/WTA, 946) / −9.4%
+  (Challenger, 125) at 1¢. **E1 is invalid everywhere**: the first pre-match row is a listing-time placeholder book
+  (median ask_a + ask_b $1.84 / $1.88), now said so in the report. Amendment 5 adds E1r (first pre row with
+  ask_a + ask_b ≤ $1.05), post hoc, descriptive only, never gated, re-run with MISMATCH50-U.
+  346 tests passing (pandas 3.0.5 and 3.1.0).
 - 2026-10-28 (Data): cash-out study run locally on main e41c055 (with #130); 0 Kalshi requests, 308 tests passing.
   g0 (4,695 ATP/WTA) and g12 (8,349 Challenger/WTA 125): every gate FAILs. DOG50 at 1¢: g0 −$226.07 (ROI −18.8%, 2/7 months +),
   g12 −$641.46 (−28.7%, 0/7); DOGL g0 1/6, g12 0/6 folds +; E1/E2 FAIL on both. bid(A) = 1 − ask(B) exactly (max gap 0).

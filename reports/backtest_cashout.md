@@ -21,7 +21,12 @@ was transferred with its sha256 and checked.
   everything. Only for in-play positions near even money does a small target (3–10¢) also lift the worst
   decile (P10 about −0.61 → −0.41 to −0.53).
 
-**Verdict: every gate FAILs** (E1, E2, DOG50, DOGL; both groups), as pre-registered. The losses come
+- **Ranking mismatches** (the owner's "#20 vs #200 goes to 50-50 often"): about a third of the much
+  worse-ranked players do reach 50¢, but their price implies a bit more (ATP/WTA 34.1% vs 38.4% at 1¢). The
+  rule loses (ROI −16.0% in play at 1¢) and FAILs (§6).
+
+**Verdict: every gate FAILs** (E1, E2, DOG50, DOGL, MISMATCH50; both groups), as pre-registered. **E1 is
+invalid**: it buys listing-time placeholder offers (§4); E2 is the valid read. The losses come
 from the entry (dogs are overpriced; buying at the ask pays the spread and fee), not from when you
 cash out.
 
@@ -132,6 +137,9 @@ How to read the tables:
 | Months positive at 1¢ (need 6 of 7) | 2 | 0 |
 | ROI by band, 0¢: < 10¢ / 10–20¢ | −23.2% / −8.8% | −39.4% / −18.2% |
 
+In-play entries only (E2, the valid part; 775 of 817 and 1,503 of 1,597 positions): ROI −11.9% / −19.9%
+(ATP/WTA, 0¢ / 1¢) and −21.2% / −28.5% (Challenger). The remaining E1 dogs are listing-book entries (§4).
+
 Pre-registered: negative ROI, trigger rate ≈ 2·p0 (≈ 20–35%), Δ small. All three held; the trigger rate
 sits at the low end (18–22%), consistent with dogs being overpriced (they reach 50¢ less often than
 their price implies).
@@ -178,9 +186,11 @@ the range, with large variance reductions for small targets. No rule has a posit
 | E1, Challenger | 1 | −$305.38 / −$365.28 | 1,616 / 1,518 |
 | E2, Challenger | 3 | −$63.72 / −$292.00 | 2,082 / 1,756 |
 
-**E1 (first pre-match price) is mostly an artefact:** 87% (ATP/WTA) and 82% (Challenger) of E1 entries
-were bought at ≥ 80¢. The first pre-match observation is usually the market listing, when the book is
-nearly empty and both asks sit near 99¢. Read E1 as a check on that artefact; E2 is the meaningful entry.
+**E1 is invalid (a listing-book artefact).** At a match's first pre-match observation the book is mostly
+empty: the median ask_a + ask_b is **$1.84** (ATP/WTA) and **$1.88** (Challenger), so E1 buys placeholder
+offers on both players. That's why 87% (ATP/WTA) and 82% (Challenger) of E1 entries cost ≥ 80¢. The E1 rows
+measure the empty opening book, not cashing out. **E2 is the valid entry.** A formed-book version (E1r,
+amendment 5) is being re-run as a descriptive check; the registered verdicts above stand.
 
 ## 5. Set end vs mid-set (descriptive, ATP/WTA only, 1¢)
 A live exit counts as "set end" if it falls within ±3 min of a Kalshi set-winner close time. Kalshi has
@@ -195,13 +205,60 @@ no set markets for Challenger/WTA 125, so that group is all "no set data". E2, �
 There's no evidence that cashing out at a set end is better or worse than mid-set; the set-end samples
 are small and their CIs wide.
 
-## 6. Caveats
+## 6. MISMATCH50: buy the much worse-ranked player, sell at 50-50 (amendment 3): FAIL
+The owner's observation: ranking mismatches (e.g. #20 vs #200) "go to 50-50 pretty often". Rule: in matches where the
+worse-ranked player's rank is ≥ 4× the better one's and the better player is ranked ≤ 100, buy the worse-ranked
+player (E1 and E2), sell at net bid ≥ 50¢, otherwise hold. **Rank = a pre-match Elo rank, a proxy built from earlier
+results, not the official ranking.** Data's run (main c018be0); both sections were sha256-checked.
+
+**The direct test: they reach 50¢ less often than their price implies.** Implied = entry ask ÷ the bid needed to net
+50¢ after the fee, which is generous because it uses the ask. Eligible = bought below 50¢ all-in (mostly E2).
+
+| Group | Positions eligible | Reached 50¢, 0¢ / 1¢ | Price-implied, 0¢ / 1¢ |
+|---|---|---|---|
+| ATP/WTA, all | 1,051 | 34.8% / 34.1% | 39.2% / 38.4% |
+| ATP/WTA, E2 (in play) | 936 | 34.2% / 33.3% | 38.0% / 37.3% |
+| Challenger/WTA 125, all | 159 | 34.6% / 34.6% | 38.5% / 37.8% |
+| Challenger/WTA 125, E2 | 123 | 35.0% / 35.0% | 35.6% / 34.9% |
+
+By rank-ratio bucket (every worse-ranked player, any better rank; 0¢), the reach rate falls short of the price in
+**every bucket of both groups**:
+
+| Rank ratio | ATP/WTA reached vs implied | Challenger reached vs implied |
+|---|---|---|
+| < 2× | 64.7% vs 71.2% | 61.1% vs 68.2% |
+| 2–4× | 52.3% vs 58.2% | 43.1% vs 49.1% |
+| 4–8× | 39.6% vs 45.3% | 28.4% vs 35.7% |
+| ≥ 8× | 27.8% vs 30.0% | 18.8% vs 23.4% (n = 48) |
+
+So the owner is right that a third of these players get to 50-50, but the price already expects a bit more than
+that. **There's no under-pricing to exploit.** The one near-tie, Challenger E2 at 1¢ (35.0% vs 34.9%), is 123 positions.
+
+**P&L, read on E2 (in play; the valid entry):**
+
+| | ATP/WTA (946 positions) | Challenger/WTA 125 (125 positions) |
+|---|---|---|
+| ROI, 0¢ (95% CI) | −9.8% (−17.8% to −2.6%) | −4.1% (−25.8% to +18.7%) |
+| ROI, 1¢ (95% CI) | −16.0% (−23.5% to −9.2%) | −9.4% (−30.1% to +12.2%) |
+| Δ vs hold, ¢/contract, 0¢ | −1.2 (−2.9 to +0.7) | −6.0 (−10.9 to −0.9) |
+| Share bought under 20¢ (DOG50 overlap) | 50% | 59% |
+
+**Gate (fixed rule, all entries, as registered): FAIL**, 0 of 7 months positive in both groups. ATP/WTA: −$6,288.37 /
+−$6,522.58 at 0¢ / 1¢ on 1,916 positions. Challenger: −$651.65 / −$679.17 on 251 positions; few Challenger players
+rank inside the Elo top 100. Those totals are dominated by **E1, which is invalid**: ROI −75.6% (ATP/WTA) and −69.0%
+(Challenger) from buying listing-time placeholder offers (§4). The E1r re-run is pending.
+
+Unranked opponents (MISMATCH50-U, amendment 4) will be added once Data's run with the reason columns is in.
+
+## 7. Caveats
 - **Candles, not order books.** These are 1-minute closes with no depth: fills assume the sampled bid or
   ask in full size, and moves inside a minute are missed. Fewer than 0.2% of triggers sold on a bid
   unchanged for > 60 s, so stale-quote exits are not driving the results.
 - **Taker only.** Every fill pays the spread and the taker fee. Resting (maker) orders were not tested.
-- **E1** is dominated by opening-book prices (see §4).
+- **E1 is invalid:** it buys listing-time placeholder offers (median combined ask $1.84 / $1.88); see §4.
+  Read E2. The E1r re-run (formed book, post hoc, descriptive) is pending.
 - **Dog samples are modest:** 817 ATP/WTA dog positions over 7 months. Every CI is shown.
+- **Rank** in §6 is a pre-match Elo rank (a proxy), not the official ATP/WTA ranking.
 - **Fee constants** (0.07) still await the owner's confirmation at kalshi.com/fee-schedule.
 - Kalshi data is for the owner's private research; this report holds aggregates only.
 
@@ -212,3 +269,6 @@ never comes back, is unchanged. The dog bet itself loses 11–29% depending on t
 On ordinary positions, each take-profit costs about 2–5¢ per contract in spread and fee in exchange for
 a much smoother P&L. If smoother P&L is worth that to you, a small target (+3¢ to +10¢) buys the most
 variance reduction per cent paid. It does not add expected profit.
+
+Ranking mismatches don't change this: the much worse-ranked player reaches 50-50 about a third of the time, a
+little less often than the price already implies, so buying them to sell at 50¢ loses too.
