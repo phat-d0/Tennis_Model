@@ -483,6 +483,11 @@ Since phat-d0/Tennis_Model#116 also: `min_arb_profit_per_contract` (the alert th
   −28.7% at 1¢). Selling lowers SD only by capping the upside; P10 (lost stake) is unchanged. In-play take-profits cost
   −2¢ to −5¢ per triggered contract and cut SD a lot. Set end vs mid-set: no difference. E1 entries are mostly
   opening-book asks (82–87% at ≥ 80¢). Identity bid(A) = 1 − ask(B): max gap 0 over 17.3 M rows.
+- 2026-10-28 (Backtest): cash-out amendment 3, MISMATCH50 (owner: "#20 vs #200 goes to 50-50 often"). Buy the worse-ranked
+  player (pre-match Elo rank proxy, ratio ≥ 4×, better ≤ 100) at E1/E2, sell at net bid ≥ 50¢. Reports reach-50 vs the
+  price-implied rate, P&L/ROI/Δ/SD/P10 by tier and rank-ratio bucket, and the DOG50 overlap; same fixed-rule gate.
+  CLI `--ranks` (match_id, rank_a, rank_b). Expected FAIL. Not run yet (waits on Upsets' rank export). 335 tests passing
+  (pandas 3.0.5 and 3.1.0).
 - 2026-10-28 (Data): cash-out study run locally on main e41c055 (with #130); 0 Kalshi requests, 308 tests passing.
   g0 (4,695 ATP/WTA) and g12 (8,349 Challenger/WTA 125): every gate FAILs. DOG50 at 1¢: g0 −$226.07 (ROI −18.8%, 2/7 months +),
   g12 −$641.46 (−28.7%, 0/7); DOGL g0 1/6, g12 0/6 folds +; E1/E2 FAIL on both. bid(A) = 1 − ask(B) exactly (max gap 0).

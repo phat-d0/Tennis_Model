@@ -27,9 +27,9 @@ conflict (git merges edits that touch different blocks).
 - **Data.** Now: cash-out study run done (2026-10-28; g0 + g12, all FAIL); aggregates sent to Backtest. Next: the OddsPapi
   test; Kalshi work otherwise paused. Waiting on: the owner's OddsPapi key.
 
-- **Backtest.** Done: cash-out study (#123, #125, #130) and `reports/backtest_cashout.md`. All gates FAIL; the exit level
-  doesn't matter for dogs (±1¢ vs hold), and the dog entry loses 11–29%. Next: re-run the cash-out and swing studies on
-  recorded order books once the VPS recorder has history (real depth). Waiting on: recorder extracts.
+- **Backtest.** Now: cash-out amendment 3, MISMATCH50 (worse-ranked player, sell at 50¢) + `--ranks` hook. Done: cash-out
+  study (#123, #125, #130, #135), all gates FAIL. Next: the MISMATCH50 read once Data runs it; re-run the cash-out and
+  swing studies on recorded order books. Waiting on: Upsets' rank export, then Data's run.
 
 - **Scanner.** Now: paper trading live on the VPS since 2026-10-27 17:34 UTC; cash-out group C0–C4 (owner 2026-10-28)
   built and pre-registered, PR #132. Next: after merge the owner updates the server; watch 429s, the 04:00 UTC lookback and

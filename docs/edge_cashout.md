@@ -190,3 +190,37 @@ risk trade-off of that choice. No cash-out number had been computed.
      - Δ vs hold is slightly negative and shrinks toward 0 as L rises;
      - **DOGL FAIL**.
    - A clearly positive Δ at L ≈ 0.5–0.6 would mean comebacks are overpriced, i.e. the owner's idea works.
+
+### 2026-10-28, third amendment (before any run): MISMATCH50
+The owner sees ranking mismatches (e.g. ATP #20 vs #200, tour and Challenger level) "go to 50-50 pretty often" and
+wants "buy the underdog, cash out at 50-50" tracked as a portfolio. No MISMATCH50 number had been computed.
+
+1. **Rank** = the **pre-match Elo rank**, a proxy computed only from results before each match and supplied by the
+   Upsets role as a parquet (`match_id, rank_a, rank_b`; CLI `--ranks`). Real ATP/WTA ranks for Apr–Oct 2026 are not
+   in our data. It is labelled a proxy in every output.
+2. **MISMATCH50 entry:** in matches where the worse-ranked player's rank is ≥ 4× the better-ranked player's rank, and
+   the better player is ranked ≤ 100, buy the **worse-ranked** player at E1 and at E2, at any price (the price is
+   recorded).
+   - **Exit:** sell when net bid ≥ 0.50, otherwise hold to settlement.
+   - As with every level rule, the exit applies only when the all-in entry is below 50¢. A worse-ranked player who is
+     already the market favourite simply holds.
+   - Ties and matches without a rank are left out.
+3. **Report**, at 0¢ and 1¢ with match-clustered CIs:
+   - **Reach-50 rate vs the price-implied rate.** Among entries bought below 50¢ all-in, compare the share that hit the
+     exit with the average of p0 / b*. Here p0 is the entry ask and b* is the smallest whole-cent bid that nets 50¢ after
+     the fee, plus slippage. Under a martingale, P(reach b*) = p0 / b*. Using the ask for p0 makes the implied rate
+     generous. This is the direct test of "pretty often".
+   - **Per-contract metrics:** P&L per contract, ROI, Δ vs hold, SD, P10.
+   - **Splits:** by tour level (`tier`), and by rank-ratio bucket (< 2, 2–4, 4–8, ≥ 8) for every worse-ranked player
+     (any ratio, any better rank) as context.
+   - **Overlap with DOG50:** the share of MISMATCH50 entries bought under 20¢.
+4. **Gate:** the DOG50 fixed-rule gate, on absolute P&L, monthly, every month out of sample. It needs ≥ 4 months,
+   ≥ ⌈0.75 × months⌉ positive at 1¢, total > 0 at 0¢ and 1¢, and ≥ 30 triggers.
+5. **Expectation.** The rank is already in the price. Dogs under 20¢ reached a 50¢ net only 21.7% (ATP/WTA) and 18.5%
+   (Challenger) of the time, against a higher price-implied rate. So expect:
+   - reach-50 at or below the price-implied rate;
+   - negative ROI;
+   - **FAIL**.
+
+   A reach rate clearly above the implied rate *and* positive Δ vs hold would mean ranking mismatches are under-priced
+   in-play, i.e. the owner's observation is an edge.

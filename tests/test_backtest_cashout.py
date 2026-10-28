@@ -5,7 +5,8 @@ import pandas as pd
 import pytest
 
 from swinglock.backtest.align import align
-from swinglock.backtest.cashout import (DOG_CURVE_RULES, RULES, cash_paths, dog_positions, dog_summary,
+from swinglock.backtest.cashout import (DOG_CURVE_RULES, RULES, cash_paths, mismatch_positions, mismatch_summary,
+                                        ranked_positions, target_bid, dog_positions, dog_summary,
                                         dogl_walk_forward, fee_vec, fixed_rule_gate, identity_check, main,
                                         match_months, simulate_cashout, summarize, tag_set_split,
                                         walk_forward_cashout)
@@ -297,3 +298,52 @@ def test_dogl_hold_is_always_eligible_and_counts_positions():
     g = dogl_walk_forward(by, months, {**wf_settings({}), "min_train_trades": 99})
     assert list(g.folds["rule"]) == ["hold"] * 4 and list(g.gate["triggers"]) == [0, 0]
     assert not g.passed and any("0 of 4 folds positive" in r for r in g.reasons)   # B always wins
+
+
+# ---- addendum 3: MISMATCH50 ---------------------------------------------------------
+
+def ranks(rows):
+    return pd.DataFrame(rows, columns=["match_id", "rank_a", "rank_b"])
+
+
+def test_ranked_positions_keep_the_worse_ranked_side():
+    pos = simulate_cashout(cash_paths(align(book(DOG), matches("M1")), matches("M1"), CFG), CFG, 0.0)
+    r = ranked_positions(pos, ranks([("M1", 300, 20)]))
+    assert set(r["side"]) == {"A"} and set(r["rule"]) == {"L=50c"} and len(r) == 2      # E1 + E2, A only
+    assert (r["rank_ratio"] == 15).all() and (r["ratio_bucket"] == ">=8").all() and (r["better_rank"] == 20).all()
+    assert set(ranked_positions(pos, ranks([("M1", 20, 50)]))["side"]) == {"B"}
+    assert ranked_positions(pos, ranks([("M1", 40, 40)])).empty                          # tie: no worse side
+    assert ranked_positions(pos, ranks([("OTHER", 300, 20)])).empty
+    assert ranked_positions(pos, None).empty
+    assert list(ranked_positions(pos, ranks([("M1", 60, 20)]))["ratio_bucket"]) == ["2-4", "2-4"]
+    mm = mismatch_positions(ranked_positions(pos, ranks([("M1", 300, 20)])))
+    assert len(mm) == 2
+    assert mismatch_positions(ranked_positions(pos, ranks([("M1", 600, 150)]))).empty    # better ranked > 100
+    assert mismatch_positions(ranked_positions(pos, ranks([("M1", 70, 20)]))).empty      # ratio 3.5 < 4
+
+
+def test_target_bid_and_reach_vs_implied():
+    # 10 lots: 0.51 nets 0.51 - 0.018 = 0.492 < 0.50; 0.52 nets 0.502
+    assert target_bid(FM, 10) == 0.52
+    pos = simulate_cashout(cash_paths(align(book(DOG), matches("M1")), matches("M1"), CFG), CFG, 0.0)
+    mm = mismatch_positions(ranked_positions(pos, ranks([("M1", 300, 20)]))).assign(slippage=0.0)
+    s = mismatch_summary(mm, ("mode",), FM).set_index("mode")
+    # E1: A at 0.10 reaches the 0.55 bid -> reach 1; implied 0.10 / 0.52. E2: A at 0.57 is above 50c: not eligible
+    assert s.loc["E1", "reach_rate"] == 1 and s.loc["E1", "implied_rate"] == pytest.approx(0.10 / 0.52)
+    assert s.loc["E1", "frac_under_20c"] == 1 and s.loc["E1", "roi"] == pytest.approx((5.32 - 1.07) / 1.07)
+    assert s.loc["E2", "reach_eligible"] == 0 and s.loc["E2", "frac_under_20c"] == 0
+
+
+def test_cli_with_ranks(tmp_path):
+    m, q = monthly(n_per_month=2)
+    data, out = tmp_path / "data", tmp_path / "out"
+    data.mkdir()
+    m.to_parquet(data / "matches.parquet")
+    q.to_parquet(data / "quotes.parquet")
+    ranks([(mid, 300, 20) for mid in m["match_id"]]).to_parquet(tmp_path / "ranks.parquet")
+    assert main(["--data", str(data), "--out", str(out), "--ranks", str(tmp_path / "ranks.parquet")]) == 0
+    for f in ("cashout_mm50.csv", "cashout_mm50_tier.csv", "cashout_ratio_bucket.csv", "cashout_mm50_gate.csv"):
+        assert (out / f).exists()
+    assert "MISMATCH50" in (out / "cashout_summary.md").read_text() and "PROXY" in (out / "cashout_summary.md").read_text()
+    assert main(["--data", str(data), "--out", str(tmp_path / "o2")]) == 0
+    assert not (tmp_path / "o2" / "cashout_mm50.csv").exists()
