@@ -34,3 +34,57 @@ def test_windows_fill_missing_minutes_with_the_best_of_median():
                            "commence": pd.to_datetime(["2024-01-15 10:00"] * 4, utc=True)})
     got = di.windows(priced, sack)
     assert list(got["dur"]) == [90.0, 110.0, 100.0, di.MAX_MINUTES]
+
+
+def snap_fn(live_until):
+    """Fake historical fetch: event e1 (A vs B) listed until `live_until`, plus an unrelated event."""
+    calls = []
+
+    def fetch(key, when):
+        calls.append(when)
+        ts = pd.Timestamp(when)
+        data = [{"id": "zz", "commence_time": "2024-01-15T10:00:00Z", "home_team": "C D", "away_team": "E F"}]
+        if ts <= pd.Timestamp(live_until, tz="UTC"):
+            data.append({"id": "e1", "commence_time": "2024-01-15T10:00:00Z", "home_team": "Bee Bob",
+                         "away_team": "Ann Aye"})
+        return {"timestamp": when, "data": data}
+    return fetch, calls
+
+
+def match_w():
+    return pd.DataFrame([{"key": "k", "commence": pd.Timestamp("2024-01-15 10:00", tz="UTC"), "dur": 90,
+                          "season": 2024, "level": "slam",
+                          "pair": frozenset((di.pkey("Ann Aye"), di.pkey("Bob Bee")))}])
+
+
+def test_walk_resolves_the_event_and_stops_after_the_match_is_gone():
+    fetch, calls = snap_fn("2024-01-15 11:20")
+    res = di.walk(match_w(), fetch, step_min=10, slack_min=180)
+    m = res["matches"].iloc[0]
+    assert m["event_id"] == "e1" and m["snaps"] == 9                     # 10:00 .. 11:20
+    assert m["finished_at"] == pd.Timestamp("2024-01-15 11:50", tz="UTC")  # 3 snapshots without it: 11:30, 11:40, 11:50
+    assert len(calls) == 12 and not res["stopped"]                       # not the planned 10:00 .. 14:30 (28)
+
+
+def test_walk_stops_at_the_cap():
+    fetch, calls = snap_fn("2024-01-15 11:20")
+    n = {"left": 3}
+
+    def capped(key, when):
+        if n["left"] == 0:
+            return None
+        n["left"] -= 1
+        return fetch(key, when)
+    res = di.walk(match_w(), capped, step_min=10, slack_min=180)
+    assert res["stopped"] and res["fetched"] == 3
+
+
+def test_event_found_by_names_when_dk_moves_the_start_and_unknown_matches_stop():
+    snap = {"data": [{"id": "e9", "commence_time": "2024-01-15T10:40:00Z", "home_team": "Christopher O'Connell",
+                      "away_team": "Bee Bob"}]}
+    pair = frozenset((di.pkey("Christopher Oconnell"), di.pkey("Bob Bee")))
+    assert di._event_id(snap, pd.Timestamp("2024-01-15 10:00", tz="UTC"), pair) == "e9"
+    w = match_w().assign(pair=[frozenset(("nobody", "else"))])
+    fetch, calls = snap_fn("2024-01-15 11:20")
+    res = di.walk(w, fetch, step_min=10, slack_min=180)
+    assert res["matches"].iloc[0]["event_id"] is None and len(calls) == 5   # 10:00 .. 10:40: 3 in-window misses

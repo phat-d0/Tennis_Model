@@ -504,6 +504,15 @@ Since phat-d0/Tennis_Model#116 also: `min_arb_profit_per_contract` (the alert th
   10 min and 398k–476k at 5 min. Proposed cap 270k (10 min + 5-min refinement before triggers); live poll ≈ 5–7k/month at
   10 min. **Nothing pulled; 0 credits.** Owner approved a 300,000-credit cap (Lead, same day): pilot ≤ 2,000 first, live
   tracking plan-only until the backtest is in. 3 new tests; 351 tests (pandas 2 and 3.1).
+- 2026-10-28: DK in-play **pilot** (phat-d0/Tennis_Model#PRNUM; Lead-approved plan: 2023–May 2026, 10 min + 5-min refinement,
+  cap 270,000 within the owner's 300k). `python -m upsets.dk_inplay pull` walks each key's snapshots in time order and stops
+  a match after 3 snapshots without its event. Pilot: ATP Qatar 2025, 24 matches, 175 snapshots, **1,750 credits** (job log),
+  vs 1,870 planned. DK is quoted on 236 and Pinnacle on 235 in-play rows; DK quote age median 1.1 min, 90% ≤ 5 min. The pilot
+  found 2 bugs, fixed and replayed from cache: DK moves commence_time, so events are now matched by player names (apostrophes
+  ignored); never-found matches stop too. After the fix 23/24 resolve and finish is detected for all 23 (median 140 min after
+  commence); the walk needs 168 snapshots (≈ 90% of plan), so the full pull projects to ≈ 215k + refinement. In-play
+  snapshots are cached apart (`data/raw/odds_api/inplay/`): mixed into the close cache they changed dk_history's closes.
+  No outcomes read. Full pull waits on the Lead. 363 tests (pandas 2 and 3.1).
 - 2026-10-28 (Backtest): cash-out study code merged (phat-d0/Tennis_Model#125): `swinglock/backtest/cashout.py`, CLI
   `python -m swinglock.backtest.cashout --data <dir> [--sets <dir>/sets.parquet]`. Dated amendment (before any run):
   Level exits (12 gate rules), DOG50 fixed-rule gate on absolute P&L, DOG30 descriptive, set-end split (descriptive),
