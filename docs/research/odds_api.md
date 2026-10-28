@@ -71,9 +71,9 @@ Confidence tags: **[confirmed: url]** means I read it in that official page.
 - Featured markets from **2020-06-06**, in **10-min snapshots, then 5-min snapshots from Sept 2022**. Additional markets from 2023-05-03, in 5-min snapshots. **Paid plans only** (`HISTORICAL_UNAVAILABLE_ON_FREE_USAGE_PLAN`). [confirmed: https://the-odds-api.com/historical-odds-data/; G/api-error-codes.html]
 - Earliest snapshot per tennis key (historical page table): Slams from 2020–21 (e.g. `tennis_atp_us_open` 2020-08-28, `tennis_atp_aus_open_singles` 2021-02-06). Most 1000s start in 2024–25 (e.g. `tennis_atp_paris_masters` 2024-10-28). Several 250/500s start only in 2026. [confirmed: https://the-odds-api.com/historical-odds-data/]
 - Historical odds before 2022-09-18 were captured as decimal only. [confirmed: G/#get-historical-odds]
-- **In-play events are in historical snapshots** (Upsets, 2026-10-28, from our own cached responses, 0 credits).
-  The docs host (the-odds-api.com) isn't reachable from cloud sessions, so this rests on our data, not on the docs
-  text. The cache holds 6,166 `/historical/sports/{key}/odds` snapshots, all tennis keys we pulled for the DK studies,
+- **In-play events are in historical snapshots** [verified from API responses, docs page not reachable from cloud
+  sessions] (Upsets, 2026-10-28, 0 credits; re-checked on fresh pulls in the pilot, phat-d0/Tennis_Model#160: DK quoted on
+  236 and Pinnacle on 235 in-play rows, DK quote age median 1.1 min). This is not a docs quote. The cache holds 6,166 `/historical/sports/{key}/odds` snapshots, all tennis keys we pulled for the DK studies,
   with `bookmakers=draftkings,pinnacle`.
   - 28,446 event rows have `commence_time` before the snapshot `timestamp`. DraftKings is quoted on 23,362 of them and
     Pinnacle on 21,299.
