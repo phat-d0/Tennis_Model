@@ -551,6 +551,10 @@ Since phat-d0/Tennis_Model#116 also: `min_arb_profit_per_contract` (the alert th
 - 2026-10-28 (Scanner): paper C rules checked against Kalshi's placeholder listing books (combined ask ≈ $1.84): no rule
   opens on them, but **E1 is effectively consumed by the placeholder listing book; live C entries are E2 apart from the
   start-up batch**. P1–P4 unaffected. No rule change (Lead); dated note in docs/scanner_paper.md.
+- 2026-10-28 (owner): mismatch idea ("#20 vs #200 often goes 50-50") tested as MISMATCH50 / -U (#140–#148, #152): FAIL; the
+  worse-ranked player reached 50¢ less often than its price implied (34% vs 38% ATP/WTA). E1 (first pre-match look) found to be
+  Kalshi's placeholder listing book (combined ask ≈ $1.84); E1r robustness (post hoc) changes nothing. Owner's soccer-style folder
+  layout for the dashboard Paper tab (#149) and the page Portfolio (#150). Live MISMATCH50 not built (Lead, after the FAIL).
 - 2026-10-27: Paper trading live on the server from 17:34 UTC. Owner deleted `team/scanner`; no ref holds ae08bf5 now (an orphaned
   commit can still be fetched by full SHA until GitHub's GC; GitHub Support can purge it).
 - 2026-10-26: **Tennis Odds page live** at https://phat-d0.github.io/Tennis_Model/ (GitHub Pages, `.github/workflows/publish.yml`,
