@@ -430,7 +430,7 @@ Since phat-d0/Tennis_Model#116 also: `min_arb_profit_per_contract` (the alert th
   own row of WORK_PLAN's new **Master plan** (Team rule 7); the Lead keeps the plan's priority order and the owner rules.
   Cash-out study pre-registered (phat-d0/Tennis_Model#123, docs/edge_cashout.md): take-profit Δ vs hold on
   selection-neutral entries, plus the owner's DOG50 (dog < 20¢, cash out at 50¢); expected FAIL.
-- 2026-10-28: Portfolio ledger restore (phat-d0/Tennis_Model#—, `upsets/site.py` `restore`, Lead-approved). The paper ledger
+- 2026-10-28: Portfolio ledger restore (phat-d0/Tennis_Model#129, `upsets/site.py` `restore`, Lead-approved). The paper ledger
   and the month's page spend lived only in the Actions cache. Each build now merges the live page's `portfolio.json` (by
   trade id; the cache's copy wins) and takes this month's `used_this_month` from its `odds.json`, keeping the larger value.
   A cold cache plus an unreadable page stops the build, so nothing deploys; a 404 starts an empty ledger with a loud log

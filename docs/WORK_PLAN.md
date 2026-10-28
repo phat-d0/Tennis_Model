@@ -37,7 +37,7 @@ conflict (git merges edits that touch different blocks).
   Next: check the lookback panel after the first 04:00 UTC run. Waiting on: an owner screenshot of the lookback.
 
 - **Upsets.** Now: page builder + Portfolio upkeep (Polymarket Challengers #111, power de-vig #112 live). The Portfolio ledger
-  and month's spend are restored from the live page when the cache is evicted (PR #—). Next: the line-shopping
+  and month's spend are restored from the live page when the cache is evicted (#129). Next: the line-shopping
   forward-test readout in Jan 2027. New research ideas need the owner. Waiting on: —
 
 
