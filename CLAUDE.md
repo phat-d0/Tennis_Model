@@ -453,11 +453,20 @@ Since phat-d0/Tennis_Model#116 also: `min_arb_profit_per_contract` (the alert th
   trade id; the cache's copy wins) and takes this month's `used_this_month` from its `odds.json`, keeping the larger value.
   A cold cache plus an unreadable page stops the build, so nothing deploys; a 404 starts an empty ledger with a loud log
   line. Nothing is committed. 290 tests (pandas 2 and 3.1).
+- 2026-10-28 (owner): "add seed losing early as a portfolio". Pre-registered in `reports/upsets_seed_portfolio.md`
+  (phat-d0/Tennis_Model#131): in R1/R2, back the unseeded player vs a seed at DK, with sub-rules all / qualifier-LL / other.
+  Gate: ≥ 30 bets, P&L > 0, ≥ 3 of the last 4 seasons positive. Expected negative. The Explorer's seeded-favourite slice
+  (2,894 bets, ≈ −11%) was already seen, and the doc says so. Live seeds will come from Wikipedia (MediaWiki API, CC BY-SA;
+  Lead's choice) and R1/R2 from a labelled proxy. No code yet; 0 credits.
 - 2026-10-28 (Backtest): cash-out study code merged (phat-d0/Tennis_Model#125): `swinglock/backtest/cashout.py`, CLI
   `python -m swinglock.backtest.cashout --data <dir> [--sets <dir>/sets.parquet]`. Dated amendment (before any run):
   Level exits (12 gate rules), DOG50 fixed-rule gate on absolute P&L, DOG30 descriptive, set-end split (descriptive),
   stale-bid share; pandas 3.1 Period fix in walk-forward. Output is aggregates only. Not yet run on data (Data runs it
   on groups 0 and 1). 305 tests passing (pandas 3.0.5 and 3.1.0).
+- 2026-10-28 (Backtest): cash-out amendment 2 (owner: "cash out a heavy dog at 50-50 or better"): a dog exit-level
+  curve (L 0.40–0.90 + hold; P&L, ROI, Δ, SD, P10, stale-bid share, for < 20¢ and < 30¢) and the DOGL walk-forward on L
+  (hold always eligible; ≥ 30 OOS positions). Pre-registered expectation: every L loses, holding is cheapest, FAIL. Not run yet.
+  308 tests passing (pandas 3.0.5 and 3.1.0).
 - 2026-10-27: Paper trading live on the server from 17:34 UTC. Owner deleted `team/scanner`; no ref holds ae08bf5 now (an orphaned
   commit can still be fetched by full SHA until GitHub's GC; GitHub Support can purge it).
 - 2026-10-26: **Tennis Odds page live** at https://phat-d0.github.io/Tennis_Model/ (GitHub Pages, `.github/workflows/publish.yml`,

@@ -27,10 +27,9 @@ conflict (git merges edits that touch different blocks).
 - **Data.** Now: inputs ready for the cash-out run (kalshi_g0 + sets, kalshi_g12). Next: run cashout locally and send
   aggregates to Backtest; the OddsPapi test. Waiting on: Backtest's cashout PR (#125); the owner's OddsPapi key.
 
-- **Backtest.** Now: cash-out study code + CLI + 14 tests (#125): Level exits, DOG50 fixed-rule gate, set-end split,
-  stale-bid share; aggregates-only output. Next: `reports/backtest_cashout.md` from Data's aggregates, against the
-  pre-registered expectation (Δ ≈ −1 to −3¢/contract, DOG50 negative ROI, both FAIL). Waiting on: #125 merge,
-  then Data's runs on groups 0 and 1.
+- **Backtest.** Now: cash-out amendment 2 (dog exit-level curve + DOGL gate) PR; #125 (cash-out code) is merged.
+  Next: `reports/backtest_cashout.md` from Data's aggregates, against the pre-registered expectations (Δ ≈ −1 to −3¢,
+  DOG50 / DOGL negative, FAIL). Waiting on: this PR's merge, then Data's single run on groups 0 and 1.
 
 - **Scanner.** Now: paper trading live on the VPS since 2026-10-27 17:34 UTC; cash-out group C0–C4 (owner 2026-10-28)
   built and pre-registered, PR #132. Next: after merge the owner updates the server; watch 429s, the 04:00 UTC lookback and
@@ -40,8 +39,10 @@ conflict (git merges edits that touch different blocks).
   Next: check the lookback panel after the first 04:00 UTC run. Waiting on: an owner screenshot of the lookback.
 
 - **Upsets.** Now: page builder + Portfolio upkeep (Polymarket Challengers #111, power de-vig #112 live). The Portfolio ledger
-  and month's spend are restored from the live page when the cache is evicted (#129). Next: the line-shopping
-  forward-test readout in Jan 2027. New research ideas need the owner. Waiting on: —
+  and month's spend are restored from the live page when the cache is evicted (#129). Now (owner 2026-10-28): "seed loses
+  early" — pre-registered (`reports/upsets_seed_portfolio.md`), next the backtest + report, then the live Portfolio
+  strategy (Wikipedia seeds, parser tested on a fixture). Later: the line-shopping forward-test readout in Jan 2027.
+  Waiting on: owner to allow en.wikipedia.org in this environment (for live parser tests only).
 
 
 ## Done

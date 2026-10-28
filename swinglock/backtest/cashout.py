@@ -51,7 +51,7 @@ ENTRY_TYPES = {"E1": "pre", "E2": "live"}
 ABS_T = (0.03, 0.05, 0.10, 0.15, 0.20, 0.30)
 REL_K = (1.5, 2.0, 3.0)
 LEVEL_L = (0.40, 0.50, 0.60)
-ABSOLUTE, RELATIVE, LEVEL = 0.0, 1.0, 2.0   # rule kind, stored in the walk-forward's "x" column
+ABSOLUTE, RELATIVE, LEVEL, HOLD = 0.0, 1.0, 2.0, 3.0   # rule kind, stored in the walk-forward's "x" column
 RULES: tuple[tuple[float, float], ...] = (*((ABSOLUTE, t) for t in ABS_T), *((RELATIVE, k) for k in REL_K),
                                           *((LEVEL, v) for v in LEVEL_L))
 BAND_EDGES = (0.0, 0.20, 0.40, 0.60, 0.80, 1.0 + 1e-9)
@@ -65,6 +65,8 @@ POSITION_COLUMNS = ["match_id", "tier", "mode", "x", "y", "rule", "side", "band"
 
 
 def rule_label(kind: float, value: float) -> str:
+    if kind == HOLD:
+        return "hold"
     if kind == LEVEL:
         return f"L={value * 100:g}c"
     return f"T={value * 100:g}c" if kind == ABSOLUTE else f"k={value:g}"
@@ -121,7 +123,8 @@ def _band(ask: float) -> str:
     return BAND_LABELS[int(np.searchsorted(BAND_EDGES, ask, side="right")) - 1]
 
 
-def _positions(p: CashPath, entry: str, contracts: float, slip: float) -> list[dict]:
+def _positions(p: CashPath, entry: str, contracts: float, slip: float,
+               rules: Sequence[tuple[float, float]] = RULES) -> list[dict]:
     """Rows (one per side x rule) for one match and entry type; [] if there is no such entry."""
     idx = np.flatnonzero(p.phase == ENTRY_TYPES[entry])
     if not idx.size:
@@ -145,9 +148,10 @@ def _positions(p: CashPath, entry: str, contracts: float, slip: float) -> list[d
         base = dict(match_id=p.match_id, tier=p.tier, mode=entry, side=side, band=_band(ask),
                     entry_ts=p.ts[i], entry_phase=str(p.phase[i]), entry_ask=ask, contracts=n,
                     entry_cost=entry_cost, settle_ts=p.settle_ts, settle_side=p.pay[side], hold_pnl=hold)
-        for kind, v in RULES:
+        for kind, v in rules:
             target = (all_in + v if kind == ABSOLUTE else all_in * v if kind == RELATIVE
-                      else v if all_in < v else np.inf)                 # level: take-profit only
+                      else v if kind == LEVEL and all_in < v            # level: take-profit only
+                      else np.inf)                                      # hold: never sell
             hit = np.flatnonzero(net >= target - 1e-12)
             r = dict(base, x=kind, y=v, rule=rule_label(kind, v), locked=bool(hit.size), exit_ts=pd.NaT,
                      exit_phase=None, exit_bid=np.nan, exit_bid_age_s=np.nan, exit_value=np.nan, minutes_to_exit=np.nan, rule_pnl=hold)
@@ -164,10 +168,11 @@ def _positions(p: CashPath, entry: str, contracts: float, slip: float) -> list[d
 
 
 def simulate_cashout(paths: Sequence[CashPath], cfg: dict[str, Any], slippage: float,
-                     entries: Sequence[str] = tuple(ENTRY_TYPES)) -> pd.DataFrame:
+                     entries: Sequence[str] = tuple(ENTRY_TYPES),
+                     rules: Sequence[tuple[float, float]] = RULES) -> pd.DataFrame:
     """Every (match, entry type, side, rule) position at this slippage; `pnl` is delta vs hold."""
     contracts = float(cfg["backtest"]["contracts_per_entry"])
-    rows = [r for p in paths for e in entries for r in _positions(p, e, contracts, slippage)]
+    rows = [r for p in paths for e in entries for r in _positions(p, e, contracts, slippage, rules)]
     df = pd.DataFrame(rows, columns=POSITION_COLUMNS)
     for c in ("entry_ts", "exit_ts", "settle_ts"):
         df[c] = pd.to_datetime(df[c], utc=True)
@@ -265,12 +270,19 @@ DOG_RULE = "L=50c"
 DOG_EDGES = (0.0, 0.10, 0.20, 0.30)
 DOG_LABELS = ("<10c", "10-20c", "20-30c")
 DOG_COLUMNS = ["entries", "triggers", "trigger_rate", "pnl_pc", "pnl_ci_lo", "pnl_ci_hi", "roi", "roi_ci_lo",
-               "roi_ci_hi", "delta_pc", "delta_ci_lo", "delta_ci_hi", "frac_stale_bid"]
+               "roi_ci_hi", "delta_pc", "delta_ci_lo", "delta_ci_hi", "sd_pc", "p10_pc", "frac_stale_bid"]
+# exit-level curve for dogs (addendum 2, 2026-10-28): sell at net bid >= L, or never ("hold")
+DOG_LEVELS = (0.40, 0.45, 0.50, 0.55, 0.60, 0.65, 0.70, 0.80, 0.90)
+DOG_CURVE_RULES: tuple[tuple[float, float], ...] = (*((LEVEL, v) for v in DOG_LEVELS), (HOLD, 1.0))
 
 
-def dog_positions(positions: pd.DataFrame, max_ask: float = 0.20) -> pd.DataFrame:
-    """DOG positions: E1/E2 sides bought below max_ask with the sell-at-50c exit (else hold)."""
-    d = positions[(positions["rule"] == DOG_RULE) & (positions["entry_ask"] < max_ask)]
+def dog_positions(positions: pd.DataFrame, max_ask: float = 0.20, rule: str | None = DOG_RULE) -> pd.DataFrame:
+    """DOG positions: E1/E2 sides bought below max_ask; `rule` keeps one exit rule (default the
+    sell-at-50c DOG50 exit), None keeps every rule present (e.g. the exit-level curve)."""
+    keep = positions["entry_ask"] < max_ask
+    if rule is not None:
+        keep &= positions["rule"] == rule
+    d = positions[keep]
     band = np.searchsorted(DOG_EDGES, d["entry_ask"].to_numpy(float), side="right") - 1
     return d.assign(dog_band=[DOG_LABELS[i] for i in band])
 
@@ -299,6 +311,7 @@ def _dog_stats(g: pd.DataFrame, st: dict[str, Any]) -> dict[str, float]:
                                      st["ci_level"], st["n_boot"], st["seed"])
     trig = g["locked"].astype(bool)
     return dict(entries=len(g), triggers=int(trig.sum()), trigger_rate=float(trig.mean()), pnl_pc=pm,
+                sd_pc=float(pnl.std()), p10_pc=float(np.quantile(pnl, 0.1)),
                 pnl_ci_lo=plo, pnl_ci_hi=phi, roi=roi, roi_ci_lo=rlo, roi_ci_hi=rhi, delta_pc=dm,
                 delta_ci_lo=dlo, delta_ci_hi=dhi,
                 frac_stale_bid=_stale_share(g.loc[trig, "exit_bid_age_s"]))
@@ -354,6 +367,67 @@ def fixed_rule_gate(by_slip: dict[float, pd.DataFrame], months: pd.Series, st: d
     return FixedGate(folds, gate, not reasons, reasons)
 
 
+def dogl_walk_forward(by_slip: dict[float, pd.DataFrame], months: pd.Series, st: dict[str, Any]) -> FixedGate:
+    """DOGL gate (addendum 2): per test month, choose the exit level (or "hold") with the best total
+    absolute P&L (`rule_pnl`) at the select slippage on earlier months, using only positions settled
+    before the test month. A level needs >= min_train_trades training triggers; "hold" has no exit
+    and is always eligible. The choice runs unchanged on the test month. PASS: >= min_folds folds,
+    positive in >= ceil(pass_frac x folds) at the worst slippage, total > 0 at every slippage,
+    >= min_oos_trades OOS positions (triggers are reported; "hold" has none)."""
+    months = months.astype("period[M]")
+    tagged = {s: d.assign(period=d["match_id"].map(months)) for s, d in by_slip.items()}
+    sel = tagged[float(st["select_slippage"])]
+    periods = sorted({p for d in tagged.values() for p in d["period"].dropna()})
+    order = {r: i for i, r in enumerate(rule_label(k, v) for k, v in DOG_CURVE_RULES)}
+    fold_rows, oos = [], {s: [] for s in tagged}
+    for k, test in enumerate(periods):
+        train_p = periods[:k][-int(st["train_months"]):] if st["train_months"] else periods[:k]
+        if len(train_p) < st["min_train_months"]:
+            continue
+        start = test.start_time.tz_localize("UTC")
+        tr = sel[sel["period"].isin(train_p) & (sel["settle_ts"] < start)]
+        agg = tr.groupby("rule").agg(total=("rule_pnl", "sum"), triggers=("locked", "sum")).reset_index()
+        agg = agg[(agg["rule"] == "hold") | (agg["triggers"] >= st["min_train_trades"])]
+        row = dict(fold=len(fold_rows) + 1, test_month=str(test), rule=None, train_pnl=np.nan, train_triggers=0)
+        if len(agg):
+            agg = agg.assign(o=agg["rule"].map(order)).sort_values(["total", "o"], ascending=[False, True])
+            best = agg.iloc[0]
+            row.update(rule=best["rule"], train_pnl=float(best["total"]), train_triggers=int(best["triggers"]))
+        for s, d in sorted(tagged.items()):
+            te = d[(d["period"] == test) & (d["rule"] == row["rule"])] if row["rule"] else d.iloc[:0]
+            row[f"pnl_{slip_label(s)}"] = float(te["rule_pnl"].sum())
+            row[f"positions_{slip_label(s)}"] = len(te)
+            row[f"triggers_{slip_label(s)}"] = int(te["locked"].sum())
+            oos[s].append(te)
+        fold_rows.append(row)
+    folds = pd.DataFrame(fold_rows)
+    n = len(folds)
+    need = math.ceil(st["pass_frac"] * n) if n else 0
+    rows = []
+    for s in sorted(tagged):
+        t = pd.concat(oos[s]) if oos[s] else tagged[s].iloc[:0]
+        pm, plo, phi = cluster_mean_ci((t["rule_pnl"] / t["contracts"]).to_numpy(float), t["match_id"].to_numpy(),
+                                       st["ci_level"], st["n_boot"], st["seed"])
+        positive = int((folds[f"pnl_{slip_label(s)}"] > 0).sum()) if n else 0
+        rows.append(dict(slippage=s, folds=n, folds_positive=positive, folds_needed=need, positions=len(t), triggers=int(t["locked"].sum()),
+                         pnl=float(t["rule_pnl"].sum()), pnl_pc=pm, pnl_ci_lo=plo, pnl_ci_hi=phi,
+                         roi=float(t["rule_pnl"].sum() / t["entry_cost"].sum()) if len(t) else np.nan))
+    gate = pd.DataFrame(rows)
+    reasons = []
+    if n < st["min_folds"]:
+        reasons.append(f"only {n} fold(s); need >= {st['min_folds']}")
+    worst = gate.loc[gate["slippage"].idxmax()]
+    if worst["folds_positive"] < need or n == 0:
+        reasons.append(f"{int(worst['folds_positive'])} of {n} folds positive at {slip_label(worst['slippage'])}; "
+                       f"need {need}")
+    for r in gate.itertuples():
+        if not r.pnl > 0:
+            reasons.append(f"P&L ${r.pnl:.2f} not positive at {slip_label(r.slippage)}")
+    if gate["positions"].min() < st["min_oos_trades"]:
+        reasons.append(f"{int(gate['positions'].min())} OOS positions; need >= {st['min_oos_trades']}")
+    return FixedGate(folds, gate, not reasons, reasons)
+
+
 # ---- walk-forward gate ---------------------------------------------------------
 
 def match_months(paths: Sequence[CashPath]) -> pd.Series:
@@ -373,7 +447,7 @@ def walk_forward_cashout(by_slip: dict[float, pd.DataFrame], months: pd.Series, 
 # ---- CLI -----------------------------------------------------------------------
 
 def report_md(data_dir, aligned, ident, summary, bands, gates: dict[str, WalkForward], set_split,
-              dog: dict[str, pd.DataFrame], dog_gate: FixedGate) -> str:
+              dog: dict[str, pd.DataFrame], dog_gate: FixedGate, dogl: FixedGate) -> str:
     fmt = lambda df: md_table(df.round(4))                               # noqa: E731
     lines = ["# Cash-out study: run summary", "",
              f"Data `{data_dir}`; {aligned['match_id'].nunique()} matches, {len(aligned)} aligned observations. "
@@ -400,6 +474,14 @@ def report_md(data_dir, aligned, ident, summary, bands, gates: dict[str, WalkFor
               fmt(dog_gate.folds), "", "Overall, by entry type and by band:", "",
               fmt(dog["dog50"]), "", fmt(dog["dog50_mode"]), "", fmt(dog["dog50_band"]), "",
               "## DOG30 (dogs < 30c; descriptive only)", "", fmt(dog["dog30_band"]), ""]
+    verdict = "PASS" if dogl.passed else "FAIL: " + "; ".join(dogl.reasons)
+    lines += ["## Dog exit-level curve: cost and risk of each exit level (addendum 2)",
+              "Dogs bought < 20c / < 30c (E1 + E2 sides); sell at net bid >= L, else hold. pnl_pc and ROI are "
+              "absolute; delta_pc = vs hold; sd_pc / p10_pc = spread and worst decile of P&L per contract.", "",
+              "Dogs < 20c:", "", fmt(dog["curve20"]), "", "Dogs < 30c:", "", fmt(dog["curve30"]), "",
+              "## DOGL gate: exit level chosen on earlier months (dogs < 20c)", "",
+              f"- Verdict: **{verdict}**", "", fmt(dogl.gate.assign(slippage=dogl.gate["slippage"].map(slip_label))),
+              "", fmt(dogl.folds), ""]
     return "\n".join(lines)
 
 
@@ -445,17 +527,24 @@ def main(argv: list[str] | None = None) -> int:
            "dog50_band": dog_summary(dog_all, ("slippage", "dog_band"), st),
            "dog30_band": dog_summary(dog30, ("slippage", "dog_band"), st)}
     dog_gate = fixed_rule_gate(dog_by, months, st)
+    curve = {s: simulate_cashout(paths, cfg, s, rules=DOG_CURVE_RULES).assign(slippage=s) for s in SLIPPAGES}
+    curve20 = {s: dog_positions(d, 0.20, rule=None) for s, d in curve.items()}
+    for cap, src in (("20", curve20), ("30", {s: dog_positions(d, 0.30, rule=None) for s, d in curve.items()})):
+        dog[f"curve{cap}"] = dog_summary(pd.concat(src.values(), ignore_index=True), ("slippage", "rule"), st)
+    dogl = dogl_walk_forward(curve20, months, st)
 
     args.out.mkdir(parents=True, exist_ok=True)
     for name, df in [("cashout_summary", summary), ("cashout_bands", bands), ("cashout_exit_phase", phases),
                      ("cashout_set_split", set_split),
                      *((f"cashout_{k}", v) for k, v in dog.items()), ("cashout_dog50_gate", dog_gate.gate),
-                     ("cashout_dog50_months", dog_gate.folds)]:
+                     ("cashout_dog50_months", dog_gate.folds), ("cashout_dogl_gate", dogl.gate),
+                     ("cashout_dogl_folds", dogl.folds)]:
         df.to_csv(args.out / f"{name}.csv", index=False)
     for e, wf in gates.items():
         wf.folds.to_csv(args.out / f"cashout_wf_folds_{e}.csv", index=False)
         wf.gate.to_csv(args.out / f"cashout_wf_gate_{e}.csv", index=False)
-    md = report_md(args.data, aligned, identity_check(aligned), summary, bands, gates, set_split, dog, dog_gate)
+    md = report_md(args.data, aligned, identity_check(aligned), summary, bands, gates, set_split, dog, dog_gate,
+                   dogl)
     (args.out / "cashout_summary.md").write_text(md)
     print(md)
     return 0
