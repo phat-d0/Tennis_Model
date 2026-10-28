@@ -502,7 +502,8 @@ Since phat-d0/Tennis_Model#116 also: `min_arb_profit_per_contract` (the alert th
   vs at the start). Pre-registered in `reports/upsets_dk_inplay.md` (phat-d0/Tennis_Model#157); a cash-out at DK = hedge to
   equal payout. Credit dry run `python -m upsets.dk_inplay plan`: 2023–May 2026 (4,673 matches) costs 200k–239k credits at
   10 min and 398k–476k at 5 min. Proposed cap 270k (10 min + 5-min refinement before triggers); live poll ≈ 5–7k/month at
-  10 min. **Nothing pulled; 0 credits; waits on the Lead.** 3 new tests; 351 tests (pandas 2 and 3.1).
+  10 min. **Nothing pulled; 0 credits.** Owner approved a 300,000-credit cap (Lead, same day): pilot ≤ 2,000 first, live
+  tracking plan-only until the backtest is in. 3 new tests; 351 tests (pandas 2 and 3.1).
 - 2026-10-28 (Backtest): cash-out study code merged (phat-d0/Tennis_Model#125): `swinglock/backtest/cashout.py`, CLI
   `python -m swinglock.backtest.cashout --data <dir> [--sets <dir>/sets.parquet]`. Dated amendment (before any run):
   Level exits (12 gate rules), DOG50 fixed-rule gate on absolute P&L, DOG30 descriptive, set-end split (descriptive),

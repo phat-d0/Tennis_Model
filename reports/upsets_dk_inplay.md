@@ -109,7 +109,8 @@ Using DraftKings' own prices, through The Odds API's historical snapshots:
 
 By tier, 2023–May 2026, 10 min, +3 h slack: 1000s 1,843 matches / 105,930; Slams 2,592 / 106,390; 250/500s 238 / 27,010.
 
-**Proposed pull (for the Lead's approval):**
+**Approved cap: 300,000 credits** (owner, via the Lead, 2026-10-28). Staged: a pilot on one tournament (≤ 2,000
+credits), checked and reported to the Lead before the full pull. **Proposed full pull:**
 - 2023–May 2026, 10-min snapshots, ≤ 239,330 credits.
 - Plus a 5-min refinement: one extra snapshot just before each first trigger, ≤ 30,000 credits.
 - **Total cap 270,000.**
