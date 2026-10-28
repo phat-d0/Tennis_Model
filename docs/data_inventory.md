@@ -140,6 +140,6 @@ phat-d0/Tennis_Model#157). Staged: pilot ≤ 2,000 first, full pull only after t
 | Date (UTC) | Who / job | Endpoint | Calls | Credits | Balance after |
 |---|---|---|---|---|---|
 | 2026-10-28 17:09–17:11 | Upsets, in-play **pilot**, ATP Qatar 2025 (24 R1–R2 matches), 10-min, `bookmakers=draftkings,pinnacle` | `/historical/sports/{key}/odds` | 175 | 1,750 | 4,652,408 |
-| 2026-10-28 17:37–18:00 | Upsets, in-play stage 1, season 2026 (1,131 R1–R2 matches; stopped by an HTTP 502 at tennis_atp_italian_open, ~10 of 23 keys done; resumes after #163) | `/historical/sports/{key}/odds` | 1,667 | 16,670 | 4,624,936 |
+| 2026-10-28 17:37–18:00 | Upsets, in-play stage 1, season 2026 (1,131 R1–R2 matches; stopped by an HTTP 502 in tennis_atp_italian_open; 6 of 23 keys done, 304 matches at 53.4 credits each vs 63.2 planned; resumes after #163) | `/historical/sports/{key}/odds` | 1,667 | 16,670 | 4,624,936 |
 | | **In-play job total (its spend log)** | | 1,842 | **18,420** | 4,624,936 |
 
