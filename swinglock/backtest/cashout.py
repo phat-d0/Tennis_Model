@@ -265,7 +265,7 @@ DOG_RULE = "L=50c"
 DOG_EDGES = (0.0, 0.10, 0.20, 0.30)
 DOG_LABELS = ("<10c", "10-20c", "20-30c")
 DOG_COLUMNS = ["entries", "triggers", "trigger_rate", "pnl_pc", "pnl_ci_lo", "pnl_ci_hi", "roi", "roi_ci_lo",
-               "roi_ci_hi", "delta_pc", "delta_ci_lo", "delta_ci_hi"]
+               "roi_ci_hi", "delta_pc", "delta_ci_lo", "delta_ci_hi", "frac_stale_bid"]
 
 
 def dog_positions(positions: pd.DataFrame, max_ask: float = 0.20) -> pd.DataFrame:
@@ -300,7 +300,8 @@ def _dog_stats(g: pd.DataFrame, st: dict[str, Any]) -> dict[str, float]:
     trig = g["locked"].astype(bool)
     return dict(entries=len(g), triggers=int(trig.sum()), trigger_rate=float(trig.mean()), pnl_pc=pm,
                 pnl_ci_lo=plo, pnl_ci_hi=phi, roi=roi, roi_ci_lo=rlo, roi_ci_hi=rhi, delta_pc=dm,
-                delta_ci_lo=dlo, delta_ci_hi=dhi)
+                delta_ci_lo=dlo, delta_ci_hi=dhi,
+                frac_stale_bid=_stale_share(g.loc[trig, "exit_bid_age_s"]))
 
 
 def dog_summary(dog: pd.DataFrame, by: Sequence[str], st: dict[str, Any] | None = None) -> pd.DataFrame:

@@ -211,6 +211,7 @@ def test_dog50_positions_and_summary():
     # entry 1.00 + fee 0.07 = 1.07; sold at 0.55: 5.50 - 0.18 = 5.32; hold = -1.07 (B wins)
     assert s["triggers"] == 1 and s["pnl_pc"] == pytest.approx((5.32 - 1.07) / 10)
     assert s["roi"] == pytest.approx((5.32 - 1.07) / 1.07) and s["delta_pc"] == pytest.approx(0.532)
+    assert s["frac_stale_bid"] == 0.0                                     # B's ask moved at the exit row
     assert dog_positions(df, 0.30).equals(dog)                           # B at 0.92 is no dog either way
 
 
