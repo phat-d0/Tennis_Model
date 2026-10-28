@@ -535,8 +535,10 @@ Since phat-d0/Tennis_Model#116 also: `min_arb_profit_per_contract` (the alert th
   Lead-approved re-statement, 0 credits, no rule search). Matches whose listed start moved > 1 h after the close: 2023 17
   (2%), 2024 38 (4%), 2025 75 (4%), 2026 26 (2%), median move 1.5 h; 2020–22 unknown (no later snapshots). Without them:
   every DK dog −9.6% → −9.1% (Pinnacle −6.4% → −6.0%), seed all −10.3% → −9.9%, Portfolio model −12.7% → −12.3%, line
-  +9.2% → +9.6%, dogs −10.4% → −9.9%; DK vs Pinnacle margin unchanged (5.12% vs 2.70%). No verdict changes. 367 tests
-  (pandas 2 and 3.1).
+  +9.2% → +9.6%, dogs −10.4% → −9.9%; DK vs Pinnacle margin unchanged (5.12% vs 2.70%). No verdict changes. Duplicate DK
+  listings at close time (Lead's check): in 2020–24, 27–51% of pairings were listed twice; the earliest listing is a
+  placeholder DK stops quoting a median 14.4 h before its own start, and the close comes from the re-listing (ordinary
+  pre-match prices: overround 0.049 vs 0.051), so no close comes from after the match. 367 tests (pandas 2 and 3.1).
 - 2026-10-28 (Backtest): cash-out study code merged (phat-d0/Tennis_Model#125): `swinglock/backtest/cashout.py`, CLI
   `python -m swinglock.backtest.cashout --data <dir> [--sets <dir>/sets.parquet]`. Dated amendment (before any run):
   Level exits (12 gate rules), DOG50 fixed-rule gate on absolute P&L, DOG30 descriptive, set-end split (descriptive),

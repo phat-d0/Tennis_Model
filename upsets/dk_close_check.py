@@ -56,6 +56,52 @@ def flag(ids: pd.DataFrame, finals: pd.DataFrame, inplay_from: int = 2023, seaso
     return d
 
 
+def duplicates(t: pd.DataFrame, sack: pd.DataFrame, priced: pd.DataFrame, root: Path = dh.CACHE) -> str:
+    """When DK lists more than one event for a pairing, which one gives the close? (as dk_history.prices: the latest
+    snapshot >= 5 min before each event's own listed start, over all the pairing's events). Reads prices, not results."""
+    snaps = dh.all_snapshots(root)
+    ev = pd.concat([dh.load_events(dh.events_schedule(t, 24.0), root), dh.snapshot_events(snaps, t)], ignore_index=True)
+    ev = ev.sort_values("listed").drop_duplicates(["key", "event_id"], keep="last")
+    j = dh.join_events(ev, sack)
+    need = j[(j["sack_row"] >= 0) & (j["round_idx"] <= 2)]
+    n_ev = need.groupby("sack_row")["event_id"].nunique()
+    dk = snaps[snaps["book"] == "draftkings"]
+    m = need[["key", "event_id", "sack_row", "commence"]].merge(dk, on=["key", "event_id"])
+    m = m[m["snapshot_ts"] <= m["commence"] - pd.Timedelta(minutes=5)]
+    close = m.sort_values("snapshot_ts").drop_duplicates("sack_row", keep="last").copy()
+    first = need.groupby("sack_row")["commence"].min()
+    close["later_listing"] = (n_ev.reindex(close["sack_row"]).to_numpy() > 1) & \
+        (close["commence"].to_numpy() > close["sack_row"].map(first).to_numpy() + np.timedelta64(60, "m"))
+    close["season"] = sack.loc[close["sack_row"], "season"].to_numpy()
+    # the earliest listing of each duplicated pairing: when does DK stop quoting it, relative to its own listed start?
+    early = need[need["sack_row"].isin(n_ev[n_ev > 1].index)].sort_values("commence").drop_duplicates("sack_row")
+    last_q = dk.groupby(["key", "event_id"])["snapshot_ts"].max()
+    rel = (pd.Series(last_q.reindex(pd.MultiIndex.from_frame(early[["key", "event_id"]])).to_numpy()) -
+           early["commence"].reset_index(drop=True)).dt.total_seconds() / 3600
+    p = priced.set_index("sack_row")
+    lo = p[["odds_w_draftkings", "odds_l_draftkings"]].min(axis=1)
+    ovr = 1 / p["odds_w_draftkings"] + 1 / p["odds_l_draftkings"] - 1
+    L = ["", "### Duplicate DK listings at close time", "",
+         "| Season | Priced | Pairing listed as > 1 event | Close taken from a later re-listing |", "|---|---|---|---|"]
+    for s_, g in close.groupby("season"):
+        L.append(f"| {int(s_)} | {len(g):,} | {int((n_ev.reindex(g['sack_row']) > 1).sum()):,} | "
+                 f"{int(g['later_listing'].sum()):,} ({g['later_listing'].mean():.0%}) |")
+    later = close.loc[close["later_listing"], "sack_row"]
+    other = close.loc[~close["later_listing"], "sack_row"]
+    L += ["", f"- The earliest listing of a duplicated pairing stops being quoted by DK a median of "
+          f"{-rel.median():.1f} h **before** its own listed start ({rel.notna().sum():,} with quotes), so it is a "
+          "placeholder that DK withdraws and re-lists with a new id and the real time; the close then comes from the "
+          "re-listing (dk_history.prices only takes snapshots >= 5 min before the listed start of the event they "
+          "belong to).",
+          f"- Closes from a re-listing look like ordinary pre-match prices: median overround {ovr.reindex(later).median():.3f} "
+          f"vs {ovr.reindex(other).median():.3f}, min odds <= 1.05 in {np.mean(lo.reindex(later) <= 1.05):.1%} vs "
+          f"{np.mean(lo.reindex(other) <= 1.05):.1%} (settled or in-play prices would show far more extremes).",
+          "- So, on this evidence, a close does not come from after the real match: it always predates the start listed "
+          "by the event it was read from, and that event is the re-listing DK kept quoting, not the withdrawn "
+          "placeholder. No re-statement is needed for this."]
+    return "\n".join(L) + "\n"
+
+
 def _pct(x) -> str:
     return "—" if x is None or not np.isfinite(x) else f"{x:+.1%}"
 
@@ -128,7 +174,7 @@ def run(root: Path, cache: Path = dh.CACHE) -> str:
             vals.append(f"{a.get('bets', 0):,} bets, {_pct(a.get('roi'))} vs {_pct(a.get('expected_roi'))} expected"
                         if a.get("bets") else "—")
         rows.append((f"Portfolio backtest: {sid}", *vals))
-    return report(d, rows)
+    return report(d, rows) + duplicates(t, sack, priced, cache)
 
 
 def main(argv=None) -> None:
