@@ -288,6 +288,12 @@ def window(q: pd.DataFrame, minutes: pd.Series | None = None) -> pd.DataFrame:
     c = ~settled.astype(int).groupby(q["match"]).cummax().astype(bool)     # that snapshot and all later ones out
     d = q["ts"] <= q["listed_start"] + pd.Timedelta(hours=MAX_LIVE_H)
     q["live"] = a & b & c & d
+    if "close_start" in q:   # variant: (a) and (c) anchored on the start listed at the close (known in advance)
+        a2 = q["ts"] >= q["close_start"] + pd.Timedelta(minutes=LIVE_AFTER_MIN)
+        settled2 = ((lo <= SETTLED_LO) | (hi >= SETTLED_HI)) & a2
+        c2 = ~settled2.astype(int).groupby(q["match"]).cummax().astype(bool)
+        d2 = q["ts"] <= q["close_start"] + pd.Timedelta(hours=MAX_LIVE_H)
+        q["live_close"] = a2 & b & c2 & d2
     if minutes is not None:
         mm = q["match"].map(minutes)
         q["live_minutes"] = q["live"] & mm.notna() & (q["ts"] <= q["listed_start"] + pd.to_timedelta(mm + 30, unit="m"))
@@ -317,19 +323,25 @@ def coverage(w: pd.DataFrame, minutes: pd.Series, step_min: int = 10, slack_min:
     misses: list = []
     m = walk(w, cache_fetch(misses), step_min, slack_min)["matches"].reset_index(drop=True)
     mins = pd.Series(minutes.to_numpy(), index=range(len(m)))
-    q = window(quotes(m), mins)
-    per = q.groupby("match").agg(live=("live", "any"), live_minutes=("live_minutes", "any"),
+    q = quotes(m)
+    q["close_start"] = q["match"].map(m["commence"])
+    q = window(q, mins)
+    per = q.groupby("match").agg(live=("live", "any"), live_close=("live_close", "any"),
+                                 live_minutes=("live_minutes", "any"),
                                  live_final=("live_final", "any"), final_start=("listed_start", "last"),
                                  last_ts=("ts", "max"))
     m = m.join(per)
-    m[["live", "live_minutes", "live_final"]] = m[["live", "live_minutes", "live_final"]].fillna(False).astype(bool)
+    cols = ["live", "live_close", "live_minutes", "live_final"]
+    m[cols] = m[cols].fillna(False).astype(bool)
     m["finished"] = m["finished_at"].notna()
     m["postponed"] = m["final_start"].notna() & (m["final_start"] > m["last_ts"] - pd.Timedelta(minutes=LIVE_AFTER_MIN))
-    L = ["| Season | Stopped (finish seen or event never found) | Matches | Event found | In play, rules (a)–(d) | + Sackmann-minutes cut | "
-         "+ final-start cut (later info) | Postponed past our window |", "|---|---|---|---|---|---|---|---|"]
+    L = ["| Season | Stopped (finish seen or event never found) | Matches | Event found | In play, rules (a)–(d) | "
+         "(a)–(d) from the close's listed start | + Sackmann-minutes cut | + final-start cut (later info) | "
+         "Postponed past our window |", "|---|---|---|---|---|---|---|---|---|"]
     for (season, fin), g in m.groupby(["season", "finished"]):
         L.append(f"| {season} | {'yes' if fin else 'no'} | {len(g):,} | {int(g['event_id'].notna().sum()):,} | "
-                 f"{int(g['live'].sum()):,} | {int(g['live_minutes'].sum()):,} | {int(g['live_final'].sum()):,} | "
+                 f"{int(g['live'].sum()):,} | {int(g['live_close'].sum()):,} | {int(g['live_minutes'].sum()):,} | "
+                 f"{int(g['live_final'].sum()):,} | "
                  f"{int(g['postponed'].sum()):,} |")
     pp = m[m["postponed"]].assign(commence=lambda x: x["final_start"])
     plan_credits = credits(pp, step_min, slack_min) if len(pp) else 0
