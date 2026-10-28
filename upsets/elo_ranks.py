@@ -10,10 +10,14 @@ rank_b, plus elo/n/matched columns) and prints the match rate. Nothing here is c
   results, then Kalshi settlements after Sackmann ends (May 2026), with the round_monotone and no-read
   guards. Overall Elo, players keyed per tour, so ATP and WTA are ranked separately. Challenger and
   WTA 125 matches are included (series KXATPCHALLENGERMATCH, KXWTACHALLENGERMATCH).
-- Rank: 1 + the number of active players of the same tour rated higher than this player's pre-match
-  Elo. Active = at least MIN_N rated matches and a match in the ACTIVE_DAYS before the match's day.
-  The pool is a snapshot of ratings at the start of the match's UTC day, so it uses only earlier
-  results. Results from the same day aren't in the pool yet.
+- Rank: integer, lower = better: 1 + the number of active players of the same tour rated higher than this
+  player's pre-match Elo. A/B follow matches.parquet. Active = at least MIN_N rated matches and a match in
+  the ACTIVE_DAYS before the match's day.
+- No lookahead: the player's own Elo uses only his earlier matches (all finished before he plays again).
+  The pool uses only results of matches that started at least FINISH_H hours before the match's UTC day
+  began, so they finished before it started. Sackmann rows carry estimated times (tournament start + the
+  round's share of the event), so for events inside Sackmann's span "finished" is an estimate; Kalshi rows
+  use the real scheduled start.
 - Left blank, never guessed: a player whose Kalshi name doesn't match one Sackmann player
   (upsets/names.py), or one with fewer than MIN_N rated matches. An unmatched player still counts in the
   pool once rated from Kalshi results (he is a real player); he just gets no rank himself.
@@ -37,27 +41,48 @@ from .names import player_table
 SERIES = {"KXATPMATCH": "atp", "KXWTAMATCH": "wta", "KXATPCHALLENGERMATCH": "atp", "KXWTACHALLENGERMATCH": "wta"}
 ACTIVE_DAYS = 365
 MIN_N = 10
+FINISH_H = 6.0     # a result counts in the pool only if its match started this long before the day began
 
 
-def _pool_ranks(rows: pd.DataFrame, active_days: int = ACTIVE_DAYS, min_n: int = MIN_N) -> pd.DataFrame:
+def _update(rating: dict, played: dict, last: dict, w, l, d) -> None:
+    e = elo.expected(rating[w], rating[l])
+    rating[w] += elo._k(played[w]) * (1 - e)
+    rating[l] -= elo._k(played[l]) * (1 - e)
+    played[w] += 1
+    played[l] += 1
+    last[w] = last[l] = d
+
+
+def _pool_ranks(rows: pd.DataFrame, active_days: int = ACTIVE_DAYS, min_n: int = MIN_N,
+                finish_h: float = FINISH_H) -> pd.DataFrame:
     """Replay the timeline (same updates as upsets.elo) and, for each Kalshi row, rank its winner-key and
-    loser-key players' pre-match Elo within that tour's active pool at the start of the row's day.
-    -> frame indexed like rows' Kalshi rows: w_rank, l_rank (NaN when n < min_n), pool."""
+    loser-key players' pre-match Elo within that tour's active pool.
+    - The player's own Elo is exact (his earlier matches are all finished before he plays again).
+    - The pool is a second, lagged replay: only rows that started at least `finish_h` hours before the
+      match's UTC day began, so every result in it finished before the match started.
+    -> frame indexed like rows' Kalshi rows: w_rank, l_rank (NaN when n < min_n or the pool is empty), pool."""
     rating, played, last = defaultdict(lambda: elo.START), defaultdict(int), {}
+    lag_r, lag_n, lag_last = defaultdict(lambda: elo.START), defaultdict(int), {}
     tours, wk, lk = rows["tour"].to_numpy(), rows["wkey"].to_numpy(), rows["lkey"].to_numpy()
-    days = pd.to_datetime(rows["time"]).to_numpy().astype("datetime64[D]")
+    times = pd.to_datetime(rows["time"]).to_numpy()
+    days = times.astype("datetime64[D]")
     walk = rows["comment"].fillna("").str.lower().str.startswith("walk").to_numpy()
     is_k = rows["kalshi"].notna().to_numpy()
-    snap_day, pools, own = None, {}, {}
-    out = {"row": [], "w_rank": [], "l_rank": [], "pool": []}
+    lag = np.timedelta64(int(finish_h * 3600), "s")
     window = np.timedelta64(active_days, "D")
+    snap_day, pools, own, j = None, {}, {}, 0
+    out = {"row": [], "w_rank": [], "l_rank": [], "pool": []}
     for i in range(len(rows)):
         d = days[i]
         if is_k[i] and d != snap_day:
-            snap_day = d
+            snap_day, cutoff = d, d.astype("datetime64[s]") - lag
+            while j < i and times[j] <= cutoff:     # lagged replay up to the cutoff
+                if not walk[j]:
+                    _update(lag_r, lag_n, lag_last, (tours[j], wk[j]), (tours[j], lk[j]), days[j])
+                j += 1
             vals, own = defaultdict(list), {}
-            for (t, p), r in rating.items():
-                if played[(t, p)] >= min_n and (t, p) in last and last[(t, p)] >= d - window:
+            for (t, p), r in lag_r.items():
+                if lag_n[(t, p)] >= min_n and (t, p) in lag_last and lag_last[(t, p)] >= d - window:
                     vals[t].append(r)
                     own[(t, p)] = r
             pools = {t: np.sort(np.array(v)) for t, v in vals.items()}
@@ -69,21 +94,15 @@ def _pool_ranks(rows: pd.DataFrame, active_days: int = ACTIVE_DAYS, min_n: int =
                 if played[p] < min_n or not len(pool):
                     return np.nan
                 higher = len(pool) - np.searchsorted(pool, rating[p], side="right")
-                if p in own and own[p] > rating[p]:   # the player's own day-start entry isn't a rival
+                if p in own and own[p] > rating[p]:   # the player's own pool entry isn't a rival
                     higher -= 1
                 return float(1 + higher)
             out["row"].append(i)
             out["w_rank"].append(rank(w))
             out["l_rank"].append(rank(l))
             out["pool"].append(len(pool))
-        if walk[i]:
-            continue
-        e = elo.expected(rating[w], rating[l])
-        rating[w] += elo._k(played[w]) * (1 - e)
-        rating[l] -= elo._k(played[l]) * (1 - e)
-        played[w] += 1
-        played[l] += 1
-        last[w] = last[l] = d
+        if not walk[i]:
+            _update(rating, played, last, w, l, d)
     return pd.DataFrame(out).set_index("row")
 
 
@@ -108,6 +127,7 @@ def ranks(matches: pd.DataFrame, sack: pd.DataFrame, active_days: int = ACTIVE_D
         "matched_a": km["id_a"].notna(), "matched_b": km["id_b"].notna(), "pool": pr["pool"]})
     for s in ("a", "b"):   # unmatched names: blank, never guessed
         out.loc[~out[f"matched_{s}"], [f"rank_{s}", f"elo_{s}", f"n_{s}"]] = np.nan
+        out[f"rank_{s}"] = out[f"rank_{s}"].round().astype("Int64")   # integer, lower = better; <NA> = blank
     return out.reset_index(drop=True)
 
 
