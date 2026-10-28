@@ -524,6 +524,12 @@ Since phat-d0/Tennis_Model#116 also: `min_arb_profit_per_contract` (the alert th
   scratch log, since scrubbed; nothing was committed or published. `OddsApi._get` now re-raises HTTP and network errors as
   "HTTP 502 on /path" (no URL, no chained original); `make_fetch` retries a 5xx or network error after 10 s and 30 s, then
   stops the stage cleanly (a re-run is free up to there). Stage 1 had spent 16,670 credits; job total 18,420. 366 tests (pandas 2 and 3.1).
+- 2026-10-28: **DK in-play pull complete** (phat-d0/Tennis_Model#PRNUM; spend log in docs/data_inventory.md). 2023–May 2026,
+  10-min snapshots, DK + Pinnacle, R1–R2 matches we hold DK closes for: 2026 1,131 matches / 58,990 credits (52.2 per match),
+  2025 1,753 / 79,530 (45.4), 2024 1,056 / 41,990 (39.8), 2023 733 / 23,670 (32.3). **Job total 205,930** of the 270,000 cap
+  (pilot included); every season under its plan; no 429s; one 502 (#163). Events found 97–99% per season. Finish was
+  detected less often in 2024 (775 of 1,032) and 2023 (385 of 712): many listed starts later moved by about a day
+  (postponed), see the in-play window amendment. No outcomes read; snapshots stay in data/raw/odds_api/inplay/ (gitignored).
 - 2026-10-28 (Backtest): cash-out study code merged (phat-d0/Tennis_Model#125): `swinglock/backtest/cashout.py`, CLI
   `python -m swinglock.backtest.cashout --data <dir> [--sets <dir>/sets.parquet]`. Dated amendment (before any run):
   Level exits (12 gate rules), DOG50 fixed-rule gate on absolute P&L, DOG30 descriptive, set-end split (descriptive),
