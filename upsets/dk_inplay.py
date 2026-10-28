@@ -127,7 +127,8 @@ def walk(w: pd.DataFrame, fetch, step_min: int = 10, slack_min: int = 180) -> di
     known = w["close_event_id"] if "close_event_id" in w else pd.Series([None] * len(w), index=w.index)
     st = pd.DataFrame({"event_id": known.astype(object).where(known.notna(), None), "snaps": 0, "gone": 0,
                        "finished_at": pd.Series([pd.NaT] * len(w), dtype="datetime64[ns, UTC]"),
-                       "first_seen": pd.Series([pd.NaT] * len(w), dtype="datetime64[ns, UTC]")}, index=w.index)
+                       "first_seen": pd.Series([pd.NaT] * len(w), dtype="datetime64[ns, UTC]"),
+                       "missing": 0}, index=w.index)
     fetched, stopped = 0, False
     for key, g in w.groupby("key", sort=True):
         times = sorted({x for k, x in slots(g, step_min, slack_min)})
@@ -141,6 +142,10 @@ def walk(w: pd.DataFrame, fetch, step_min: int = 10, slack_min: int = 180) -> di
             if snap is None:
                 stopped = True
                 break
+            if snap.get("missing"):                   # cache-only replay: not pulled, so unknown, not "gone"
+                for i in active:
+                    st.at[i, "missing"] += 1
+                continue
             fetched += 1
             ids = {e["id"] for e in snap.get("data") or []}
             for i in active:
@@ -292,7 +297,8 @@ def window(q: pd.DataFrame, minutes: pd.Series | None = None) -> pd.DataFrame:
 
 
 def cache_fetch(misses: list):
-    """walk() fetch that only reads the caches (0 credits); a missing snapshot counts as empty and is recorded."""
+    """walk() fetch that only reads the caches (0 credits); a snapshot we never pulled is returned as missing
+    (walk() then counts it per active match and treats it as unknown, not as the event being gone) and recorded."""
     from . import dk_history as dh
 
     def fetch(key, when):
@@ -301,7 +307,7 @@ def cache_fetch(misses: list):
             if p.exists():
                 return dh.read_cache(p)
         misses.append((key, when))
-        return {"timestamp": when, "data": []}
+        return {"timestamp": when, "data": [], "missing": True}
     return fetch
 
 
@@ -327,6 +333,11 @@ def coverage(w: pd.DataFrame, minutes: pd.Series, step_min: int = 10, slack_min:
                  f"{int(g['postponed'].sum()):,} |")
     pp = m[m["postponed"]].assign(commence=lambda x: x["final_start"])
     plan_credits = credits(pp, step_min, slack_min) if len(pp) else 0
+    short = m[m["missing"] > 0]
+    L += ["", f"Coverage of the real (close) event: {len(short):,} of {len(m):,} matches need snapshots we never pulled "
+          f"(the pull's start/stop followed the name-matched listing); re-walking them costs {10 * len(set(misses)):,} "
+          f"credits ({len(set(misses)):,} snapshots). By season: "
+          + ", ".join(f"{s} {int((g['missing'] > 0).sum())}" for s, g in m.groupby("season")) + "."]
     L += ["", f"Refinement plan for postponed matches: {len(pp):,} matches re-walked from their final listed start at "
           f"{step_min} min, planned <= {plan_credits:,} credits (not run; needs the Lead's approval). Cache misses in the "
           f"replay: {len(misses)}."]

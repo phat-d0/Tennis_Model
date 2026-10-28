@@ -224,3 +224,17 @@ def test_walk_follows_the_close_event_not_a_duplicate_listing():
     w = match_w().assign(close_event_id="e1")
     got = di.walk(w, fetch)["matches"].iloc[0]
     assert got["event_id"] == "e1" and got["finished_at"] == pd.Timestamp("2024-01-15 11:50", tz="UTC")
+
+
+def test_cache_replay_counts_unpulled_snapshots_instead_of_ending_the_match(tmp_path, monkeypatch):
+    from upsets import dk_history as dh
+    monkeypatch.setattr(di, "INPLAY_CACHE", tmp_path / "inplay")
+    monkeypatch.setattr(dh, "CACHE", tmp_path / "close")
+    w = match_w().assign(close_event_id="e1")
+    real, _ = snap_fn("2024-01-15 11:20")
+    for when in ("2024-01-15T10:00:00Z", "2024-01-15T10:10:00Z"):              # only the first two were pulled
+        dh.write_cache(dh.cache_path("odds", "k", when, di.INPLAY_CACHE), real("k", when))
+    misses = []
+    m = di.walk(w, di.cache_fetch(misses))["matches"].iloc[0]
+    assert m["snaps"] == 2 and pd.isna(m["finished_at"])                     # gaps are unknown, never "gone"
+    assert m["missing"] == len(misses) and len(misses) > 3
