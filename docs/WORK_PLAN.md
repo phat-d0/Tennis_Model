@@ -25,7 +25,7 @@ answers to the owner's open questions.
 | Backtest | `swinglock/backtest/cashout.py` + CLI + tests, with the Level/DOG50 amendment | `reports/backtest_cashout.md` from Data's aggregates | — |
 | Scanner | Paper trading live on the VPS since 2026-10-27 17:34 UTC | Watch 429s and the 04:00 UTC lookback; fixes only | — |
 | Dashboard | Paper tab live (#118) | Check it against the owner's screenshots | Owner screenshots |
-| Upsets | Page builder + Portfolio upkeep | Next idea needs the owner | — |
+| Upsets | Page builder + Portfolio upkeep (Polymarket Challengers #111, power de-vig #112 live) | Propose a durable home for the Portfolio ledger (Actions cache can be evicted) before it fills; line-shopping forward-test readout Jan 2027. New research ideas need the owner | — |
 
 
 ## Done
@@ -203,8 +203,8 @@ The owner asked for a public phone page like the soccer app, refreshed every 3 h
 - **Portfolio tab** (owner asked Upsets directly; phat-d0/Tennis_Model#96): $10 automatic paper trades for 3 rules (Elo edge ≥ 5%,
   DK beats Pinnacle-fair ≥ 1%, every dog as a control), settled only by The Odds API `/scores` (2 credits a key, inside the 3,000
   cap). It covers only the tournaments `/scores` covers, so the live ledger stays empty until about Jan 2027. The ledger lives in the
-  Actions cache (lost if the cache is evicted). The backtest view shows aggregates only (Sackmann-resolved). In-sample, the line rule is
-  +9.2% (328 bets, expected +9.3%). That is the job (A) test below, not a result yet.
+  Actions cache (lost if the cache is evicted). The backtest view shows aggregates only (Sackmann-resolved). In-sample at the power
+  de-vig (since #112): line 205 bets +9.2% vs +8.0% expected; model −12.7% vs −10.8%; dogs −10.4% vs −12.0%. Not a result yet.
 - **Closing-price pull (C): done.** 4,297 snapshots, 42,960 credits; balance 4,938,958.
 - **DK all tiers at the close (#99): no edge.** Dog ROI −11.2% against −10.9% expected at Pinnacle-fair, on 6,655 matches. DK's margin is
   5.16%, mostly on the dog. Elo walk-forward FAIL (−15.3%, 2,426 OOS bets). Drift report (#100): DK sits static in the last 3 h
@@ -248,9 +248,16 @@ The owner asked for a public phone page like the soccer app, refreshed every 3 h
   fails if anything under `data/` is tracked.
   - Dashboard fixes: the arb tile only counts arbs above the alert threshold; WTA 125 gets its own label.
   - OddsPapi test of DK Challenger lines waits on the owner: `ODDSPAPI_KEY` + allow oddspapi.io / api.oddspapi.io.
-- **Status:** jobs A, B and C and the DK report are done. Remaining leads: a live forward test of line shopping via the Portfolio tab
-  (from Jan 2027). Next ideas need the owner.
-- **Queued (owner 2026-10-26), Upsets:**
+- **Elo upgrades (B, #103): no edge.** Best variant (+fatigue+serve) log loss 0.5755 vs current Elo 0.5859 vs Pinnacle 0.5552;
+  every variant loses 11.5–14.6% at DK walk-forward. The page now runs tuned Elo + serve/return (#106).
+- **Line-shopping drawdown (#108):** luck both ways on a thin edge; realized = expected over 328 bets. The Portfolio moved to the
+  power de-vig (#112).
+- **Challengers on the page (#111):** Polymarket intl books for ATP Challenger / WTA 125, about 12 requests a build.
+- **Private Tennis Backtest Explorer** (owner-only claude.ai page): https://claude.ai/artifact/3bDnTdzVARrgthoU8GHNVC. It holds every bet
+  behind these studies; the data is embedded in the page, never in git.
+- **Status:** jobs A, B and C, the DK report, the Elo switch, the drawdown report, Challengers and the de-vig are done. Next:
+  a durable home for the Portfolio ledger, then the line-shopping forward-test readout (Jan 2027). New research ideas need the owner.
+- **Queued (owner 2026-10-26), Upsets (all three done: C #100, A #101, B #103):**
   - **(C) Closing-price snapshots.** All tiers, cap 50k credits.
   - **(A) Line-shopping test.** Bet DK only when its odds beat Pinnacle's de-vigged price by t. 0 credits, pre-registered, walk-forward,
     scored on ROI, expected ROI and CLV vs Pinnacle's close.
