@@ -476,7 +476,7 @@ Since phat-d0/Tennis_Model#116 also: `min_arb_profit_per_contract` (the alert th
   that started ≥ 6 h before the match's day began. A test flips later results and checks the ranks don't move.
   Unmatched names are left blank. Synthetic check on the real archive: ~99.6% of names matched, 38 s per 3,000 matches,
   Sinner #1, Alcaraz #2. Data runs it; nothing committed. 341 tests (pandas 2 and 3.1).
-- 2026-10-28: Live Elo rank table for the VPS paper engine (phat-d0/Tennis_Model#—): `upsets.elo_ranks.current()` and CLI
+- 2026-10-28: Live Elo rank table for the VPS paper engine (phat-d0/Tennis_Model#144): `upsets.elo_ranks.current()` and CLI
   `python -m upsets.elo_ranks current --sackmann <archive> [--results <matches.parquet>] --out data/paper/elo_ranks.json`
   (atomic write). Per tour: active players by rank, with key (name_key), name, sackmann_id, elo, n and last_played,
   plus generated_at, sackmann_through and results_through. Loading from 2010 peaks at 887 MB RSS and takes 17 s
