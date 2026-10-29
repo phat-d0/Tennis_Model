@@ -39,15 +39,13 @@ BOOKS = ("draftkings", "pinnacle")
 INPLAY_CACHE = Path("data/raw/odds_api/inplay")
 
 
-def close_event_ids(t: pd.DataFrame, sack: pd.DataFrame) -> pd.Series:
-    """sack_row -> the event id dk_history.collect priced the match from (same join as collect)."""
+def close_event_ids(t: pd.DataFrame, sack: pd.DataFrame, root: Path | None = None) -> pd.Series:
+    """sack_row -> the event the DK close was read from: dk_close_check.close_events (the latest DK snapshot >= 5 min
+    before its own event's start, over all events joined to the match), not the first joined event."""
+    from . import dk_close_check as cc
     from . import dk_history as dh
-    snaps = dh.all_snapshots(dh.CACHE)
-    ev = pd.concat([dh.load_events(dh.events_schedule(t, 24.0)), dh.snapshot_events(snaps, t)], ignore_index=True)
-    ev = ev.sort_values("listed").drop_duplicates(["key", "event_id"], keep="last")
-    j = dh.join_events(ev, sack)
-    need = j[(j["sack_row"] >= 0) & (j["round_idx"] <= 2)].drop_duplicates("sack_row")
-    return need.set_index("sack_row")["event_id"]
+    need, snaps = cc._need(t, sack, root or dh.CACHE)
+    return cc.close_events(need, snaps).set_index("sack_row")["event_id"]
 
 
 def windows(priced: pd.DataFrame, sack: pd.DataFrame) -> pd.DataFrame:

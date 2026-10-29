@@ -248,3 +248,17 @@ def test_subset_table_compares_quoted_and_unquoted_matches_on_pre_match_data():
     t = di.subset_table(m, f)
     assert "| 2024 | yes | 2 | 100% | 0% | 0% | 2.50 | 150 |" in t
     assert "| 2024 | no | 2 | 0% | 50% | 50% | 4.50 | 50 |" in t
+
+
+def test_close_event_ids_takes_the_event_the_close_came_from_not_the_first_joined(monkeypatch):
+    from upsets import dk_close_check as cc
+    ts = pd.Timestamp
+    # placeholder joined first (start a day later, DK quoted early); the close came from the re-listing
+    need = pd.DataFrame({"key": ["k", "k"], "event_id": ["placeholder", "relist"], "sack_row": [7, 7],
+                         "commence": [ts("2024-01-03 00:00", tz="UTC"), ts("2024-01-02 12:00", tz="UTC")]})
+    snaps = pd.DataFrame({"key": "k", "book": "draftkings",
+                          "event_id": ["placeholder", "relist", "relist", "placeholder"],
+                          "snapshot_ts": [ts("2024-01-01 10:00", tz="UTC"), ts("2024-01-02 09:00", tz="UTC"),
+                                          ts("2024-01-02 11:50", tz="UTC"), ts("2024-01-02 11:00", tz="UTC")]})
+    monkeypatch.setattr(cc, "_need", lambda t, sack, root: (need, snaps))
+    assert di.close_event_ids(None, None).to_dict() == {7: "relist"}
