@@ -424,6 +424,14 @@ def coverage(w: pd.DataFrame, minutes: pd.Series, step_min: int = 10, slack_min:
         tot += c1 + c2
         L.append(f"| {season} | {a1:,} | {c1:,} | {a2:,} | {c2:,} | {c1 + c2:,} |")
     L.append(f"| **All** | {len(short):,} | {10 * len(set(misses)):,} | {len(pp):,} | {plan_credits:,} | **{tot:,}** |")
+    s_ = m["live_started"] & ~m["postponed"]
+    L += ["", "Study sample = (a‴) and not postponed past our window (a postponed match whose listing moved again after its "
+          "re-walk stays out and is counted):", "", "| Season | (a‴) | of which still postponed | Sample |", "|---|---|---|---|"]
+    for season, g in m.groupby("season"):
+        L.append(f"| {season} | {int(g['live_started'].sum()):,} | {int((g['live_started'] & g['postponed']).sum()):,} | "
+                 f"{int((g['live_started'] & ~g['postponed']).sum()):,} |")
+    L.append(f"| **All** | {int(m['live_started'].sum()):,} | {int((m['live_started'] & m['postponed']).sum()):,} | "
+             f"**{int(s_.sum()):,}** |")
     return "\n".join(L), m
 
 
