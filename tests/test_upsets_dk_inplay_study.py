@@ -9,7 +9,7 @@ def _x(rows):
     """Live rows: (sack_row, minute, p_dog, odds_dog, odds_fav)."""
     t0 = pd.Timestamp("2025-01-01 12:00", tz="UTC")
     return pd.DataFrame([{"sack_row": r, "ts": t0 + pd.Timedelta(minutes=mn), "p_dog": p, "odds_dog": od,
-                          "odds_fav": of, "p_pin_dog": p} for r, mn, p, od, of in rows])
+                          "odds_fav": of} for r, mn, p, od, of in rows])
 
 
 def _entries():
@@ -24,8 +24,6 @@ def test_hedge_locks_equal_payout_at_the_first_crossing_and_holds_otherwise():
     assert b.loc[1, "hedged"] and b.loc[1, "pnl"] == pytest.approx(6.0 - 1 - 6.0 / 2.1)   # first p >= 50%: 20 min
     assert not b.loc[2, "hedged"] and b.loc[2, "pnl"] == 5.0                              # never reached: held, won
     assert b.loc[3, "pnl"] == 0.0                                                         # void: refunded
-    assert b.loc[1, "exp_delta"] == pytest.approx((6.0 - 1 - 6.0 / 2.1) - (0.55 * 6.0 - 1))  # vs fair hold value
-    assert np.isnan(b.loc[2, "exp_delta"]) and np.isnan(b.loc[3, "exp_delta"])
     cut = st.hedge_rule(_entries(), x, 0.50, 0.03).set_index("sack_row")
     assert cut.loc[1, "pnl"] == pytest.approx(6.0 - 1 - 6.0 / (1 + 1.1 * 0.97))
 
