@@ -356,11 +356,12 @@ def postponed(w: pd.DataFrame, step_min: int = 10, slack_min: int = 180) -> pd.D
     return w[flag].assign(commence=m.loc[flag, "final_start"].to_numpy()).reset_index(drop=True)
 
 
-def coverage(w: pd.DataFrame, minutes: pd.Series, step_min: int = 10, slack_min: int = 180,
-             f: pd.DataFrame | None = None) -> tuple[str, pd.DataFrame]:
-    """Replay the pull from cache, apply window(), count matches each rule keeps (split by finish detected), and
-    plan the refinement for postponed matches (final listed start past our pulled window). No outcomes."""
-    misses: list = []
+def replay(w: pd.DataFrame, minutes: pd.Series, step_min: int = 10, slack_min: int = 180,
+           misses: list | None = None) -> tuple[pd.DataFrame, pd.DataFrame]:
+    """Replay the pull from cache (0 credits): walk() -> quotes() -> window(), plus per-match flags (live, live_close,
+    live_started, live_minutes, live_final, finished, postponed). -> (m: one row per match, q: one row per (match,
+    snapshot), with pin_moved). No outcomes are read."""
+    misses = [] if misses is None else misses
     m = walk(w, cache_fetch(misses), step_min, slack_min)["matches"].reset_index(drop=True)
     mins = pd.Series(minutes.to_numpy(), index=range(len(m)))
     q = quotes(m)
@@ -382,6 +383,15 @@ def coverage(w: pd.DataFrame, minutes: pd.Series, step_min: int = 10, slack_min:
     m[cols] = m[cols].fillna(False).astype(bool)
     m["finished"] = m["finished_at"].notna()
     m["postponed"] = is_postponed(m)
+    return m, q
+
+
+def coverage(w: pd.DataFrame, minutes: pd.Series, step_min: int = 10, slack_min: int = 180,
+             f: pd.DataFrame | None = None) -> tuple[str, pd.DataFrame]:
+    """Replay the pull from cache, apply window(), count matches each rule keeps (split by finish detected), and
+    plan the refinement for postponed matches (final listed start past our pulled window). No outcomes."""
+    misses: list = []
+    m, q = replay(w, minutes, step_min, slack_min, misses)
     L = ["| Season | Stopped (finish seen or event never found) | Matches | Event found | In play, rules (a)–(d) | "
          "(a)–(d) from the close's listed start | + Sackmann-minutes cut | + final-start cut (later info) | "
          "Postponed past our window |", "|---|---|---|---|---|---|---|---|---|"]

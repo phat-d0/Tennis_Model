@@ -229,6 +229,11 @@ Since phat-d0/Tennis_Model#116 also: `min_arb_profit_per_contract` (the alert th
   0.8 min). The snapshot interval is 10 min in 2020–22 and 5 min from 2023; one snapshot = 10 credits for h2h with ≤ 10
   bookmakers and covers every event of its key. The docs host isn't reachable from cloud sessions, so this rests on our
   own data (docs/research/odds_api.md §4).
+- In those in-play snapshots **DK's tennis prices track play; Pinnacle's barely move** (Upsets 2026-10-29, prices only, then
+  post-hoc calibration; reports/upsets_dk_inplay_results.md). DK: 12% of consecutive in-play snapshots identical, decided
+  share 14% → 72% from first to last in-play snapshot, calibrated within 0.023 in every p bin, log loss at the last in-play
+  snapshot 26% of the close's. Pinnacle: 48% identical, 37% decided at the end, moves correlate 0.09 with DK's, even with
+  a fresh `last_update`. So Pinnacle is no fair in-play reference here.
 - DraftKings Predictions: **no public/partner API**. ToU (2026-08-04) bans bots/scrapers and
   limits use to personal non-commercial. It's a broker (FCM) routing to CME / Crypto.com / DKeX /
   Bitnomial. Fee ≈ flat $0.02/contract between $0.30 and $0.94. → manual logging only.
@@ -563,6 +568,13 @@ Since phat-d0/Tennis_Model#116 also: `min_arb_profit_per_contract` (the alert th
   main, newest first: 2026 70, 2025 10, 2024 700, 2023 10 credits (790 of a 6,900 ceiling; job total 218,680 of 270,000). DK
   moved most listings again: 30 of 32 still postponed; not chased (Lead), kept out and counted. **Study sample = (a‴) and not
   still postponed: 694 / 936 / 1,589 / 1,072 = 4,291** (2025–26 92%, 2023–24 91%). No outcomes read. 375 tests (pandas 2 and 3.1).
+- 2026-10-29: **DK in-play studies: every gate FAILs** (PR phat-d0/Tennis_Model#170; `upsets/dk_inplay_study.py`,
+  reports/upsets_dk_inplay_results.md; amendments 3–4; 0 credits). ROI at the 3% cut, 2025–26 / 2023–24 / pooled: DOG50 (dog < 20%)
+  −18.0% / −21.6% / −19.6% vs hold −12.6% / −16.5% / −14.3%; every exit level 0.40–0.90 below hold (walk-forward picks hold, 0 of 3
+  test seasons positive); MISMATCH50 −17.9% pooled vs hold −8.1%, the worse-ranked player reached 50% in 31.6% vs 39.5% implied
+  (a lower bound at 10 min); FAVDIP buying the favourite at 50% −17.3% (60–80%) / −10.2% (≥ 80%) vs at the close −6.3% / −2.7%.
+  DK price validity: amendment-4 checks PASS (72% decided at the end, 12% identical) and post-hoc calibration confirms. A FAIL is
+  robust to stale prices, a PASS would not have been. Still-postponed matches put back: no direction changes. 382 tests (pandas 2 and 3.1).
 - 2026-10-28 (Backtest): cash-out study code merged (phat-d0/Tennis_Model#125): `swinglock/backtest/cashout.py`, CLI
   `python -m swinglock.backtest.cashout --data <dir> [--sets <dir>/sets.parquet]`. Dated amendment (before any run):
   Level exits (12 gate rules), DOG50 fixed-rule gate on absolute P&L, DOG30 descriptive, set-end split (descriptive),

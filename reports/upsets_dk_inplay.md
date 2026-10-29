@@ -1,6 +1,6 @@
 # In-play studies on DraftKings prices: DOG50, exit-level curve, MISMATCH50, FAVDIP (pre-registration)
 
-**Status: PLAN, PRE-REGISTERED, nothing pulled, no results.** Owner request 2026-10-28: "make sure all these are for the
+**Status: RUN 2026-10-29. Every gate FAILs; results in `reports/upsets_dk_inplay_results.md`.** Pre-registered as below. Owner request 2026-10-28: "make sure all these are for the
 app too, not just the Kalshi bets". The Lead asked for a plan only; **no credits are spent until the Lead approves the
 number.** This document was written before any in-play price was pulled. The rules below won't change once data
 exists. Any change gets a dated amendment written before its run.
@@ -219,6 +219,56 @@ Each stage stops at 125% of its ceiling. It runs only after the Lead has reviewe
 - 2025–26 (main sample): 2,661 of 2,884 matches (92%).
 - 2023–24 (secondary): 1,630 of 1,789 (91%).
 - The other 5 of the 30 still-postponed matches had no (a‴) snapshot anyway.
+
+## Amendment 2026-10-29 (3): how the studies are scored
+**Timing, stated plainly.**
+- The rules below were fixed in the study code (`upsets/dk_inplay_study.py`, commit ff6165d, 03:45 UTC) and in a message
+  to the Lead (03:47 UTC), before any study number was read.
+- This written amendment is committed after the first run had been read.
+- The exit-curve rule doesn't change any verdict: the walk-forward fails under either reading (0 of 3 and 1 of 3 test
+  seasons positive).
+
+**Exit-level walk-forward (rule 2), as accepted by the Lead.** With data for 2023 to May 2026, only 2024, 2025 and 2026
+can be test seasons; 2023 has no earlier season, and 2026 is a partial season (Jan–May). The gate becomes:
+- all 3 test seasons positive;
+- out-of-sample P&L > 0 in 2025–26;
+- at least 30 out-of-sample positions.
+
+That is stricter than "3 of 4".
+
+**Fixed rules (1, 3, 4B) in 2025–26 alone** (the window amendment's condition) means:
+- at least 30 bets in 2025–26;
+- P&L > 0 there at the 3% cut.
+
+**Fills.** An in-play trigger or fill uses a snapshot inside the (a‴) window whose DK quote is at most 5 min old; a 1-min
+version is reported as a check. No 5-min snapshots were pulled, so the 10-min vs 5-min check can't be run.
+
+**Added descriptive rows (not gate inputs).**
+- **Still-postponed matches put back** (Lead): one row per study.
+- **Expected cost of each hedge** (added after the first run was read), beside the realized Δ vs hold:
+  - the locked result minus the fair value of holding at that snapshot, using Pinnacle's in-play power de-vig p when it
+    is quoted ≤ 5 min old;
+  - the realized Δ mixes the hedge's cost with the luck of how held dogs finished, and this version doesn't.
+
+## Amendment 2026-10-29 (4): DK in-play price validity, criteria set before looking
+**Why.** Pinnacle's in-play quotes in these snapshots barely move, even though their `last_update` looks fresh (§ amendment
+3). So DK's in-play prices, which every study fill uses, need their own check. The Lead asked for it before accepting any
+study section. It uses prices only, no win/loss outcomes, and costs 0 credits.
+
+**Tests**, on (a‴) rows of sample matches, with p = DK's power de-vig for the home player:
+1. **Convergence.** At each match's last (a‴) snapshot, the share of DK quotes that are decided (p ≤ 0.10 or ≥ 0.90),
+   against the same share at its first (a‴) snapshot. The same for Pinnacle, for contrast.
+2. **Movement.** The distribution of DK's snapshot-to-snapshot |Δp| within (a‴), and the share of consecutive (a‴)
+   snapshots where DK's two prices are identical to the previous ones. The same for Pinnacle.
+3. **Kalshi cross-check (when Data can run it).** DK p against Kalshi's mid at the same minute for overlapping
+   ATP/WTA matches: correlation of levels and of changes. Aggregates only; Kalshi data stays private. This container
+   holds no Kalshi data, so Data would run it.
+
+**Pass criteria (fixed now, before any number):**
+- DK decided share at the last (a‴) snapshot ≥ 70%;
+- DK identical-consecutive share ≤ 20%.
+
+If DK fails either one, no study section is sent as a finding until the Lead decides.
 
 ## Rules (fixed now)
 1. **DK-DOG50.**
