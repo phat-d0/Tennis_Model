@@ -200,6 +200,26 @@ The excluded matches are still the big mismatches:
 
 Each stage stops at 125% of its ceiling. It runs only after the Lead has reviewed the option.
 
+**Postponed re-walk 2026-10-29 (Lead-approved after #168).** Run from main 8589013, newest season first.
+- **Spend:** 2026 70, 2025 10, 2024 700, 2023 10 credits. Total 790 of the 6,900 ceiling; job total 218,680 of 270,000.
+- **Still postponed:** DK moved most of these listings again. A cache replay still flags 30 of the 32 as postponed past
+  our re-walked window, and the (a‴) counts didn't change. As the Lead decided, they are not chased further: they stay
+  out of the sample and are counted.
+
+**Study sample = (a‴) and not still postponed:**
+
+| Season | (a‴) | Still postponed | **Sample** |
+|---|---|---|---|
+| 2023 | 694 | 0 | **694** |
+| 2024 | 943 | 7 | **936** |
+| 2025 | 1,605 | 16 | **1,589** |
+| 2026 | 1,074 | 2 | **1,072** |
+| **All** | 4,316 | 25 | **4,291** |
+
+- 2025–26 (main sample): 2,661 of 2,884 matches (92%).
+- 2023–24 (secondary): 1,630 of 1,789 (91%).
+- The other 5 of the 30 still-postponed matches had no (a‴) snapshot anyway.
+
 ## Rules (fixed now)
 1. **DK-DOG50.**
    - Entry: back the pre-match dog with DK close p < 20% (also reported for < 30%), at DK's close.

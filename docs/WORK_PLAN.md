@@ -64,8 +64,8 @@ conflict (git merges edits that touch different blocks).
   Pilot done (#160); **full pull done: 205,930 credits** (2023–May 2026, 4,673 matches; #164; re-walk +70 → 206,000).
   In-play window amendment in review (#166): rule (a‴), 4,256 matches kept after the Lead's close-event/anchor fixes,
   2025–26 main sample (93%), gate must hold there alone. `dk_history.prices` commence label fixed in #167 (merged), before
-  any study. Un-pulled-slot refinement done (11,890 credits; job total 217,890; 4,316 matches kept). Next: the postponed
-  re-walk (32 matches, ≤ 6,900 credits, `--postponed`, after the Lead's review), then the four studies. Close-timing check (#165): 1–5% of closes
+  any study. Refinement done: un-pulled slots 11,890 + postponed 790 credits (job total 218,680). Study sample 4,291
+  matches (25 still-postponed out). Next: the four studies; each report section goes to the Lead before the owner. Close-timing check (#165): 1–5% of closes
   taken before a start moved > 1 h; no headline verdict changes without them.
   Waiting on: Lead review of the window amendment (PR); a real draw fixture (Wikimedia 429s cloud
   IPs; the publish runner's log will show whether it gets through).
