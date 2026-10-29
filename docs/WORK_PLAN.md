@@ -40,9 +40,9 @@ conflict (git merges edits that touch different blocks).
   `reports/backtest_favdip.md`): buying a 60–97¢ favourite at a 50¢ dip does not beat buying at the start; all 4 gates FAIL.
   Next: whatever the Lead queues. Waiting on: nothing.
 
-- **Scanner.** Now: paper trading live on the VPS since 2026-10-27 17:34 UTC; cash-out group C0–C4 (owner 2026-10-28)
-  built and pre-registered, PR #132. Next: after merge the owner updates the server; watch 429s, the 04:00 UTC lookback and
-  the C rules' first exits. Waiting on: Dashboard's contract-test update for the new keys; the owner's health-check paste.
+- **Scanner.** Now: paper trading P1–P4 (live since 2026-10-27 17:34 UTC) and the cash-out group C0–C4 (owner
+  2026-10-28; #132 with Dashboard's #136, merged). Live C entries are E2 apart from the start-up batch (#146). Next: watch
+  429s, the 04:00 UTC lookback and the C rules' first exits; fixes only, no new rules. Waiting on: the owner's health-check paste.
 
 - **Dashboard.** Now: public page Portfolio tab in the folder layout (home › portfolio › strategy), PR open; the Paper tab's
   folder layout merged (#149). Next: check both against the owner's screenshots. Waiting on: Lead review; owner screenshots.
