@@ -4,32 +4,34 @@ Status for every project. Each role updates its own block of the Master plan and
 the same PR as the work (CLAUDE.md, Team rule 7). The Lead keeps the priority order and merges. Durable rules
 and facts are in `CLAUDE.md`.
 
-## Master plan (read first; updated 2026-10-28, evening)
+## Master plan (read first; updated 2026-10-29)
 **Where we stand:** no edge found anywhere after fees. That covers Kalshi true arbs and swing locks, early-round
-underdogs at Kalshi and DraftKings, Elo models against Pinnacle, the penultimate-set and decider prices, and now every
-cash-out rule (`reports/backtest_cashout.md`: take-profit, DOG50, the exit-level curve, MISMATCH50 and -U all FAIL; dogs are
-overpriced, and the exit level only trims the upside). Seed loses early also fails (−10.3%). Line shopping is a thin,
-unproven edge. What's running now: live forward tests (Kalshi paper P1–P4 + cash-out C0–C4 on the VPS; the page Portfolio
-incl. Seed loses early).
+underdogs at Kalshi and DraftKings, Elo models against Pinnacle, the penultimate-set and decider prices, every
+cash-out rule on Kalshi (`reports/backtest_cashout.md`), the fallen favourite on Kalshi (`reports/backtest_favdip.md`), and
+now the same rules on **DraftKings in-play odds** (`reports/upsets_dk_inplay_results.md`, #170: DOG50, the exit curve,
+MISMATCH50 and FAVDIP all FAIL; a cash-out at DK pays its in-play margin a second time). Seed loses early also fails
+(−10.3%). Line shopping is a thin, unproven edge. What's running now: live forward tests (Kalshi paper P1–P4 + cash-out
+C0–C4 on the VPS; the page Portfolio incl. Seed loses early).
 
 **Priority order (owner sets it; the Lead records it):**
 1. **Paper trading forward test** on the VPS: swing P1–P4 and cash-out C0–C4, live ledger + nightly lookback over
-   recorded books. Read monthly, with ≥ 30 settled trades per rule before any verdict. Cash-out study itself: **done**.
+   recorded books. Read monthly, with ≥ 30 settled trades per rule before any verdict.
 2. **Public Tennis Odds page + Portfolio** upkeep (folder layout #150). Forward tests read out in Jan 2027.
-3. **DK in-play studies** (owner 2026-10-28: "all these for the app too"): cash-out / MISMATCH50 / fallen favourite on DraftKings
-   in-play odds via The Odds API historical snapshots. **Owner-approved cap: 300,000 credits** (floor 5,000; pilot ≤ 2,000 first;
-   every spend logged). Upsets runs it; live in-play tracking in the app is plan-only until the backtest is in.
-4. **Fallen favourite on Kalshi** (owner 2026-10-28, docs/edge_favdip.md): favourite 60–80% / ≥ 80% at the last formed pre-match book;
-   buy at the start vs buy when it drops to 50¢ in play. Backtest builds it, Data runs it.
-5. **Not built (owner can ask):** a live MISMATCH50 rule (backtest FAIL; the Elo-rank feed `upsets.elo_ranks.current()`
-   exists, a VPS job doesn't).
-6. **Open on the owner:** `ODDSPAPI_KEY` + allow oddspapi.io / api.oddspapi.io (DK Challenger lines test); en.wikipedia.org is allowed (2026-10-28) but Wikimedia rate-limits cloud IPs (429). Optional: GitHub Support purge of the orphaned commit ae08bf5.
+3. **Done 2026-10-29:** DK in-play studies (owner cap 300,000; spent 218,680 in the job's log, pilot included; every gate
+   FAILs, so no live in-play tracking is proposed) and the fallen favourite on Kalshi (FAIL).
+4. **Not built (owner can ask):** a live MISMATCH50 rule (backtest FAIL on Kalshi and DK; the Elo-rank feed
+   `upsets.elo_ranks.current()` exists, a VPS job doesn't); live in-play DK tracking (plan only, nothing passed).
+5. **Open on the owner:** `ODDSPAPI_KEY` + allow oddspapi.io / api.oddspapi.io (DK Challenger lines test); whether to rotate the
+   Odds API key (it leaked into one cloud session's local log and transcript on 2026-10-28; fixed in #163); whether
+   docs/data_inventory.md should keep the exact balance (public) or "above floor: yes/no". en.wikipedia.org is allowed but
+   Wikimedia rate-limits cloud IPs (429). Optional: GitHub Support purge of the orphaned commit ae08bf5.
 
 **Roles.** Each role edits only its own block. The blocks are kept apart by blank lines so that two PRs don't
 conflict (git merges edits that touch different blocks).
 
-- **Lead.** Now: review and merge; the Odds API budget; owner reports. Next: consolidate the scanner and collector
-  clients; the README. Waiting on: the owner's screenshots of the new Paper/Portfolio folder layouts.
+- **Lead.** Now: review and merge; the Odds API budget; owner reports. DK in-play job closed (#160–#170). Next: consolidate
+  the scanner and collector clients; the README. Waiting on: the owner's screenshots of the new Paper/Portfolio folder
+  layouts; the owner's answers in item 5.
 
 - **Data.** Now: cash-out, MISMATCH50, MISMATCH50-U, E1r and fallen-favourite runs done (2026-10-28; all FAIL); aggregates sent to Backtest.
   Next: the OddsPapi test; Kalshi work otherwise paused. Waiting on: the owner's OddsPapi key.

@@ -575,6 +575,9 @@ Since phat-d0/Tennis_Model#116 also: `min_arb_profit_per_contract` (the alert th
   (a lower bound at 10 min); FAVDIP buying the favourite at 50% −17.3% (60–80%) / −10.2% (≥ 80%) vs at the close −6.3% / −2.7%.
   DK price validity: amendment-4 checks PASS (72% decided at the end, 12% identical) and post-hoc calibration confirms. A FAIL is
   robust to stale prices, a PASS would not have been. Still-postponed matches put back: no direction changes. 382 tests (pandas 2 and 3.1).
+- 2026-10-29 (Lead): DK in-play job closed (#160–#170): 218,680 credits in the job log (owner cap 300,000; Lead cap 270,000),
+  floor never near. Review caught the duplicate-listing event pick and the first-joined `commence` anchor (#166, #167) before
+  any outcome was read. Master plan updated: DK in-play and Kalshi FAVDIP done (FAIL), no live in-play tracking proposed.
 - 2026-10-28 (Backtest): cash-out study code merged (phat-d0/Tennis_Model#125): `swinglock/backtest/cashout.py`, CLI
   `python -m swinglock.backtest.cashout --data <dir> [--sets <dir>/sets.parquet]`. Dated amendment (before any run):
   Level exits (12 gate rules), DOG50 fixed-rule gate on absolute P&L, DOG30 descriptive, set-end split (descriptive),
