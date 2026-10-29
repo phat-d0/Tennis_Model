@@ -385,8 +385,8 @@ def coverage(w: pd.DataFrame, minutes: pd.Series, step_min: int = 10, slack_min:
                  f"{int(g['live_started'].sum()):,} | {g['live_started'].sum() / max(g['live_close'].sum(), 1):.0%} | "
                  + " / ".join(f"{x:.0%}" for x in sh) + " |")
     short = m[m["missing"] > 0]
-    season_of = dict(zip(w["key"], w["season"]))
-    miss = pd.Series([season_of.get(k) for k, _ in set(misses)], dtype="float64").value_counts()
+    # keys repeat every year (one per tournament), so a slot's season is its own year
+    miss = pd.Series([pd.Timestamp(x).year for _, x in set(misses)], dtype="float64").value_counts()
     pp_cr = pp.groupby("season").apply(lambda g: credits(g, step_min, slack_min)) if len(pp) else pd.Series(dtype=float)
     L += ["", f"Coverage of the real (close) event, anchored on its own listed start: {len(short):,} of {len(m):,} matches "
           f"have slots in their walk window (start through Sackmann minutes + {slack_min} min, until the finish is seen) "
