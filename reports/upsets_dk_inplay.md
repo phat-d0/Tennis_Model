@@ -59,48 +59,91 @@ Using DraftKings' own prices, through The Odds API's historical snapshots:
   the price shown then, not a guaranteed fill. These are paper results at displayed prices.
 
 ## Amendment 2026-10-28 (2): the in-play window (written before any outcome is read)
-**Why.** An audit of the pulled snapshots found two problems. It read only quote ages, price levels and listed start times,
-never a result.
-- **Duplicate listings.** In 2024, 281 matches never dropped out of the snapshots. For 248 of them, the walk was
-  following a different event id than the one their DK close came from. DK sometimes lists a duplicate event for the
-  same pairing, and matching by player names latched onto the stale duplicate, whose start is later moved by about a
-  day. The real event, joined to Sackmann by player ids, is in the same snapshots and finished on time. The walk now
-  uses the close's event id and falls back to names only when there is none (`close_event_ids`).
-- **Moved starts.** Separately, 2–4% of matches per season (2023–26) had their listed start move by more than 1 h after
-  the close, a median of 1.5 h (reports/upsets_dk_close_check.md).
-- **Lookahead risk.** Any snapshot taken after a match ended could show settled or near-settled odds. Those odds would give
-  away the winner, so they could fake a "dog reached 50%" trigger or a hedge fill.
+**Why.** An audit of the pulled snapshots found four problems. It read only quote ages, price levels, listed start
+times and pre-match fields, never a result.
+- **Duplicate listings.** DK often lists one pairing as more than one event: a placeholder for a later start (often the
+  next day at 00:00, with prices that never move) next to the real event. Matching by player names latched onto
+  placeholders (248 of 281 "unfinished" 2024 matches). The walk now uses the event the DK close came from
+  (`close_event_ids`, joined to Sackmann by player ids) and falls back to names only when there is none.
+- **No live market in 2023–24.** For about half the 2023 matches, the close's event disappears at the start and no other
+  listing carries live prices: the only other listing of the pairing in the match window is a placeholder dated about a
+  day later whose DK prices don't move (favourite odds range 0.00 at the median). DK offered no in-play market we can
+  see for those matches.
+- **Leap-frogging starts.** In 2023–24 a delayed match's listed start keeps moving to just after each snapshot, so "the
+  start listed in that snapshot" alone can't mark the start of play.
+- **Lookahead risk.** Any snapshot taken after a match ended could show settled or near-settled odds, which would give
+  away the winner and could fake a "dog reached 50%" trigger or a hedge fill.
 
-**Rule (replaces "in-play snapshot" everywhere above; `upsets.dk_inplay.window`).** A snapshot counts as in play for a
-match only if all of these hold:
-- (a) its timestamp is at least 15 min after the start listed **in that same snapshot**. This is causal: it is what
-  anyone could see at that moment.
+**Rule: (a‴), chosen by the Lead's decision rule** ("use (a‴) if it keeps ≥ 90% of what (a′) keeps in 2023–24"; it keeps
+99% in every season). It replaces "in-play snapshot" everywhere above (`upsets.dk_inplay.window`, column `live_started`).
+A snapshot counts as in play for a match only if all of these hold:
+- (a‴) its timestamp is at least 15 min after the start listed **at the close** (known in advance), and the start listed
+  in that same snapshot is not later than its timestamp (the listing has stopped leap-frogging: play has begun).
 - (b) the match's DK quote in it was updated within the last 15 min. A frozen quote means the market was suspended or the
   match was finished.
 - (c) neither it nor any earlier in-play snapshot of the match shows a DK price ≤ 1.01 or ≥ 50. That snapshot counts as
   settled and ends the window: it and every later snapshot are out.
-- (d) it is no later than the listed start + 6 h.
+- (d) it is no later than the close's listed start + 6 h.
 
-**Matches with no in-play snapshot left are dropped from the in-play rules.** The counts are reported per season,
-together with whether the pull saw the match finish. "Stopped" = the event dropped out of the snapshots, or was never
-found by player names.
+The two variants it was chosen against, reported once here:
+- (a) needed timestamp ≥ the start listed in that same snapshot + 15 min.
+- (a′) used only the close's listed start.
+
+| Season | Matches | (a) | (a′) | **(a‴)** | Pinnacle moved > 5 pp from its close in those snapshots: (a) / (a′) / (a‴) |
+|---|---|---|---|---|---|
+| 2023 | 733 | 356 | 361 | **359** | 55% / 55% / 55% |
+| 2024 | 1,056 | 641 | 674 | **667** | 66% / 62% / 65% |
+| 2025 | 1,753 | 1,549 | 1,606 | **1,592** | 67% / 60% / 66% |
+| 2026 | 1,131 | 1,080 | 1,080 | **1,074** | 68% / 60% / 67% |
+
+**Sample: 3,692 matches.** 2025–26 is the main sample, covering 2,666 of 2,884 matches (92%). 2023–24 covers 1,026 of
+1,789 (57%).
+
+**Which matches DK quoted live.** Pre-match data only, `subset_table`:
+
+| Season | Quoted in play | Matches | Slam | 1000 | 250/500 | Dog's DK close odds (median) | Elo gap (median) |
+|---|---|---|---|---|---|---|---|
+| 2023 | no | 374 | 100% | 0% | 0% | 3.20 | 132 |
+| 2023 | yes | 359 | 100% | 0% | 0% | 3.15 | 126 |
+| 2024 | no | 389 | 98% | 2% | 0% | 3.70 | 148 |
+| 2024 | yes | 667 | 54% | 42% | 3% | 3.10 | 125 |
+| 2025 | no | 161 | 78% | 19% | 4% | 4.70 | 209 |
+| 2025 | yes | 1,592 | 40% | 56% | 4% | 2.80 | 124 |
+| 2026 | no | 57 | 39% | 54% | 7% | 12.40 | 277 |
+| 2026 | yes | 1,074 | 32% | 54% | 14% | 2.85 | 110 |
+
+- **2023:** the quoted half looks like the excluded half.
+- **2024:** the excluded matches are mostly Slams with longer dogs.
+- **2025–26:** the excluded matches are the big mismatches (dog median 4.70 / 12.40, Elo gap 209 / 277).
+- **So the in-play sample under-represents heavy underdogs.** That matters most for DK-DOG50 (dogs < 20%, odds > 5):
+  its results describe the heavy dogs DK chose to quote live, not all of them.
+
+**Reporting and gate (added):**
+- Every study is reported three ways: 2025–26 (main), 2023–24 (secondary) and pooled.
+- **A gate pass counts only if it also holds in 2025–26 on its own.**
+- The season walk-forward for the exit curve keeps its test seasons.
 
 **Reported alongside, never as gate inputs:**
-- **Sackmann-minutes cut:** also require timestamp ≤ listed start + Sackmann `minutes` + 30 min. This uses the match's
-  real length, so it is labelled a robustness check.
-- **Final-start cut:** also require timestamp ≥ the match's final listed start + 15 min. This uses later information.
-  It removes pre-match quotes of a match whose postponement wasn't announced yet when the snapshot was taken. Those
-  prices were tradable at the time, so this isn't P&L lookahead, but it blurs "first in-play price". Descriptive only.
-- **Every rule split by stopped (finish seen) vs not.**
+- **Sackmann-minutes cut:** also require timestamp ≤ the close's listed start + Sackmann `minutes` + 30 min. This uses
+  the match's real length, so it is labelled a robustness check.
+- **Final-start cut:** also require timestamp ≥ the match's final listed start + 15 min. This uses later information,
+  so it is descriptive only.
+- **Every rule split by stopped vs not.** "Stopped" = the walk saw the event drop out of the snapshots (finished), or never
+  found it.
 
-**Test:** a synthetic post-finish snapshot (settled price, or a stale quote) and every later snapshot are never in play
-(`tests/test_upsets_dk_inplay.py`).
+**Tests** (`tests/test_upsets_dk_inplay.py`):
+- A synthetic post-finish snapshot (a settled price, or a stale quote) and every later snapshot are never in play.
+- The walk follows the close's event rather than a duplicate listing.
+- A cache replay counts un-pulled snapshots instead of ending a match.
+
+**Coverage of the real event:** the approved re-walk (7 snapshots, 70 credits) left 0 matches with un-pulled snapshots.
 
 **Refinement for postponed matches (plan only, needs the Lead's approval):**
-- **Which matches:** those whose final listed start lies past the last snapshot we pulled.
+- **Which matches:** 46 (2023 9, 2024 12, 2025 20, 2026 5). Postponed = the close's event was later listed for a start
+  more than 1 h after the close's, and our pull ended before it. Events that just stop being listed at the start are not
+  postponed: DK had no live market for them.
 - **What:** re-walk them from their final listed start, at 10 min, with the same stop rules.
-- **Budget:** inside the ≤ 30,000 refinement allowance and the 270,000 cap.
-- **Counts and credits:** given by `python -m upsets.dk_inplay window` and in the PR.
+- **Budget:** ≤ 9,980 credits, inside the 30,000 refinement allowance and the 270,000 cap (job total now 206,000).
 
 ## Rules (fixed now)
 1. **DK-DOG50.**

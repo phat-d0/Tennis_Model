@@ -61,10 +61,11 @@ conflict (git merges edits that touch different blocks).
   paid call, a pilot (one tournament, ≤ 2,000) reported to the Lead before the full pull, floor 5,000, every spend logged in
   docs/data_inventory.md, balance never in a public log. Live in-play tracking stays plan-only until the backtest is in. Later: the line-shopping forward-test
   readout in Jan 2027.
-  Pilot done (#160); **full pull done: 205,930 credits** (2023–May 2026, 4,673 matches; #164). Next: the in-play window
-  amendment (no outcomes read before it merges), then the four studies. Close-timing check (#165): 1–5% of closes
+  Pilot done (#160); **full pull done: 205,930 credits** (2023–May 2026, 4,673 matches; #164; re-walk +70 → 206,000).
+  In-play window amendment in review: rule (a‴), 3,692 matches kept, 2025–26 main sample (92%), gate must hold there alone.
+  Next after it merges: the refinement pull (46 postponed matches, ≤ 9,980 credits) if the Lead approves, then the four studies. Close-timing check (#165): 1–5% of closes
   taken before a start moved > 1 h; no headline verdict changes without them.
-  Waiting on: Lead review of the window amendment; a real draw fixture (Wikimedia 429s cloud
+  Waiting on: Lead review of the window amendment (PR); a real draw fixture (Wikimedia 429s cloud
   IPs; the publish runner's log will show whether it gets through).
 
 
