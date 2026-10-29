@@ -220,6 +220,36 @@ Each stage stops at 125% of its ceiling. It runs only after the Lead has reviewe
 - 2023–24 (secondary): 1,630 of 1,789 (91%).
 - The other 5 of the 30 still-postponed matches had no (a‴) snapshot anyway.
 
+## Amendment 2026-10-29 (3): how the studies are scored
+**Timing, stated plainly.**
+- The rules below were fixed in the study code (`upsets/dk_inplay_study.py`, commit ff6165d, 03:45 UTC) and in a message
+  to the Lead (03:47 UTC), before any study number was read.
+- This written amendment is committed after the first run had been read.
+- The exit-curve rule doesn't change any verdict: the walk-forward fails under either reading (0 of 3 and 1 of 3 test
+  seasons positive).
+
+**Exit-level walk-forward (rule 2), as accepted by the Lead.** With data for 2023 to May 2026, only 2024, 2025 and 2026
+can be test seasons; 2023 has no earlier season, and 2026 is a partial season (Jan–May). The gate becomes:
+- all 3 test seasons positive;
+- out-of-sample P&L > 0 in 2025–26;
+- at least 30 out-of-sample positions.
+
+That is stricter than "3 of 4".
+
+**Fixed rules (1, 3, 4B) in 2025–26 alone** (the window amendment's condition) means:
+- at least 30 bets in 2025–26;
+- P&L > 0 there at the 3% cut.
+
+**Fills.** An in-play trigger or fill uses a snapshot inside the (a‴) window whose DK quote is at most 5 min old; a 1-min
+version is reported as a check. No 5-min snapshots were pulled, so the 10-min vs 5-min check can't be run.
+
+**Added descriptive rows (not gate inputs).**
+- **Still-postponed matches put back** (Lead): one row per study.
+- **Expected cost of each hedge** (added after the first run was read), beside the realized Δ vs hold:
+  - the locked result minus the fair value of holding at that snapshot, using Pinnacle's in-play power de-vig p when it
+    is quoted ≤ 5 min old;
+  - the realized Δ mixes the hedge's cost with the luck of how held dogs finished, and this version doesn't.
+
 ## Rules (fixed now)
 1. **DK-DOG50.**
    - Entry: back the pre-match dog with DK close p < 20% (also reported for < 30%), at DK's close.
