@@ -528,8 +528,17 @@ Since phat-d0/Tennis_Model#116 also: `min_arb_profit_per_contract` (the alert th
   10-min snapshots, DK + Pinnacle, R1–R2 matches we hold DK closes for: 2026 1,131 matches / 58,990 credits (52.2 per match),
   2025 1,753 / 79,530 (45.4), 2024 1,056 / 41,990 (39.8), 2023 733 / 23,670 (32.3). **Job total 205,930** of the 270,000 cap
   (pilot included); every season under its plan; no 429s; one 502 (#163). Events found 97–99% per season. Finish was
-  detected less often in 2024 (775 of 1,032) and 2023 (385 of 712): many listed starts later moved by about a day
-  (postponed), see the in-play window amendment. No outcomes read; snapshots stay in data/raw/odds_api/inplay/ (gitignored).
+  detected less often in 2024 (775 of 1,032) and 2023 (385 of 712). The cause is name matching that followed stale
+  duplicate DK listings of the same pairing; it is not postponement (corrected the same day, see the next line and the
+  in-play window amendment). No outcomes read; snapshots stay in data/raw/odds_api/inplay/ (gitignored).
+- 2026-10-28: DK close-timing check (phat-d0/Tennis_Model#165, `upsets/dk_close_check.py`, reports/upsets_dk_close_check.md;
+  Lead-approved re-statement, 0 credits, no rule search). Matches whose listed start moved > 1 h after the close (on the
+  event the close came from): 2023 7 (1%), 2024 50 (5%), 2025 69 (4%), 2026 25 (2%), median 1.4–1.6 h; 2020–22 unknown.
+  Duplicate DK listings (2020–24: 27–52% of pairings) are placeholders re-listed with a new id; in-play quotes show the
+  close's event is the one played (2023: quoted in play 199 vs 1 for the latest-listed one); 3 stale-duplicate closes.
+  Without moved + stale: every DK dog −9.6% → −8.9% (Pinnacle −6.4% → −5.7%), seed all −10.3% → −9.6%, Portfolio model
+  −12.7% → −12.4%, line +9.2% → +9.0%, dogs −10.4% → −9.7%; DK vs Pinnacle margin unchanged (5.12% vs 2.70%). No verdict
+  changes. One bet per pairing (6,319 rows = 6,319 matches). 367 tests (pandas 2 and 3.1).
 - 2026-10-28 (Backtest): cash-out study code merged (phat-d0/Tennis_Model#125): `swinglock/backtest/cashout.py`, CLI
   `python -m swinglock.backtest.cashout --data <dir> [--sets <dir>/sets.parquet]`. Dated amendment (before any run):
   Level exits (12 gate rules), DOG50 fixed-rule gate on absolute P&L, DOG30 descriptive, set-end split (descriptive),
