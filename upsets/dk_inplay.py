@@ -385,15 +385,27 @@ def coverage(w: pd.DataFrame, minutes: pd.Series, step_min: int = 10, slack_min:
                  f"{int(g['live_started'].sum()):,} | {g['live_started'].sum() / max(g['live_close'].sum(), 1):.0%} | "
                  + " / ".join(f"{x:.0%}" for x in sh) + " |")
     short = m[m["missing"] > 0]
-    L += ["", f"Coverage of the real (close) event: {len(short):,} of {len(m):,} matches need snapshots we never pulled "
-          f"(the pull's start/stop followed the name-matched listing); re-walking them costs {10 * len(set(misses)):,} "
-          f"credits ({len(set(misses)):,} snapshots). By season: "
-          + ", ".join(f"{s} {int((g['missing'] > 0).sum())}" for s, g in m.groupby("season")) + "."]
+    season_of = dict(zip(w["key"], w["season"]))
+    miss = pd.Series([season_of.get(k) for k, _ in set(misses)], dtype="float64").value_counts()
+    pp_cr = pp.groupby("season").apply(lambda g: credits(g, step_min, slack_min)) if len(pp) else pd.Series(dtype=float)
+    L += ["", f"Coverage of the real (close) event, anchored on its own listed start: {len(short):,} of {len(m):,} matches "
+          f"have slots in their walk window (start through Sackmann minutes + {slack_min} min, until the finish is seen) "
+          f"that were never pulled, because the pull followed the first-joined event's start. Re-walking them with the "
+          f"merged pull pays only those slots: at most {len(set(misses)):,} snapshots ({10 * len(set(misses)):,} credits; "
+          f"fewer once the finish is seen)."]
     if f is not None:
         L += ["", "Matches DK quoted in play under (a‴) vs the rest (pre-match data only):", "", subset_table(m, f)]
-    L += ["", f"Refinement plan for postponed matches: {len(pp):,} matches re-walked from their final listed start at "
-          f"{step_min} min, planned <= {plan_credits:,} credits (not run; needs the Lead's approval). Cache misses in the "
-          f"replay: {len(misses)}."]
+    L += ["", "Refinement plan, newest season first (not run; needs the Lead's approval). Un-pulled slots: re-run of the "
+          f"merged `pull --season` with the corrected anchor. Postponed: re-walked from the final listed start at {step_min} min.",
+          "", "| Season | Matches with un-pulled slots | Credits ≤ | Postponed matches | Credits ≤ | Total ≤ |",
+          "|---|---|---|---|---|---|"]
+    tot = 0
+    for season in sorted(m["season"].unique(), reverse=True):
+        a1 = int((short["season"] == season).sum()); c1 = 10 * int(miss.get(season, 0))
+        a2 = int((pp["season"] == season).sum()) if len(pp) else 0; c2 = int(pp_cr.get(season, 0))
+        tot += c1 + c2
+        L.append(f"| {season} | {a1:,} | {c1:,} | {a2:,} | {c2:,} | {c1 + c2:,} |")
+    L.append(f"| **All** | {len(short):,} | {10 * len(set(misses)):,} | {len(pp):,} | {plan_credits:,} | **{tot:,}** |")
     return "\n".join(L), m
 
 
