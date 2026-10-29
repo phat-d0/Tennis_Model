@@ -39,13 +39,15 @@ BOOKS = ("draftkings", "pinnacle")
 INPLAY_CACHE = Path("data/raw/odds_api/inplay")
 
 
-def close_event_ids(t: pd.DataFrame, sack: pd.DataFrame, root: Path | None = None) -> pd.Series:
-    """sack_row -> the event the DK close was read from: dk_close_check.close_events (the latest DK snapshot >= 5 min
-    before its own event's start, over all events joined to the match), not the first joined event."""
+def close_event_ids(t: pd.DataFrame, sack: pd.DataFrame, root: Path | None = None) -> pd.DataFrame:
+    """sack_row -> event_id, commence of the event the DK close was read from: dk_close_check.close_events (the latest
+    DK snapshot >= 5 min before its own event's start, over all events joined to the match), not the first joined
+    event. commence is that event's own listed start at the close (dk_history.prices' commence column is the first
+    joined event's)."""
     from . import dk_close_check as cc
     from . import dk_history as dh
     need, snaps = cc._need(t, sack, root or dh.CACHE)
-    return cc.close_events(need, snaps).set_index("sack_row")["event_id"]
+    return cc.close_events(need, snaps).set_index("sack_row")[["event_id", "commence"]]
 
 
 def windows(priced: pd.DataFrame, sack: pd.DataFrame) -> pd.DataFrame:
@@ -460,7 +462,11 @@ def main(argv=None) -> None:
     priced = dh.collect(t, elo.add_elo(sack, keys=("winner_id", "loser_id")), 24.0)
     w = windows(priced, sack)
     if a.cmd in ("pull", "window"):
-        w["close_event_id"] = close_event_ids(t, sack).reindex(priced["sack_row"].to_numpy()).to_numpy()
+        ce = close_event_ids(t, sack).reindex(priced["sack_row"].to_numpy())
+        w["close_event_id"] = ce["event_id"].to_numpy()
+        # anchor every window on the close's own event start (falls back to priced's where no close event is found)
+        cs = pd.to_datetime(ce["commence"], utc=True).to_numpy()
+        w["commence"] = pd.Series(cs).fillna(w["commence"]).to_numpy()
     if a.cmd == "plan":
         print(plan(w))
         return

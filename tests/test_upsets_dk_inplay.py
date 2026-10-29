@@ -261,4 +261,6 @@ def test_close_event_ids_takes_the_event_the_close_came_from_not_the_first_joine
                           "snapshot_ts": [ts("2024-01-01 10:00", tz="UTC"), ts("2024-01-02 09:00", tz="UTC"),
                                           ts("2024-01-02 11:50", tz="UTC"), ts("2024-01-02 11:00", tz="UTC")]})
     monkeypatch.setattr(cc, "_need", lambda t, sack, root: (need, snaps))
-    assert di.close_event_ids(None, None).to_dict() == {7: "relist"}
+    got = di.close_event_ids(None, None)
+    assert got["event_id"].to_dict() == {7: "relist"}
+    assert got.loc[7, "commence"] == ts("2024-01-02 12:00", tz="UTC")    # the close's own start, not the first joined
