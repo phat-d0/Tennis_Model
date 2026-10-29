@@ -539,13 +539,15 @@ Since phat-d0/Tennis_Model#116 also: `min_arb_profit_per_contract` (the alert th
   Without moved + stale: every DK dog −9.6% → −8.9% (Pinnacle −6.4% → −5.7%), seed all −10.3% → −9.6%, Portfolio model
   −12.7% → −12.4%, line +9.2% → +9.0%, dogs −10.4% → −9.7%; DK vs Pinnacle margin unchanged (5.12% vs 2.70%). No verdict
   changes. One bet per pairing (6,319 rows = 6,319 matches). 367 tests (pandas 2 and 3.1).
-- 2026-10-29: DK in-play window amendment (reports/upsets_dk_inplay.md, `upsets.dk_inplay.window`; written before any outcome
-  is read). A snapshot is in play only from 15 min after the start listed at the close, once the listing stops leap-frogging,
-  with a DK quote ≤ 15 min old, up to the first settled price (≤ 1.01 / ≥ 50) and ≤ 6 h. The walk follows the close's event, not
-  name matches (duplicate DK listings). Kept: 2023 359/733, 2024 667/1,056, 2025 1,592/1,753, 2026 1,074/1,131 (3,692); in about
-  half of 2023 DK had no live market. 2025–26 = main sample (92% coverage); a gate pass must hold there alone. Live-quoted matches
-  in 2025–26 under-represent heavy dogs (excluded: dog median 4.70 / 12.40). Refinement for 46 postponed matches (≤ 9,980
-  credits) waits on the Lead. Re-walk 70 credits; job total 206,000. 372 tests (pandas 2 and 3.1).
+- 2026-10-29: DK in-play window amendment (phat-d0/Tennis_Model#166, reports/upsets_dk_inplay.md, `upsets.dk_inplay.window`;
+  written before any outcome is read). A snapshot is in play only from 15 min after the start listed at the close, once the
+  listing stops leap-frogging, with a DK quote ≤ 15 min old, up to the first settled price (≤ 1.01 / ≥ 50) and ≤ 6 h. Lead
+  review found the walk used the first joined DK event, and `dk_history.prices`' `commence` is that event's start, not the
+  close event's (> 1 h apart for 363 of 733 matches in 2023, 289 in 2024); both fixed. The earlier "no live market for half
+  of 2023" was this bug, withdrawn. Kept: 2023 659/733, 2024 918/1,056, 2025 1,605/1,753, 2026 1,074/1,131 (4,256).
+  2025–26 = main sample (93%); a gate pass must hold there alone. Matches not quoted live are the big mismatches
+  (dog median 5.00–12.40). Refinement (339 matches with un-pulled slots + 36 postponed, ≤ 22,940 credits) waits on the
+  Lead. Job total 206,000. 373 tests (pandas 2 and 3.1).
 - 2026-10-28 (Backtest): cash-out study code merged (phat-d0/Tennis_Model#125): `swinglock/backtest/cashout.py`, CLI
   `python -m swinglock.backtest.cashout --data <dir> [--sets <dir>/sets.parquet]`. Dated amendment (before any run):
   Level exits (12 gate rules), DOG50 fixed-rule gate on absolute P&L, DOG30 descriptive, set-end split (descriptive),

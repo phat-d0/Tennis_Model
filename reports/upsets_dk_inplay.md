@@ -158,7 +158,17 @@ Matches kept (cache replay, 0 credits):
   floor check, every spend logged. The postponed re-walk needs a small CLI option (a pull of those matches from their
   final start), which goes up for review before any call.
 
-REFTABLE
+Refinement plan, newest season first (credits are ceilings: the walk stops a match once its finish is seen):
+
+| Season | Matches with un-pulled slots | Credits ≤ | Postponed matches | Credits ≤ | Total ≤ |
+|---|---|---|---|---|---|
+| 2026 | 0 | 0 | 4 | 970 | 970 |
+| 2025 | 3 | 260 | 16 | 2,970 | 3,230 |
+| 2024 | 189 | 7,170 | 12 | 3,060 | 10,230 |
+| 2023 | 147 | 7,270 | 4 | 1,240 | 8,510 |
+| **All** | 339 | 14,700 | 36 | 8,240 | **22,940** |
+
+The total fits in the remaining cap of 64,000 (job total now 206,000 of 270,000).
 
 ## Rules (fixed now)
 1. **DK-DOG50.**
