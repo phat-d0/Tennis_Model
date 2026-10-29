@@ -539,6 +539,11 @@ Since phat-d0/Tennis_Model#116 also: `min_arb_profit_per_contract` (the alert th
   Without moved + stale: every DK dog −9.6% → −8.9% (Pinnacle −6.4% → −5.7%), seed all −10.3% → −9.6%, Portfolio model
   −12.7% → −12.4%, line +9.2% → +9.0%, dogs −10.4% → −9.7%; DK vs Pinnacle margin unchanged (5.12% vs 2.70%). No verdict
   changes. One bet per pairing (6,319 rows = 6,319 matches). 367 tests (pandas 2 and 3.1).
+- 2026-10-29: `dk_history.prices` `commence` = the start of the event each close was read from (DK's, else Pinnacle's),
+  not the first joined event's (phat-d0/Tennis_Model#PRNUM; found in the Lead's #166 review). Prices and ages unchanged
+  (identical output). Date changes: 2020 70, 2021 361, 2022 304, 2023 350, 2024 270, 2025 4, 2026 1 matches; month changes
+  170 (2020–23 only); year changes 0. Every study folds on Sackmann's season, so no fold or season assignment changes and no
+  headline moves; the line-shopping drawdown report (#108) regenerates byte-identical. 368 tests (pandas 2 and 3.1).
 - 2026-10-28 (Backtest): cash-out study code merged (phat-d0/Tennis_Model#125): `swinglock/backtest/cashout.py`, CLI
   `python -m swinglock.backtest.cashout --data <dir> [--sets <dir>/sets.parquet]`. Dated amendment (before any run):
   Level exits (12 gate rules), DOG50 fixed-rule gate on absolute P&L, DOG30 descriptive, set-end split (descriptive),
