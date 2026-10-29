@@ -545,7 +545,7 @@ Since phat-d0/Tennis_Model#116 also: `min_arb_profit_per_contract` (the alert th
   name matches (duplicate DK listings). Kept: 2023 359/733, 2024 667/1,056, 2025 1,592/1,753, 2026 1,074/1,131 (3,692); in about
   half of 2023 DK had no live market. 2025–26 = main sample (92% coverage); a gate pass must hold there alone. Live-quoted matches
   in 2025–26 under-represent heavy dogs (excluded: dog median 4.70 / 12.40). Refinement for 46 postponed matches (≤ 9,980
-  credits) waits on the Lead. Re-walk 70 credits; job total 206,000. TESTS.
+  credits) waits on the Lead. Re-walk 70 credits; job total 206,000. 372 tests (pandas 2 and 3.1).
 - 2026-10-28 (Backtest): cash-out study code merged (phat-d0/Tennis_Model#125): `swinglock/backtest/cashout.py`, CLI
   `python -m swinglock.backtest.cashout --data <dir> [--sets <dir>/sets.parquet]`. Dated amendment (before any run):
   Level exits (12 gate rules), DOG50 fixed-rule gate on absolute P&L, DOG30 descriptive, set-end split (descriptive),
