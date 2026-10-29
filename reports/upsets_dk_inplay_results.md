@@ -123,6 +123,16 @@ Reach 50% (non-void, close p < 50%, 1,472 matches): 31.6% reached it; the close 
 | FAVDIP (B), 60%–80% | 1,080 | -185.6u | -17.2% | 1,080 |
 | FAVDIP (B), ≥ 80% | 210 | -21.5u | -10.2% | 210 |
 
+## Caveats (Lead review, 2026-10-29)
+- **Reach-50% at a 10-min step undercounts touches.** A dog can touch 50% between snapshots, so 31.6% is a lower bound
+  on the true reach rate, and part of the gap to the close's 39.5% is sampling. Kalshi's 1-min run (34.1% vs 38.4%,
+  `reports/backtest_cashout.md` §6) is the cleaner number.
+- **FAVDIP ≥ 80% is the same set as DOG50 with dog < 20%.**
+  - A favourite at ≥ 80% is a dog at < 20%, and a favourite dipping to 50% is that dog reaching 50%.
+  - So B's 117 / 93 / 210 bets are exactly DOG50's hedged positions, seen from the other side.
+- **FAVDIP 60–80% B (1,079 bets) and DOG50 dog < 20% (1,079 positions) match by coincidence.** They come from different
+  entries: 673 + 406 against 607 + 472.
+
 ## Gates
 
 | Rule | Verdict | Detail |
