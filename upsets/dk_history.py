@@ -411,7 +411,13 @@ def prices(need: pd.DataFrame, snaps: pd.DataFrame, sack: pd.DataFrame, lead_min
     for c in wide.columns:
         wide[c] = pd.to_datetime(wide[c]) if c.startswith("snapshot_ts") else pd.to_numeric(wide[c])
     out = wide.reset_index()
-    out["commence"] = out["sack_row"].map(need.drop_duplicates("sack_row").set_index("sack_row")["commence"])
+    # the start of the event each close was read from (DK's; Pinnacle's if DK has none), not the first joined event's:
+    # a pairing DK listed twice has two events, and the placeholder can start a day or more later
+    start = m.set_index(["sack_row", "book"])["commence"]
+    out["commence"] = out["sack_row"].map(start.xs("draftkings", level="book") if "draftkings" in m["book"].values
+                                          else pd.Series(dtype="datetime64[ns]"))
+    if "pinnacle" in m["book"].values:
+        out["commence"] = out["commence"].fillna(out["sack_row"].map(start.xs("pinnacle", level="book")))
     return out
 
 
