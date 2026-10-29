@@ -416,3 +416,17 @@ def test_close_drift_report():
     text = dk_close.report(e)
     assert "| 0–1 h | 1 | 2.0 |" in text and "| 24–inf h | 1 | 12.0 |" in text
     assert "Matches with a close and at least one earlier snapshot: 2" in text
+
+
+def test_prices_commence_is_the_close_event_start_not_the_first_joined():
+    ts = pd.Timestamp
+    sack = pd.DataFrame({"winner_id": ["a"]}, index=[7])
+    # the placeholder is joined first (starts a day later); the close came from the re-listing
+    need = pd.DataFrame({"key": "k", "event_id": ["placeholder", "relist"], "sack_row": 7, "id_home": "a",
+                         "id_away": "b", "commence": [ts("2024-01-03 00:00"), ts("2024-01-02 12:00")]})
+    snaps = pd.DataFrame({"key": "k", "event_id": ["placeholder", "relist", "relist"],
+                          "book": ["draftkings", "draftkings", "pinnacle"], "odds_1": [1.5, 1.4, 1.45],
+                          "odds_2": [2.6, 2.9, 2.8],
+                          "snapshot_ts": [ts("2024-01-02 10:00"), ts("2024-01-02 11:50"), ts("2024-01-02 11:50")]})
+    out = dh.prices(need, snaps, sack).set_index("sack_row")
+    assert out.loc[7, "odds_w_draftkings"] == 1.4 and out.loc[7, "commence"] == ts("2024-01-02 12:00")
