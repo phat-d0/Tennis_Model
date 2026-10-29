@@ -4,7 +4,7 @@
 
 dk_history.collect takes each match's close as the last snapshot >= 5 min before the start listed in the close
 studies' cache. The DK in-play pull (reports/upsets_dk_inplay.md) showed that a listed start can move after that
-snapshot; this measures how often (2–4% of matches per season in 2023–26, median 1.5 h) and whether it matters.
+snapshot; this measures how often (1–5% of matches per season in 2023–26, median 1.4–1.6 h) and whether it matters.
 It also checks pairings DK listed as more than one event (a placeholder later re-listed): which event the close
 came from. Here, per priced match: final listed start = the event's commence_time in the latest snapshot of either cache;
 moved = final start more than MOVED_MIN after the start the close used. The in-play cache covers 2023 - May 2026

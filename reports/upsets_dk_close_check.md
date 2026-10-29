@@ -16,7 +16,7 @@ threshold or split was searched; the same code is re-run with a group of matches
   May 2026. #86's report also used Kalshi results for Jun–Oct 2026, which aren't in this re-run.
 
 ## Reading
-- **Few closes are affected.** Only 2–4% of matches per season moved by more than 1 h after the close, and the median
+- **Few closes are affected.** Only 1–5% of matches per season moved by more than 1 h after the close, and the median
   move is 1.4–1.6 h, not a day.
 - **No headline changes sign or verdict without them.** Every early-round DK dog goes from −9.6% to −8.9%. The DK vs
   Pinnacle margin is unchanged (5.12% vs 2.70%).
@@ -25,7 +25,7 @@ threshold or split was searched; the same code is re-run with a group of matches
 - **Duplicate listings at close time** (2020–24: 27–52% of pairings) are DK placeholders re-listed with a new id.
   Where in-play snapshots exist (2023 on), only 3 closes came from a stale duplicate; they are excluded with the moved
   matches (table at the end). The "latest listed" test is not evidence of staleness, for the reason given there.
-- **The moved matches themselves did worse,** e.g. dogs −38.6% on 153 bets. The sample is small, and nothing is built on it.
+- **The moved matches themselves did worse,** e.g. dogs −38.6% on 153 bets (moved + the 3 stale-duplicate closes). The sample is small, and nothing is built on it.
 
 ## Results
 
