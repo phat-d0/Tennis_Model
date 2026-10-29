@@ -3,6 +3,7 @@ Plan only, pre-registered in reports/upsets_dk_inplay.md. This module makes no p
 
     python -m upsets.dk_inplay plan [--sackmann PATH]
     python -m upsets.dk_inplay pull --pilot KEY:TOURNEY_ID --cap 2000 --yes    # paid, staged (Lead's go)
+    python -m upsets.dk_inplay pull --season 2024 --postponed --cap 270000 --yes   # paid: postponed matches only
     python -m upsets.dk_inplay pull --season 2025 --cap 270000 --per-match-max 87.5 --yes   # one full-pull stage
 
 Universe: the early-round matches we already hold DraftKings + Pinnacle closes for (upsets.dk_history.collect,
@@ -335,6 +336,26 @@ def subset_table(m: pd.DataFrame, f: pd.DataFrame, col: str = "live_started") ->
     return "\n".join(L)
 
 
+def is_postponed(m: pd.DataFrame) -> pd.Series:
+    """Postponed = the close's event was later listed for a start > 1 h after the close's (m: commence, final_start =
+    its latest listed start, last_ts = our last pulled snapshot of it) and our pull ended before that start + 15 min."""
+    return (m["final_start"].notna() & (m["final_start"] > m["commence"] + pd.Timedelta(hours=1))
+            & (m["final_start"] > m["last_ts"] - pd.Timedelta(minutes=LIVE_AFTER_MIN)))
+
+
+def postponed(w: pd.DataFrame, step_min: int = 10, slack_min: int = 180) -> pd.DataFrame:
+    """The postponed matches of w (cache replay, 0 credits), with commence moved to their final listed start, ready for
+    a walk() over make_fetch: the same event (close_event_id), the same stop rules. No outcomes are read."""
+    w = w.reset_index(drop=True)
+    m = walk(w, cache_fetch([]), step_min, slack_min)["matches"].reset_index(drop=True)
+    q = quotes(m)
+    if not len(q):
+        return w.iloc[:0]
+    m = m.join(q.groupby("match").agg(final_start=("listed_start", "last"), last_ts=("ts", "max")))
+    flag = is_postponed(m).fillna(False).astype(bool).to_numpy()
+    return w[flag].assign(commence=m.loc[flag, "final_start"].to_numpy()).reset_index(drop=True)
+
+
 def coverage(w: pd.DataFrame, minutes: pd.Series, step_min: int = 10, slack_min: int = 180,
              f: pd.DataFrame | None = None) -> tuple[str, pd.DataFrame]:
     """Replay the pull from cache, apply window(), count matches each rule keeps (split by finish detected), and
@@ -360,10 +381,7 @@ def coverage(w: pd.DataFrame, minutes: pd.Series, step_min: int = 10, slack_min:
     cols = ["live", "live_close", "live_started", "live_minutes", "live_final"]
     m[cols] = m[cols].fillna(False).astype(bool)
     m["finished"] = m["finished_at"].notna()
-    # postponed = the close's event was later listed for a start > 1 h after the close's and our pull ended before it
-    # (an event that simply stops being listed at the start is not postponed: DK offered no in-play market for it)
-    m["postponed"] = (m["final_start"].notna() & (m["final_start"] > m["commence"] + pd.Timedelta(hours=1))
-                      & (m["final_start"] > m["last_ts"] - pd.Timedelta(minutes=LIVE_AFTER_MIN)))
+    m["postponed"] = is_postponed(m)
     L = ["| Season | Stopped (finish seen or event never found) | Matches | Event found | In play, rules (a)–(d) | "
          "(a)–(d) from the close's listed start | + Sackmann-minutes cut | + final-start cut (later info) | "
          "Postponed past our window |", "|---|---|---|---|---|---|---|---|---|"]
@@ -459,6 +477,8 @@ def main(argv=None) -> None:
     ap.add_argument("--pilot", default=None, help="KEY:TOURNEY_ID, one tournament only")
     ap.add_argument("--since", type=int, default=2023, help="first season of the full pull")
     ap.add_argument("--season", type=int, default=None, help="one stage: this season only")
+    ap.add_argument("--postponed", action="store_true",
+                    help="with --season: only that season's postponed matches, re-walked from their final listed start")
     ap.add_argument("--per-match-max", type=float, default=None,
                     help="stop the stage once it spends more than this x its matches (drift stop)")
     ap.add_argument("--step", type=int, default=10)
@@ -495,6 +515,10 @@ def main(argv=None) -> None:
         w = w[(w["key"] == key) & (w["tourney_id"].astype(str) == tid)]
     elif a.season is not None:
         w = w[w["season"] == a.season]
+        if a.postponed:
+            w = postponed(w, a.step, a.slack)
+    elif a.postponed:
+        raise SystemExit("--postponed needs --season")
     else:
         w = w[w["season"] >= a.since]
     planned = credits(w, a.step, a.slack)

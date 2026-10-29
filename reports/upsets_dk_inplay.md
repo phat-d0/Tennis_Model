@@ -170,6 +170,36 @@ Refinement plan, newest season first (credits are ceilings: the walk stops a mat
 
 The total fits in the remaining cap of 64,000 (job total now 206,000 of 270,000).
 
+**Refinement run 2026-10-29 (un-pulled slots, Lead-approved after #166).** Run from main 7f91c1b, newest season first.
+- **Spend:** 2025 120, 2024 6,030, 2023 5,740 credits. Total 11,890 of the 14,700 ceiling; job total 217,890 of 270,000.
+- **Re-stated from the cache (0 credits):** no match has an un-pulled slot left.
+
+| Season | Matches | (a) | (a′) | **(a‴)** | (a‴) / (a′) |
+|---|---|---|---|---|---|
+| 2023 | 733 | 691 | 697 | **694** | 100% |
+| 2024 | 1,056 | 920 | 948 | **943** | 99% |
+| 2025 | 1,753 | 1,560 | 1,619 | **1,605** | 99% |
+| 2026 | 1,131 | 1,081 | 1,080 | **1,074** | 99% |
+
+**Sample now 4,316 matches.** 2025–26: 2,679 of 2,884 (93%, unchanged). 2023–24: 1,637 of 1,789 (92%).
+
+The excluded matches are still the big mismatches:
+
+| Season | Not quoted live | Dog's DK close odds (median) | Elo gap (median) | Quoted live | Dog odds | Elo gap |
+|---|---|---|---|---|---|---|
+| 2023 | 39 | 15.00 | 412 | 694 | 3.10 | 124 |
+| 2024 | 113 | 5.62 | 240 | 943 | 3.15 | 125 |
+| 2025 | 148 | 5.00 | 209 | 1,605 | 2.85 | 124 |
+| 2026 | 57 | 12.40 | 277 | 1,074 | 2.85 | 110 |
+
+**Postponed (still to run):** 32 matches (2026 4, 2025 16, 2024 11, 2023 1), at most 6,900 credits. They run via
+`pull --season S --postponed`, which:
+- finds the season's postponed matches by a cache replay, with the same `is_postponed` rule as the coverage table;
+- moves their start to the final listed start;
+- walks the same event through `make_fetch`.
+
+Each stage stops at 125% of its ceiling. It runs only after the Lead has reviewed the option.
+
 ## Rules (fixed now)
 1. **DK-DOG50.**
    - Entry: back the pre-match dog with DK close p < 20% (also reported for < 30%), at DK's close.

@@ -152,4 +152,8 @@ phat-d0/Tennis_Model#157). Staged: pilot ≤ 2,000 first, full pull only after t
 | | **In-play job total, pull complete (its spend log)** | | 20,593 | **205,930** of the 270,000 cap | 4,411,572 |
 | 2026-10-28 23:3x | Upsets, in-play coverage re-walk of the real (close) events (Lead-approved ≤ 310): `pull --season` 2026/2024/2023 with close event ids; only un-pulled snapshots paid | `/historical/sports/{key}/odds` | 7 | 70 | 4,411,497 |
 | | **In-play job total (its spend log)** | | 20,600 | **206,000** of the 270,000 cap | 4,411,497 |
+| 2026-10-29 02:09–02:10 | Upsets, in-play refinement of un-pulled slots (Lead-approved after #166; ceiling 260, stop at +25%): `pull --season 2025` from main 7f91c1b, windows anchored on the close event's own start; cached slots re-read free | `/historical/sports/{key}/odds` | 12 | 120 | 4,411,360 |
+| 2026-10-29 02:12–02:20 | Upsets, same, `pull --season 2024` (ceiling 7,170) | `/historical/sports/{key}/odds` | 603 | 6,030 | 4,405,330 |
+| 2026-10-29 02:22–02:30 | Upsets, same, `pull --season 2023` (ceiling 7,270) | `/historical/sports/{key}/odds` | 574 | 5,740 | 4,399,590 |
+| | **In-play job total (its spend log)**; refinement 11,890 of its 14,700 ceiling | | 21,789 | **217,890** of the 270,000 cap | 4,399,590 |
 
