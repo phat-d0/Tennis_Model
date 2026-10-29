@@ -250,6 +250,26 @@ version is reported as a check. No 5-min snapshots were pulled, so the 10-min vs
     is quoted ≤ 5 min old;
   - the realized Δ mixes the hedge's cost with the luck of how held dogs finished, and this version doesn't.
 
+## Amendment 2026-10-29 (4): DK in-play price validity, criteria set before looking
+**Why.** Pinnacle's in-play quotes in these snapshots barely move, even though their `last_update` looks fresh (§ amendment
+3). So DK's in-play prices, which every study fill uses, need their own check. The Lead asked for it before accepting any
+study section. It uses prices only, no win/loss outcomes, and costs 0 credits.
+
+**Tests**, on (a‴) rows of sample matches, with p = DK's power de-vig for the home player:
+1. **Convergence.** At each match's last (a‴) snapshot, the share of DK quotes that are decided (p ≤ 0.10 or ≥ 0.90),
+   against the same share at its first (a‴) snapshot. The same for Pinnacle, for contrast.
+2. **Movement.** The distribution of DK's snapshot-to-snapshot |Δp| within (a‴), and the share of consecutive (a‴)
+   snapshots where DK's two prices are identical to the previous ones. The same for Pinnacle.
+3. **Kalshi cross-check (when Data can run it).** DK p against Kalshi's mid at the same minute for overlapping
+   ATP/WTA matches: correlation of levels and of changes. Aggregates only; Kalshi data stays private. This container
+   holds no Kalshi data, so Data would run it.
+
+**Pass criteria (fixed now, before any number):**
+- DK decided share at the last (a‴) snapshot ≥ 70%;
+- DK identical-consecutive share ≤ 20%.
+
+If DK fails either one, no study section is sent as a finding until the Lead decides.
+
 ## Rules (fixed now)
 1. **DK-DOG50.**
    - Entry: back the pre-match dog with DK close p < 20% (also reported for < 30%), at DK's close.
