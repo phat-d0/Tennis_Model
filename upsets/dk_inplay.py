@@ -57,6 +57,7 @@ def windows(priced: pd.DataFrame, sack: pd.DataFrame) -> pd.DataFrame:
                       "minutes": s["minutes"].to_numpy(), "best_of": s["best_of"].to_numpy(),
                       "season": s["season"].to_numpy(), "level": s["level_group"].to_numpy(),
                       "tourney_id": priced["tourney_id"].to_numpy() if "tourney_id" in priced else None,
+                      "sack_row": priced["sack_row"].to_numpy(),
                       "pair": [frozenset((pkey(a), pkey(b))) for a, b in
                                zip(s.get("winner", [""] * len(s)), s.get("loser", [""] * len(s)))]})
     med = w.groupby("best_of")["minutes"].median()
@@ -319,7 +320,23 @@ def cache_fetch(misses: list):
     return fetch
 
 
-def coverage(w: pd.DataFrame, minutes: pd.Series, step_min: int = 10, slack_min: int = 180) -> tuple[str, pd.DataFrame]:
+def subset_table(m: pd.DataFrame, f: pd.DataFrame, col: str = "live_started") -> str:
+    """Matches DK quoted in play (by `col`) vs the rest, on pre-match data only: tier mix, the dog's DK close odds and
+    the Elo gap (dk_study.frame's columns). Never reads results."""
+    x = m[["sack_row", "season", col]].merge(
+        f[["sack_row", "level_group", "odds_dog_dk", "elo_dog", "elo_fav"]], on="sack_row", how="left")
+    x["elo_gap"] = x["elo_fav"] - x["elo_dog"]
+    L = ["| Season | Quoted in play | Matches | Slam | 1000 | 250/500 | Dog's DK close odds (median) | "
+         "Elo gap (median) |", "|---|---|---|---|---|---|---|---|"]
+    for (season, live), g in x.groupby(["season", col]):
+        lv = g["level_group"].value_counts(normalize=True)
+        L.append(f"| {season} | {'yes' if live else 'no'} | {len(g):,} | {lv.get('slam', 0):.0%} | {lv.get('1000', 0):.0%} | "
+                 f"{lv.get('other', 0):.0%} | {g['odds_dog_dk'].median():.2f} | {g['elo_gap'].median():.0f} |")
+    return "\n".join(L)
+
+
+def coverage(w: pd.DataFrame, minutes: pd.Series, step_min: int = 10, slack_min: int = 180,
+             f: pd.DataFrame | None = None) -> tuple[str, pd.DataFrame]:
     """Replay the pull from cache, apply window(), count matches each rule keeps (split by finish detected), and
     plan the refinement for postponed matches (final listed start past our pulled window). No outcomes."""
     misses: list = []
@@ -372,6 +389,8 @@ def coverage(w: pd.DataFrame, minutes: pd.Series, step_min: int = 10, slack_min:
           f"(the pull's start/stop followed the name-matched listing); re-walking them costs {10 * len(set(misses)):,} "
           f"credits ({len(set(misses)):,} snapshots). By season: "
           + ", ".join(f"{s} {int((g['missing'] > 0).sum())}" for s, g in m.groupby("season")) + "."]
+    if f is not None:
+        L += ["", "Matches DK quoted in play under (a‴) vs the rest (pre-match data only):", "", subset_table(m, f)]
     L += ["", f"Refinement plan for postponed matches: {len(pp):,} matches re-walked from their final listed start at "
           f"{step_min} min, planned <= {plan_credits:,} credits (not run; needs the Lead's approval). Cache misses in the "
           f"replay: {len(misses)}."]
@@ -450,7 +469,9 @@ def main(argv=None) -> None:
     if a.cmd == "window":
         mins = sack.loc[priced["sack_row"].to_numpy(), "minutes"].reset_index(drop=True)
         keep = (w["season"] >= a.since).to_numpy()
-        text, _ = coverage(w[keep].reset_index(drop=True), mins[keep].reset_index(drop=True), a.step, a.slack)
+        from . import dk_study as ds
+        f = ds.frame(priced, elo.add_elo(sack, keys=("winner_id", "loser_id")))
+        text, _ = coverage(w[keep].reset_index(drop=True), mins[keep].reset_index(drop=True), a.step, a.slack, f)
         print(text)
         return
     if a.pilot:

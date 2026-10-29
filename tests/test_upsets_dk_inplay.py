@@ -238,3 +238,13 @@ def test_cache_replay_counts_unpulled_snapshots_instead_of_ending_the_match(tmp_
     m = di.walk(w, di.cache_fetch(misses))["matches"].iloc[0]
     assert m["snaps"] == 2 and pd.isna(m["finished_at"])                     # gaps are unknown, never "gone"
     assert m["missing"] == len(misses) and len(misses) > 3
+
+
+def test_subset_table_compares_quoted_and_unquoted_matches_on_pre_match_data():
+    m = pd.DataFrame({"sack_row": [1, 2, 3, 4], "season": 2024, "live_started": [True, True, False, False]})
+    f = pd.DataFrame({"sack_row": [1, 2, 3, 4], "level_group": ["slam", "slam", "1000", "other"],
+                      "odds_dog_dk": [2.0, 3.0, 4.0, 5.0], "elo_dog": [1500.0] * 4, "elo_fav": [1600, 1700, 1550, 1550.0],
+                      "upset": [1, 0, 1, 0]})                                     # results are never read
+    t = di.subset_table(m, f)
+    assert "| 2024 | yes | 2 | 100% | 0% | 0% | 2.50 | 150 |" in t
+    assert "| 2024 | no | 2 | 0% | 50% | 50% | 4.50 | 50 |" in t
