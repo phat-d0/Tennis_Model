@@ -156,4 +156,9 @@ phat-d0/Tennis_Model#157). Staged: pilot ≤ 2,000 first, full pull only after t
 | 2026-10-29 02:12–02:20 | Upsets, same, `pull --season 2024` (ceiling 7,170) | `/historical/sports/{key}/odds` | 603 | 6,030 | 4,405,330 |
 | 2026-10-29 02:22–02:30 | Upsets, same, `pull --season 2023` (ceiling 7,270) | `/historical/sports/{key}/odds` | 574 | 5,740 | 4,399,590 |
 | | **In-play job total (its spend log)**; refinement 11,890 of its 14,700 ceiling | | 21,789 | **217,890** of the 270,000 cap | 4,399,590 |
+| 2026-10-29 02:58 | Upsets, in-play postponed re-walk (Lead-approved after #168; stop at +25% per stage): `pull --season 2026 --postponed` from main 8589013, 4 matches (ceiling 970) | `/historical/sports/{key}/odds` | 7 | 70 | 4,399,520 |
+| 2026-10-29 03:01 | Upsets, same, `--season 2025 --postponed`, 16 matches (ceiling 2,970) | `/historical/sports/{key}/odds` | 1 | 10 | 4,399,510 |
+| 2026-10-29 03:04–03:05 | Upsets, same, `--season 2024 --postponed`, 11 matches (ceiling 2,610) | `/historical/sports/{key}/odds` | 70 | 700 | 4,398,810 |
+| 2026-10-29 03:07 | Upsets, same, `--season 2023 --postponed`, 1 match (ceiling 350) | `/historical/sports/{key}/odds` | 1 | 10 | 4,398,800 |
+| | **In-play job total (its spend log)**; postponed re-walk 790 of its 6,900 ceiling | | 21,868 | **218,680** of the 270,000 cap | 4,398,800 |
 
