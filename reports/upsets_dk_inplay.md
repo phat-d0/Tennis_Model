@@ -1,6 +1,6 @@
 # In-play studies on DraftKings prices: DOG50, exit-level curve, MISMATCH50, FAVDIP (pre-registration)
 
-**Status: PLAN, PRE-REGISTERED, nothing pulled, no results.** Owner request 2026-10-28: "make sure all these are for the
+**Status: RUN 2026-10-29. Every gate FAILs; results in `reports/upsets_dk_inplay_results.md`.** Pre-registered as below. Owner request 2026-10-28: "make sure all these are for the
 app too, not just the Kalshi bets". The Lead asked for a plan only; **no credits are spent until the Lead approves the
 number.** This document was written before any in-play price was pulled. The rules below won't change once data
 exists. Any change gets a dated amendment written before its run.
