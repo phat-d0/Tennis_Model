@@ -39,6 +39,17 @@ BOOKS = ("draftkings", "pinnacle")
 INPLAY_CACHE = Path("data/raw/odds_api/inplay")
 
 
+def close_event_ids(t: pd.DataFrame, sack: pd.DataFrame, root: Path | None = None) -> pd.DataFrame:
+    """sack_row -> event_id, commence of the event the DK close was read from: dk_close_check.close_events (the latest
+    DK snapshot >= 5 min before its own event's start, over all events joined to the match), not the first joined
+    event. commence is that event's own listed start at the close (dk_history.prices' commence column is the first
+    joined event's)."""
+    from . import dk_close_check as cc
+    from . import dk_history as dh
+    need, snaps = cc._need(t, sack, root or dh.CACHE)
+    return cc.close_events(need, snaps).set_index("sack_row")[["event_id", "commence"]]
+
+
 def windows(priced: pd.DataFrame, sack: pd.DataFrame) -> pd.DataFrame:
     """One row per priced match: key, commence (UTC), dur (minutes), season, level, tourney_id, players."""
     s = sack.loc[priced["sack_row"].to_numpy()].reset_index(drop=True)
@@ -46,6 +57,7 @@ def windows(priced: pd.DataFrame, sack: pd.DataFrame) -> pd.DataFrame:
                       "minutes": s["minutes"].to_numpy(), "best_of": s["best_of"].to_numpy(),
                       "season": s["season"].to_numpy(), "level": s["level_group"].to_numpy(),
                       "tourney_id": priced["tourney_id"].to_numpy() if "tourney_id" in priced else None,
+                      "sack_row": priced["sack_row"].to_numpy(),
                       "pair": [frozenset((pkey(a), pkey(b))) for a, b in
                                zip(s.get("winner", [""] * len(s)), s.get("loser", [""] * len(s)))]})
     med = w.groupby("best_of")["minutes"].median()
@@ -108,12 +120,16 @@ def walk(w: pd.DataFrame, fetch, step_min: int = 10, slack_min: int = 180) -> di
     """Walk each key's snapshot times in order; a time is fetched only while some match of that key is in its
     live window and not yet finished. A match is finished after GONE_SNAPSHOTS consecutive snapshots (each at
     least MIN_LIVE_MIN after its commence) without its event; a match whose event is never found (by player
-    names) is dropped the same way, since its prices can't be used. fetch(key, when_iso) -> snapshot dict, or None to
+    names) is dropped the same way, since its prices can't be used. A match with a `close_event_id` (the event its DK
+    close came from, joined to Sackmann by player ids) uses that event; player names only find the event otherwise
+    (DK can list duplicate events for one pairing, and a stale duplicate may be moved a day later). fetch(key, when_iso) -> snapshot dict, or None to
     stop (cap reached). -> {"fetched", "stopped", "matches": per-match frame}."""
     w = w.reset_index(drop=True)
-    st = pd.DataFrame({"event_id": pd.Series([None] * len(w), dtype=object), "snaps": 0, "gone": 0,
+    known = w["close_event_id"] if "close_event_id" in w else pd.Series([None] * len(w), index=w.index)
+    st = pd.DataFrame({"event_id": known.astype(object).where(known.notna(), None), "snaps": 0, "gone": 0,
                        "finished_at": pd.Series([pd.NaT] * len(w), dtype="datetime64[ns, UTC]"),
-                       "first_seen": pd.Series([pd.NaT] * len(w), dtype="datetime64[ns, UTC]")}, index=w.index)
+                       "first_seen": pd.Series([pd.NaT] * len(w), dtype="datetime64[ns, UTC]"),
+                       "missing": 0}, index=w.index)
     fetched, stopped = 0, False
     for key, g in w.groupby("key", sort=True):
         times = sorted({x for k, x in slots(g, step_min, slack_min)})
@@ -127,6 +143,10 @@ def walk(w: pd.DataFrame, fetch, step_min: int = 10, slack_min: int = 180) -> di
             if snap is None:
                 stopped = True
                 break
+            if snap.get("missing"):                   # cache-only replay: not pulled, so unknown, not "gone"
+                for i in active:
+                    st.at[i, "missing"] += 1
+                continue
             fetched += 1
             ids = {e["id"] for e in snap.get("data") or []}
             for i in active:
@@ -199,6 +219,196 @@ def pilot_stats(m: pd.DataFrame, snaps: list[dict], planned: int, spent: float) 
 RETRY_WAITS_S = (10, 30)   # a 5xx or a network error is retried after these pauses, then the stage stops
 
 
+# --- the in-play window (reports/upsets_dk_inplay.md, amendment 2026-10-28) ---------------------------------
+
+LIVE_AFTER_MIN = 15        # (a) in play from the start listed in that same snapshot + this
+STALE_MIN = 15             # (b) the DK quote must have updated within this
+SETTLED_LO, SETTLED_HI = 1.01, 50.0   # (c) a DK price at or beyond these ends the window (that snapshot too)
+MAX_LIVE_H = 6             # (d) no later than the listed start + this
+
+
+def quotes(m: pd.DataFrame, roots=None) -> pd.DataFrame:
+    """One row per (match, cached snapshot that lists its event): listed start in that snapshot, DK and Pinnacle
+    h2h odds by home/away with last_update. m = walk()'s matches (key, event_id). Reads one file at a time."""
+    from . import dk_history as dh
+    roots = roots or (INPLAY_CACHE, dh.CACHE)
+    want = m.dropna(subset=["event_id"]).reset_index().rename(columns={"index": "match"})
+    rows = []
+    for key, g in want.groupby("key"):
+        ids = dict(zip(g["event_id"], g["match"]))
+        lo, hi = g["commence"].min() - pd.Timedelta(hours=1), g["commence"].max() + pd.Timedelta(days=3)
+        seen = set()
+        for root in roots:
+            for f in sorted((Path(root) / "odds" / key).glob("*.json.gz")):
+                if f.name in seen:
+                    continue
+                ts_guess = pd.Timestamp(f.name.split(".")[0], tz="UTC")
+                if not lo <= ts_guess <= hi:
+                    continue
+                seen.add(f.name)
+                b = dh.read_cache(f)
+                ts = pd.Timestamp(b["timestamp"])
+                for e in b.get("data") or []:
+                    if e["id"] not in ids:
+                        continue
+                    r = {"match": ids[e["id"]], "ts": ts, "listed_start": pd.Timestamp(e["commence_time"]),
+                         "home": e["home_team"], "away": e["away_team"]}
+                    for bk in e.get("bookmakers") or []:
+                        if bk["key"] not in BOOKS:
+                            continue
+                        o = {x["name"]: x["price"] for mk in bk["markets"] if mk["key"] == "h2h"
+                             for x in mk["outcomes"]}
+                        r[f"{bk['key']}_home"] = o.get(e["home_team"])
+                        r[f"{bk['key']}_away"] = o.get(e["away_team"])
+                        r[f"{bk['key']}_updated"] = pd.Timestamp(bk["last_update"])
+                    rows.append(r)
+    q = pd.DataFrame(rows)
+    if not len(q):
+        return q
+    for b in BOOKS:
+        for c in ("home", "away"):
+            if f"{b}_{c}" not in q:
+                q[f"{b}_{c}"] = np.nan
+        if f"{b}_updated" not in q:
+            q[f"{b}_updated"] = pd.NaT
+    return q.drop_duplicates(["match", "ts"]).sort_values(["match", "ts"]).reset_index(drop=True)
+
+
+def window(q: pd.DataFrame, minutes: pd.Series | None = None) -> pd.DataFrame:
+    """Flags per quote row (no outcome is read):
+    - live: the pre-registered in-play rule, rules (a)-(d) (causal: only what that snapshot and earlier showed);
+    - live_minutes: robustness, live and ts <= listed start + Sackmann minutes + 30 min (uses the match's duration);
+    - live_final: sensitivity, live and ts >= the match's final listed start + LIVE_AFTER_MIN (uses later information;
+      descriptive only, never a gate input)."""
+    q = q.copy()
+    a = q["ts"] >= q["listed_start"] + pd.Timedelta(minutes=LIVE_AFTER_MIN)
+    b = q["draftkings_updated"].notna() & (q["ts"] - q["draftkings_updated"] <= pd.Timedelta(minutes=STALE_MIN))
+    lo = q[["draftkings_home", "draftkings_away"]].min(axis=1)
+    hi = q[["draftkings_home", "draftkings_away"]].max(axis=1)
+    settled = ((lo <= SETTLED_LO) | (hi >= SETTLED_HI)) & a
+    c = ~settled.astype(int).groupby(q["match"]).cummax().astype(bool)     # that snapshot and all later ones out
+    d = q["ts"] <= q["listed_start"] + pd.Timedelta(hours=MAX_LIVE_H)
+    q["live"] = a & b & c & d
+    if "close_start" in q:   # variant: (a) and (c) anchored on the start listed at the close (known in advance)
+        a2 = q["ts"] >= q["close_start"] + pd.Timedelta(minutes=LIVE_AFTER_MIN)
+        settled2 = ((lo <= SETTLED_LO) | (hi >= SETTLED_HI)) & a2
+        c2 = ~settled2.astype(int).groupby(q["match"]).cummax().astype(bool)
+        d2 = q["ts"] <= q["close_start"] + pd.Timedelta(hours=MAX_LIVE_H)
+        q["live_close"] = a2 & b & c2 & d2
+        # (a‴) causal: also require the snapshot's own listed start to have stopped leap-frogging (<= its time)
+        q["live_started"] = q["live_close"] & (q["listed_start"] <= q["ts"])
+    if minutes is not None:
+        mm = q["match"].map(minutes)
+        q["live_minutes"] = q["live"] & mm.notna() & (q["ts"] <= q["listed_start"] + pd.to_timedelta(mm + 30, unit="m"))
+    final = q.groupby("match")["listed_start"].transform("last")
+    q["live_final"] = q["live"] & (q["ts"] >= final + pd.Timedelta(minutes=LIVE_AFTER_MIN))
+    return q
+
+
+def cache_fetch(misses: list):
+    """walk() fetch that only reads the caches (0 credits); a snapshot we never pulled is returned as missing
+    (walk() then counts it per active match and treats it as unknown, not as the event being gone) and recorded."""
+    from . import dk_history as dh
+
+    def fetch(key, when):
+        for root in (INPLAY_CACHE, dh.CACHE):
+            p = dh.cache_path("odds", key, when, root)
+            if p.exists():
+                return dh.read_cache(p)
+        misses.append((key, when))
+        return {"timestamp": when, "data": [], "missing": True}
+    return fetch
+
+
+def subset_table(m: pd.DataFrame, f: pd.DataFrame, col: str = "live_started") -> str:
+    """Matches DK quoted in play (by `col`) vs the rest, on pre-match data only: tier mix, the dog's DK close odds and
+    the Elo gap (dk_study.frame's columns). Never reads results."""
+    x = m[["sack_row", "season", col]].merge(
+        f[["sack_row", "level_group", "odds_dog_dk", "elo_dog", "elo_fav"]], on="sack_row", how="left")
+    x["elo_gap"] = x["elo_fav"] - x["elo_dog"]
+    L = ["| Season | Quoted in play | Matches | Slam | 1000 | 250/500 | Dog's DK close odds (median) | "
+         "Elo gap (median) |", "|---|---|---|---|---|---|---|---|"]
+    for (season, live), g in x.groupby(["season", col]):
+        lv = g["level_group"].value_counts(normalize=True)
+        L.append(f"| {season} | {'yes' if live else 'no'} | {len(g):,} | {lv.get('slam', 0):.0%} | {lv.get('1000', 0):.0%} | "
+                 f"{lv.get('other', 0):.0%} | {g['odds_dog_dk'].median():.2f} | {g['elo_gap'].median():.0f} |")
+    return "\n".join(L)
+
+
+def coverage(w: pd.DataFrame, minutes: pd.Series, step_min: int = 10, slack_min: int = 180,
+             f: pd.DataFrame | None = None) -> tuple[str, pd.DataFrame]:
+    """Replay the pull from cache, apply window(), count matches each rule keeps (split by finish detected), and
+    plan the refinement for postponed matches (final listed start past our pulled window). No outcomes."""
+    misses: list = []
+    m = walk(w, cache_fetch(misses), step_min, slack_min)["matches"].reset_index(drop=True)
+    mins = pd.Series(minutes.to_numpy(), index=range(len(m)))
+    q = quotes(m)
+    q["close_start"] = q["match"].map(m["commence"])
+    q = window(q, mins)
+    # Pinnacle's own close (last quote >= 5 min before the close's listed start) vs each snapshot, by home side:
+    # real in-play prices move, pre-match ones mostly don't. Prices only, no results.
+    ph = (1 / q["pinnacle_home"]) / (1 / q["pinnacle_home"] + 1 / q["pinnacle_away"])
+    pre = q[q["ts"] <= q["close_start"] - pd.Timedelta(minutes=5)].assign(ph=ph)
+    p0 = pre.groupby("match")["ph"].last()
+    q["pin_moved"] = (ph - q["match"].map(p0)).abs() > 0.05
+    per = q.groupby("match").agg(live=("live", "any"), live_close=("live_close", "any"),
+                                 live_started=("live_started", "any"),
+                                 live_minutes=("live_minutes", "any"),
+                                 live_final=("live_final", "any"), final_start=("listed_start", "last"),
+                                 last_ts=("ts", "max"))
+    m = m.join(per)
+    cols = ["live", "live_close", "live_started", "live_minutes", "live_final"]
+    m[cols] = m[cols].fillna(False).astype(bool)
+    m["finished"] = m["finished_at"].notna()
+    # postponed = the close's event was later listed for a start > 1 h after the close's and our pull ended before it
+    # (an event that simply stops being listed at the start is not postponed: DK offered no in-play market for it)
+    m["postponed"] = (m["final_start"].notna() & (m["final_start"] > m["commence"] + pd.Timedelta(hours=1))
+                      & (m["final_start"] > m["last_ts"] - pd.Timedelta(minutes=LIVE_AFTER_MIN)))
+    L = ["| Season | Stopped (finish seen or event never found) | Matches | Event found | In play, rules (a)–(d) | "
+         "(a)–(d) from the close's listed start | + Sackmann-minutes cut | + final-start cut (later info) | "
+         "Postponed past our window |", "|---|---|---|---|---|---|---|---|---|"]
+    for (season, fin), g in m.groupby(["season", "finished"]):
+        L.append(f"| {season} | {'yes' if fin else 'no'} | {len(g):,} | {int(g['event_id'].notna().sum()):,} | "
+                 f"{int(g['live'].sum()):,} | {int(g['live_close'].sum()):,} | {int(g['live_minutes'].sum()):,} | "
+                 f"{int(g['live_final'].sum()):,} | "
+                 f"{int(g['postponed'].sum()):,} |")
+    pp = m[m["postponed"]].assign(commence=lambda x: x["final_start"])
+    plan_credits = credits(pp, step_min, slack_min) if len(pp) else 0
+    L += ["", "| Season | Matches | (a) listed start in that snapshot | (a′) close's listed start | "
+          "(a‴) (a′) + listing stopped moving | (a‴) / (a′) | Pinnacle moved > 5 pp: (a) / (a′) / (a‴) |",
+          "|---|---|---|---|---|---|---|"]
+    q["season"] = q["match"].map(m["season"])
+    for season, g in m.groupby("season"):
+        qs = q[q["season"] == season]
+        sh = [qs.loc[qs[v], "pin_moved"].mean() for v in ("live", "live_close", "live_started")]
+        L.append(f"| {season} | {len(g):,} | {int(g['live'].sum()):,} | {int(g['live_close'].sum()):,} | "
+                 f"{int(g['live_started'].sum()):,} | {g['live_started'].sum() / max(g['live_close'].sum(), 1):.0%} | "
+                 + " / ".join(f"{x:.0%}" for x in sh) + " |")
+    short = m[m["missing"] > 0]
+    # keys repeat every year (one per tournament), so a slot's season is its own year
+    miss = pd.Series([pd.Timestamp(x).year for _, x in set(misses)], dtype="float64").value_counts()
+    pp_cr = pp.groupby("season").apply(lambda g: credits(g, step_min, slack_min)) if len(pp) else pd.Series(dtype=float)
+    L += ["", f"Coverage of the real (close) event, anchored on its own listed start: {len(short):,} of {len(m):,} matches "
+          f"have slots in their walk window (start through Sackmann minutes + {slack_min} min, until the finish is seen) "
+          f"that were never pulled, because the pull followed the first-joined event's start. Re-walking them with the "
+          f"merged pull pays only those slots: at most {len(set(misses)):,} snapshots ({10 * len(set(misses)):,} credits; "
+          f"fewer once the finish is seen)."]
+    if f is not None:
+        L += ["", "Matches DK quoted in play under (a‴) vs the rest (pre-match data only):", "", subset_table(m, f)]
+    L += ["", "Refinement plan, newest season first (not run; needs the Lead's approval). Un-pulled slots: re-run of the "
+          f"merged `pull --season` with the corrected anchor. Postponed: re-walked from the final listed start at {step_min} min.",
+          "", "| Season | Matches with un-pulled slots | Credits ≤ | Postponed matches | Credits ≤ | Total ≤ |",
+          "|---|---|---|---|---|---|"]
+    tot = 0
+    for season in sorted(m["season"].unique(), reverse=True):
+        a1 = int((short["season"] == season).sum()); c1 = 10 * int(miss.get(season, 0))
+        a2 = int((pp["season"] == season).sum()) if len(pp) else 0; c2 = int(pp_cr.get(season, 0))
+        tot += c1 + c2
+        L.append(f"| {season} | {a1:,} | {c1:,} | {a2:,} | {c2:,} | {c1 + c2:,} |")
+    L.append(f"| **All** | {len(short):,} | {10 * len(set(misses)):,} | {len(pp):,} | {plan_credits:,} | **{tot:,}** |")
+    return "\n".join(L), m
+
+
 def make_fetch(api, log: Path, cap: float, stage_budget: float | None = None, keep: list | None = None,
                pause_s: float = 0.2, retry_waits_s=RETRY_WAITS_S):
     """fetch(key, when) for walk(): cached snapshots first (in-play cache, then the close studies' cache, read
@@ -244,7 +454,7 @@ def make_fetch(api, log: Path, cap: float, stage_budget: float | None = None, ke
 
 def main(argv=None) -> None:
     ap = argparse.ArgumentParser(description=__doc__.splitlines()[0])
-    ap.add_argument("cmd", choices=["plan", "pull"])
+    ap.add_argument("cmd", choices=["plan", "pull", "window"])
     ap.add_argument("--sackmann", type=Path, default=Path("/home/user/phat-d0/tennis-sackmann-archive"))
     ap.add_argument("--pilot", default=None, help="KEY:TOURNEY_ID, one tournament only")
     ap.add_argument("--since", type=int, default=2023, help="first season of the full pull")
@@ -263,8 +473,22 @@ def main(argv=None) -> None:
     t = dh.tournaments(sack, dh._keys(), hist_start={**dh.HIST_START, "other": pd.Timestamp("2024-01-01")})
     priced = dh.collect(t, elo.add_elo(sack, keys=("winner_id", "loser_id")), 24.0)
     w = windows(priced, sack)
+    if a.cmd in ("pull", "window"):
+        ce = close_event_ids(t, sack).reindex(priced["sack_row"].to_numpy())
+        w["close_event_id"] = ce["event_id"].to_numpy()
+        # anchor every window on the close's own event start (falls back to priced's where no close event is found)
+        cs = pd.to_datetime(ce["commence"], utc=True).to_numpy()
+        w["commence"] = pd.Series(cs).fillna(w["commence"]).to_numpy()
     if a.cmd == "plan":
         print(plan(w))
+        return
+    if a.cmd == "window":
+        mins = sack.loc[priced["sack_row"].to_numpy(), "minutes"].reset_index(drop=True)
+        keep = (w["season"] >= a.since).to_numpy()
+        from . import dk_study as ds
+        f = ds.frame(priced, elo.add_elo(sack, keys=("winner_id", "loser_id")))
+        text, _ = coverage(w[keep].reset_index(drop=True), mins[keep].reset_index(drop=True), a.step, a.slack, f)
+        print(text)
         return
     if a.pilot:
         key, tid = a.pilot.split(":", 1)

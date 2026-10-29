@@ -175,3 +175,92 @@ def test_api_errors_never_carry_the_key_and_5xx_is_retried(tmp_path, monkeypatch
     gone = di.make_fetch(OddsApi(floor=0, key="K", session=S([502, 503, 502]), spend_log=tmp_path / "s3.log"),
                          tmp_path / "s3.log", cap=1e9, pause_s=0, retry_waits_s=(0, 0))
     assert gone("k", "2024-01-15T12:00:00Z") is None and gone.why == "API error (HTTPError 502)"
+
+
+def qrow(ts, start="2024-01-15 10:00", dk=(1.8, 2.0), age_min=0.5, match=0):
+    t = pd.Timestamp(ts, tz="UTC")
+    return {"match": match, "ts": t, "listed_start": pd.Timestamp(start, tz="UTC"), "draftkings_home": dk[0],
+            "draftkings_away": dk[1], "draftkings_updated": t - pd.Timedelta(minutes=age_min),
+            "pinnacle_home": dk[0], "pinnacle_away": dk[1], "pinnacle_updated": t}
+
+
+def test_window_never_admits_post_finish_or_settled_prices():
+    q = pd.DataFrame([
+        qrow("2024-01-15 10:00"),                            # pre-match (before start + 15 min): out
+        qrow("2024-01-15 10:30"),                            # in play: in
+        qrow("2024-01-15 11:00", dk=(1.3, 3.4)),             # in
+        qrow("2024-01-15 11:10", dk=(1.01, 34.0)),           # settled-looking: out, and ends the window
+        qrow("2024-01-15 11:20", dk=(1.7, 2.1)),             # fresh, ordinary-looking after that: still out
+        qrow("2024-01-15 16:30"),                            # past start + 6 h: out
+    ])
+    w = di.window(q)
+    assert list(w["live"]) == [False, True, True, False, False, False]
+    stale = pd.DataFrame([qrow("2024-01-15 10:30"), qrow("2024-01-15 11:30", dk=(1.5, 2.6), age_min=40)])
+    assert list(di.window(stale)["live"]) == [True, False]          # a frozen quote (suspended/finished): out
+
+
+def test_window_postponed_match_and_the_sensitivity_cuts():
+    # listed at 10:00, moved to the next day in the 11:00 snapshot: 10:30 still passes (a) (old start shown then)
+    q = pd.DataFrame([qrow("2024-01-15 10:30"), qrow("2024-01-15 11:00", start="2024-01-16 12:00"),
+                      qrow("2024-01-16 12:30", start="2024-01-16 12:00"),
+                      qrow("2024-01-16 14:30", start="2024-01-16 12:00")])
+    w = di.window(q, minutes=pd.Series({0: 100.0}))
+    assert list(w["live"]) == [True, False, True, True]
+    assert list(w["live_final"]) == [False, False, True, True]         # later information: drops the 10:30 row
+    assert list(w["live_minutes"]) == [True, False, True, False]       # 12:00 + 100 + 30 min = 14:10
+
+
+def test_walk_follows_the_close_event_not_a_duplicate_listing():
+    # two listings of the same pairing: "dup" (stale, still listed later) and "e1" (the real one, which the close used)
+    def fetch(key, when):
+        ts = pd.Timestamp(when)
+        data = [{"id": "dup", "commence_time": "2024-01-15T10:00:00Z", "home_team": "Bee Bob", "away_team": "Ann Aye"}]
+        if ts <= pd.Timestamp("2024-01-15 11:20", tz="UTC"):
+            data.append({"id": "e1", "commence_time": "2024-01-15T10:05:00Z", "home_team": "Bee Bob",
+                         "away_team": "Ann Aye"})
+        return {"timestamp": when, "data": data}
+    by_name = di.walk(match_w(), fetch)["matches"].iloc[0]
+    assert by_name["event_id"] == "dup" and pd.isna(by_name["finished_at"])      # names alone pick the stale one
+    w = match_w().assign(close_event_id="e1")
+    got = di.walk(w, fetch)["matches"].iloc[0]
+    assert got["event_id"] == "e1" and got["finished_at"] == pd.Timestamp("2024-01-15 11:50", tz="UTC")
+
+
+def test_cache_replay_counts_unpulled_snapshots_instead_of_ending_the_match(tmp_path, monkeypatch):
+    from upsets import dk_history as dh
+    monkeypatch.setattr(di, "INPLAY_CACHE", tmp_path / "inplay")
+    monkeypatch.setattr(dh, "CACHE", tmp_path / "close")
+    w = match_w().assign(close_event_id="e1")
+    real, _ = snap_fn("2024-01-15 11:20")
+    for when in ("2024-01-15T10:00:00Z", "2024-01-15T10:10:00Z"):              # only the first two were pulled
+        dh.write_cache(dh.cache_path("odds", "k", when, di.INPLAY_CACHE), real("k", when))
+    misses = []
+    m = di.walk(w, di.cache_fetch(misses))["matches"].iloc[0]
+    assert m["snaps"] == 2 and pd.isna(m["finished_at"])                     # gaps are unknown, never "gone"
+    assert m["missing"] == len(misses) and len(misses) > 3
+
+
+def test_subset_table_compares_quoted_and_unquoted_matches_on_pre_match_data():
+    m = pd.DataFrame({"sack_row": [1, 2, 3, 4], "season": 2024, "live_started": [True, True, False, False]})
+    f = pd.DataFrame({"sack_row": [1, 2, 3, 4], "level_group": ["slam", "slam", "1000", "other"],
+                      "odds_dog_dk": [2.0, 3.0, 4.0, 5.0], "elo_dog": [1500.0] * 4, "elo_fav": [1600, 1700, 1550, 1550.0],
+                      "upset": [1, 0, 1, 0]})                                     # results are never read
+    t = di.subset_table(m, f)
+    assert "| 2024 | yes | 2 | 100% | 0% | 0% | 2.50 | 150 |" in t
+    assert "| 2024 | no | 2 | 0% | 50% | 50% | 4.50 | 50 |" in t
+
+
+def test_close_event_ids_takes_the_event_the_close_came_from_not_the_first_joined(monkeypatch):
+    from upsets import dk_close_check as cc
+    ts = pd.Timestamp
+    # placeholder joined first (start a day later, DK quoted early); the close came from the re-listing
+    need = pd.DataFrame({"key": ["k", "k"], "event_id": ["placeholder", "relist"], "sack_row": [7, 7],
+                         "commence": [ts("2024-01-03 00:00", tz="UTC"), ts("2024-01-02 12:00", tz="UTC")]})
+    snaps = pd.DataFrame({"key": "k", "book": "draftkings",
+                          "event_id": ["placeholder", "relist", "relist", "placeholder"],
+                          "snapshot_ts": [ts("2024-01-01 10:00", tz="UTC"), ts("2024-01-02 09:00", tz="UTC"),
+                                          ts("2024-01-02 11:50", tz="UTC"), ts("2024-01-02 11:00", tz="UTC")]})
+    monkeypatch.setattr(cc, "_need", lambda t, sack, root: (need, snaps))
+    got = di.close_event_ids(None, None)
+    assert got["event_id"].to_dict() == {7: "relist"}
+    assert got.loc[7, "commence"] == ts("2024-01-02 12:00", tz="UTC")    # the close's own start, not the first joined

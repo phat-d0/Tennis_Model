@@ -58,6 +58,118 @@ Using DraftKings' own prices, through The Odds API's historical snapshots:
 - **Caveat:** DraftKings may reject or re-price in-play bets, and limits differ by account. A 5- or 10-min snapshot is
   the price shown then, not a guaranteed fill. These are paper results at displayed prices.
 
+## Amendment 2026-10-28 (2): the in-play window (written before any outcome is read; revised 2026-10-29)
+**Why.** An audit of the pulled snapshots found four problems. It read only quote ages, price levels, listed start
+times and pre-match fields, never a result.
+- **Duplicate listings.** DK often lists one pairing as more than one event: a placeholder for a later start (often the
+  next day at 00:00, with prices that never move) next to the real event. Matching by player names latched onto
+  placeholders (248 of 281 "unfinished" 2024 matches).
+  - The walk now uses the event the DK close came from: `close_event_ids` = `dk_close_check.close_events`, the latest DK
+    snapshot ≥ 5 min before its own event's start, over all events joined to the match.
+  - It falls back to names only when there is none.
+  - **Lead review, 2026-10-29:** the first version took the first joined event instead. That changed the event for 370
+    of 733 matches in 2023, 290 of 1,056 in 2024, 54 in 2025 and 2 in 2026.
+- **Wrong anchor (found in that review).** `dk_history.prices` reads the right close prices and ages, but the
+  `commence` column it outputs is the first joined event's start, not the close event's.
+  - They differ by more than 1 h for 363 of 733 matches in 2023 (90th percentile +54 h), 289 of 1,056 in 2024, 13 in
+    2025 and 1 in 2026.
+  - The window now anchors on the close event's own listed start. The label itself is fixed in its own PR.
+  - **The earlier reading "DK had no live market for about half of 2023" came from this anchor bug and is withdrawn.**
+    With the right event and start, DK quoted 90% of 2023 matches in play.
+- **Leap-frogging starts.** In 2023–24 a delayed match's listed start keeps moving to just after each snapshot, so "the
+  start listed in that snapshot" alone can't mark the start of play.
+- **Lookahead risk.** Any snapshot taken after a match ended could show settled or near-settled odds, which would give
+  away the winner and could fake a "dog reached 50%" trigger or a hedge fill.
+
+**Rule: (a‴), chosen by the Lead's decision rule** ("use (a‴) if it keeps ≥ 90% of what (a′) keeps in 2023–24"). After
+both fixes it keeps 99–100% in every season. It replaces "in-play snapshot" everywhere above
+(`upsets.dk_inplay.window`, column `live_started`). A snapshot counts as in play for a match only if all of these hold:
+- (a‴) its timestamp is at least 15 min after the start listed **at the close** (known in advance), and the start listed
+  in that same snapshot is not later than its timestamp (the listing has stopped leap-frogging: play has begun).
+- (b) the match's DK quote in it was updated within the last 15 min. A frozen quote means the market was suspended or the
+  match was finished.
+- (c) neither it nor any earlier in-play snapshot of the match shows a DK price ≤ 1.01 or ≥ 50. That snapshot counts as
+  settled and ends the window: it and every later snapshot are out.
+- (d) it is no later than the close's listed start + 6 h.
+
+The two variants it was chosen against, reported once here:
+- (a) needed timestamp ≥ the start listed in that same snapshot + 15 min.
+- (a′) used only the close's listed start.
+
+Matches kept (cache replay, 0 credits):
+
+| Season | Matches | (a) | (a′) | **(a‴)** | Pinnacle moved > 5 pp from its close in those snapshots: (a) / (a′) / (a‴) |
+|---|---|---|---|---|---|
+| 2023 | 733 | 659 | 661 | **659** | 60% / 59% / 60% |
+| 2024 | 1,056 | 892 | 925 | **918** | 66% / 62% / 65% |
+| 2025 | 1,753 | 1,560 | 1,619 | **1,605** | 67% / 60% / 66% |
+| 2026 | 1,131 | 1,081 | 1,080 | **1,074** | 68% / 60% / 67% |
+
+**Sample: 4,256 matches.**
+- 2025–26 is the main sample: 2,679 of 2,884 matches (93%).
+- 2023–24 is secondary: 1,577 of 1,789 (88%).
+- The 2023–24 counts can still rise: some of their real windows have snapshots we never pulled (refinement plan below).
+
+**Which matches DK quoted live.** Pre-match data only, `subset_table`:
+
+| Season | Quoted in play | Matches | Slam | 1000 | 250/500 | Dog's DK close odds (median) | Elo gap (median) |
+|---|---|---|---|---|---|---|---|
+| 2023 | no | 74 | 100% | 0% | 0% | 6.75 | 250 |
+| 2023 | yes | 659 | 100% | 0% | 0% | 3.10 | 124 |
+| 2024 | no | 138 | 96% | 4% | 0% | 5.50 | 228 |
+| 2024 | yes | 918 | 67% | 31% | 3% | 3.10 | 125 |
+| 2025 | no | 148 | 76% | 20% | 4% | 5.00 | 209 |
+| 2025 | yes | 1,605 | 41% | 56% | 4% | 2.85 | 124 |
+| 2026 | no | 57 | 39% | 54% | 7% | 12.40 | 277 |
+| 2026 | yes | 1,074 | 32% | 54% | 14% | 2.85 | 110 |
+
+- **In every season the matches DK didn't quote live are the big mismatches** (dog median 5.00–12.40 vs 2.85–3.10, Elo
+  gap 209–277 vs 110–125). They also lean to Slams.
+- **So the in-play sample under-represents heavy underdogs.** That matters most for DK-DOG50 (dogs < 20%, odds > 5):
+  its results describe the heavy dogs DK chose to quote live, not all of them.
+
+**Reporting and gate (added):**
+- Every study is reported three ways: 2025–26 (main), 2023–24 (secondary) and pooled.
+- **A gate pass counts only if it also holds in 2025–26 on its own.**
+- The season walk-forward for the exit curve keeps its test seasons.
+
+**Reported alongside, never as gate inputs:**
+- **Sackmann-minutes cut:** also require timestamp ≤ the close's listed start + Sackmann `minutes` + 30 min. This uses
+  the match's real length, so it is labelled a robustness check.
+- **Final-start cut:** also require timestamp ≥ the match's final listed start + 15 min. This uses later information,
+  so it is descriptive only.
+- **Every rule split by stopped vs not.** "Stopped" = the walk saw the event drop out of the snapshots (finished), or never
+  found it.
+
+**Tests** (`tests/test_upsets_dk_inplay.py`):
+- A synthetic post-finish snapshot (a settled price, or a stale quote) and every later snapshot are never in play.
+- The walk follows the close's event rather than a duplicate listing.
+- `close_event_ids` returns the re-listing the close came from, and its start, when a placeholder is joined first.
+- A cache replay counts un-pulled snapshots instead of ending a match.
+
+**Refinement (plan only, needs the Lead's approval; remaining cap 64,000):**
+- **Un-pulled slots.** The pull walked ~650 matches in 2023–24 from the first-joined event's start, so part of their
+  real window was never pulled.
+  - The fix is a re-run of the merged `pull --season` with the corrected anchor. Cached slots are free; it pays only
+    the missing ones and stops a match at its finish.
+- **Postponed.** The close's event was later listed for a start more than 1 h after the close's, and our pull ended
+  before it. These are re-walked from their final listed start at 10 min, with the same stop rules.
+- **Same spending path as the pull.** Every refinement snapshot goes through `make_fetch`: job cap 270,000, the 5,000
+  floor check, every spend logged. The postponed re-walk needs a small CLI option (a pull of those matches from their
+  final start), which goes up for review before any call.
+
+Refinement plan, newest season first (credits are ceilings: the walk stops a match once its finish is seen):
+
+| Season | Matches with un-pulled slots | Credits ≤ | Postponed matches | Credits ≤ | Total ≤ |
+|---|---|---|---|---|---|
+| 2026 | 0 | 0 | 4 | 970 | 970 |
+| 2025 | 3 | 260 | 16 | 2,970 | 3,230 |
+| 2024 | 189 | 7,170 | 12 | 3,060 | 10,230 |
+| 2023 | 147 | 7,270 | 4 | 1,240 | 8,510 |
+| **All** | 339 | 14,700 | 36 | 8,240 | **22,940** |
+
+The total fits in the remaining cap of 64,000 (job total now 206,000 of 270,000).
+
 ## Rules (fixed now)
 1. **DK-DOG50.**
    - Entry: back the pre-match dog with DK close p < 20% (also reported for < 30%), at DK's close.
