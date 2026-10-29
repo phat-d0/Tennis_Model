@@ -67,3 +67,16 @@ def test_gate_needs_the_main_sample_too():
                       "pnl": [1.0] * 40 + [-1.0, 0.5, 0.5, 0.5, 0.5] * 2})
     g = st.gate(b)
     assert g["pos"] == 4 and g["pnl"] > 0 and not g["pass"]   # 10 bets in 2025-26 < 30
+
+
+def test_validity_counts_decided_and_identical_prices_without_outcomes():
+    ts = lambda mn: pd.Timestamp("2025-01-01 12:00", tz="UTC") + pd.Timedelta(minutes=mn)  # noqa: E731
+    m = pd.DataFrame({"live_started": [True, True], "postponed": [False, False], "season": [2025, 2025]})
+    q = pd.DataFrame({"match": [0, 0, 0, 1, 1], "ts": [ts(0), ts(10), ts(20), ts(0), ts(10)], "live_started": True,
+                      "draftkings_home": [1.8, 1.5, 1.05, 2.0, 2.0], "draftkings_away": [2.0, 2.6, 12.0, 1.8, 1.8],
+                      "pinnacle_home": [1.8, 1.8, 1.8, 2.0, 2.0], "pinnacle_away": [2.0, 2.0, 2.0, 1.8, 1.8]})
+    text = st.validity(m, q)
+    dk = [r for r in text.splitlines() if r.startswith("| DraftKings | Pooled")][0].split("|")
+    assert dk[4].strip() == "0%" and dk[5].strip() == "50%"      # decided at first / last
+    assert dk[7].strip() == "33%"                                # 1 of 3 consecutive pairs identical
+    assert "FAIL" in text

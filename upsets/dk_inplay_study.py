@@ -333,6 +333,43 @@ def report(s: pd.DataFrame, x: pd.DataFrame, x1: pd.DataFrame, sack: pd.DataFram
     return "\n".join(L) + "\n"
 
 
+def validity(m: pd.DataFrame, q: pd.DataFrame) -> str:
+    """DK (and Pinnacle) in-play price validity on (a‴) rows of sample matches: convergence (decided share, p <= 0.10 or
+    >= 0.90, at the first vs last (a‴) snapshot) and movement (|Δp| between consecutive (a‴) snapshots, share of
+    identical consecutive prices). Prices only: no outcome is read."""
+    keep = m.index[m["live_started"] & ~m["postponed"]]
+    x = q[q["live_started"] & q["match"].isin(keep)].sort_values(["match", "ts"])
+    x = x.assign(season=x["match"].map(m["season"]))
+    L = ["| Book | Seasons | Matches | Decided at first (a‴) snapshot | Decided at last | |Δp| median / P90 | "
+         "Identical consecutive | Pairs |", "|---|---|---|---|---|---|---|---|"]
+    out = {}
+    for book in ("draftkings", "pinnacle"):
+        h, a = x[f"{book}_home"], x[f"{book}_away"]
+        y = x[h.notna() & a.notna()].copy()
+        y["p"] = devig_power(y[f"{book}_home"].to_numpy(), y[f"{book}_away"].to_numpy())
+        y["decided"] = (y["p"] <= 0.10) | (y["p"] >= 0.90)
+        g = y.groupby("match")
+        y["dp"] = g["p"].diff().abs()
+        same = (g[f"{book}_home"].diff() == 0) & (g[f"{book}_away"].diff() == 0)
+        y["same"] = same.astype(float).where(y["dp"].notna())
+        for name, seasons in SPLITS:
+            z = y[y["season"].isin(seasons)]
+            gz = z.groupby("match")
+            first, last = gz["decided"].first(), gz["decided"].last()
+            pairs = z["dp"].notna()
+            st_ = {"first": float(first.mean()), "last": float(last.mean()),
+                   "same": float(z.loc[pairs, "same"].mean())}
+            out[(book, name)] = st_
+            L.append(f"| {'DraftKings' if book == 'draftkings' else 'Pinnacle'} | {name} | {gz.ngroups:,} | "
+                     f"{st_['first']:.0%} | {st_['last']:.0%} | {z['dp'].median():.3f} / {z['dp'].quantile(0.9):.3f} | "
+                     f"{st_['same']:.0%} | {int(pairs.sum()):,} |")
+    dk = out[("draftkings", "Pooled")]
+    ok = dk["last"] >= 0.70 and dk["same"] <= 0.20
+    L += ["", f"Pass criteria (amendment 4, fixed before looking): DK decided at the last (a‴) snapshot ≥ 70% "
+          f"({dk['last']:.0%}) and DK identical-consecutive ≤ 20% ({dk['same']:.0%}): **{'PASS' if ok else 'FAIL'}**."]
+    return "\n".join(L) + "\n"
+
+
 def load(sackmann_path: Path):
     """-> (sack, f: dk_study.frame of the priced matches, m, q, home_is_w)."""
     from . import dk_close_check as cc
@@ -364,8 +401,15 @@ def main(argv=None) -> None:
     ap = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     ap.add_argument("--sackmann", type=Path, default=Path("/home/user/phat-d0/tennis-sackmann-archive"))
     ap.add_argument("--out", type=Path, default=None)
+    ap.add_argument("--validity", action="store_true", help="only the DK in-play price validity check")
     a = ap.parse_args(argv)
     sack, f, m, q, home_is_w = load(a.sackmann)
+    if a.validity:
+        text = "## DK in-play price validity\n\n" + validity(m, q)
+        print(text)
+        if a.out:
+            a.out.write_text(text)
+        return
     s = sample(f, m)
     x = live_rows(q, m, home_is_w, s)
     x1 = live_rows(q, m, home_is_w, s, FRESH_CHECK_MIN)
