@@ -568,7 +568,7 @@ Since phat-d0/Tennis_Model#116 also: `min_arb_profit_per_contract` (the alert th
   main, newest first: 2026 70, 2025 10, 2024 700, 2023 10 credits (790 of a 6,900 ceiling; job total 218,680 of 270,000). DK
   moved most listings again: 30 of 32 still postponed; not chased (Lead), kept out and counted. **Study sample = (a‴) and not
   still postponed: 694 / 936 / 1,589 / 1,072 = 4,291** (2025–26 92%, 2023–24 91%). No outcomes read. 375 tests (pandas 2 and 3.1).
-- 2026-10-29: **DK in-play studies: every gate FAILs** (PR phat-d0/Tennis_Model#PRNUM; `upsets/dk_inplay_study.py`,
+- 2026-10-29: **DK in-play studies: every gate FAILs** (PR phat-d0/Tennis_Model#170; `upsets/dk_inplay_study.py`,
   reports/upsets_dk_inplay_results.md; amendments 3–4; 0 credits). ROI at the 3% cut, 2025–26 / 2023–24 / pooled: DOG50 (dog < 20%)
   −18.0% / −21.6% / −19.6% vs hold −12.6% / −16.5% / −14.3%; every exit level 0.40–0.90 below hold (walk-forward picks hold, 0 of 3
   test seasons positive); MISMATCH50 −17.9% pooled vs hold −8.1%, the worse-ranked player reached 50% in 31.6% vs 39.5% implied
