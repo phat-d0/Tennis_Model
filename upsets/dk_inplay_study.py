@@ -395,6 +395,34 @@ def validity(m: pd.DataFrame, q: pd.DataFrame) -> str:
     return "\n".join(L) + "\n"
 
 
+def calibration(s: pd.DataFrame, x: pd.DataFrame) -> str:
+    """Post-hoc DK in-play validity (outcomes read; Lead 2026-10-29): calibration of the dog's DK in-play p over all
+    usable (a‴) rows of non-void matches, and log loss at each match's last (a‴) row vs at the close, same matches.
+    Criteria fixed before running: |predicted - realized| <= 0.05 in every bin with >= 200 rows, and last-row log loss
+    <= 0.8 x the close's."""
+    ok = s.loc[~s["void"].astype(bool), ["sack_row", "p_dk"]]
+    y = x[x["sack_row"].isin(ok["sack_row"])].copy()
+    y["bin"] = pd.cut(y["p_dog"], np.linspace(0, 1, 11), include_lowest=True)
+    L = ["| DK in-play p (dog) | Rows | Matches | Mean predicted | Realized |", "|---|---|---|---|---|"]
+    worst = 0.0
+    for b, g in y.groupby("bin", observed=True):
+        pred, real = g["p_dog"].mean(), g["upset"].mean()
+        if len(g) >= 200:
+            worst = max(worst, abs(pred - real))
+        L.append(f"| {b} | {len(g):,} | {g['sack_row'].nunique():,} | {pred:.3f} | {real:.3f} |")
+    last = y.groupby("sack_row").tail(1).set_index("sack_row")
+    close = ok.set_index("sack_row").loc[last.index, "p_dk"]
+    eps = 1e-6
+    ll = lambda p, o: float(-(o * np.log(np.clip(p, eps, 1 - eps)) + (1 - o) * np.log(np.clip(1 - p, eps, 1 - eps))).mean())  # noqa: E731
+    ll_last, ll_close = ll(last["p_dog"], last["upset"]), ll(close, last["upset"])
+    passed = worst <= 0.05 and ll_last <= 0.8 * ll_close
+    L += ["", f"Log loss on the same {len(last):,} non-void matches: close {ll_close:.4f}, last (a‴) snapshot {ll_last:.4f} "
+          f"({ll_last / ll_close:.0%} of the close). Largest calibration gap in bins with ≥ 200 rows: {worst:.3f}.",
+          "", f"Criteria (fixed before running): gap ≤ 0.05 and last-snapshot log loss ≤ 0.8 × close: "
+          f"**{'PASS' if passed else 'FAIL'}**."]
+    return "\n".join(L) + "\n"
+
+
 def load(sackmann_path: Path):
     """-> (sack, f: dk_study.frame of the priced matches, m, q, home_is_w)."""
     from . import dk_close_check as cc
@@ -427,8 +455,16 @@ def main(argv=None) -> None:
     ap.add_argument("--sackmann", type=Path, default=Path("/home/user/phat-d0/tennis-sackmann-archive"))
     ap.add_argument("--out", type=Path, default=None)
     ap.add_argument("--validity", action="store_true", help="only the DK in-play price validity check")
+    ap.add_argument("--calibration", action="store_true", help="only the post-hoc calibration check (reads outcomes)")
     a = ap.parse_args(argv)
     sack, f, m, q, home_is_w = load(a.sackmann)
+    if a.calibration:
+        s = sample(f, m)
+        text = "## DK in-play calibration (post hoc)\n\n" + calibration(s, live_rows(q, m, home_is_w, s))
+        print(text)
+        if a.out:
+            a.out.write_text(text)
+        return
     if a.validity:
         text = "## DK in-play price validity\n\n" + validity(m, q)
         print(text)

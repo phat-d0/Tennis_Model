@@ -81,3 +81,11 @@ def test_validity_counts_decided_and_identical_prices_without_outcomes():
     assert dk[7].strip() == "33%"                                # 1 of 3 consecutive pairs identical
     assert "FAIL" in text
     assert "| 0–10 | 2 | 50% | 0% |" in text                     # both last (a‴) rows are the last listed ones
+
+
+def test_calibration_bins_and_log_loss():
+    s = pd.DataFrame({"sack_row": [1, 2], "p_dk": [0.2, 0.2], "void": [False, False]})
+    x = pd.DataFrame({"sack_row": [1, 1, 2, 2], "p_dog": [0.3, 0.95, 0.25, 0.05], "upset": [1, 1, 0, 0]})
+    text = st.calibration(s, x)
+    assert "| (0.2, 0.3] | 2 | 2 | 0.275 | 0.500 |" in text
+    assert "close 0.9163" in text and "PASS" in text       # last rows 0.95 / 0.05 beat the close 0.2 / 0.2
