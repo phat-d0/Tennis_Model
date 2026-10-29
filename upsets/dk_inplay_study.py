@@ -363,6 +363,31 @@ def validity(m: pd.DataFrame, q: pd.DataFrame) -> str:
             L.append(f"| {'DraftKings' if book == 'draftkings' else 'Pinnacle'} | {name} | {gz.ngroups:,} | "
                      f"{st_['first']:.0%} | {st_['last']:.0%} | {z['dp'].median():.3f} / {z['dp'].quantile(0.9):.3f} | "
                      f"{st_['same']:.0%} | {int(pairs.sum()):,} |")
+    # (c) of amendment 4, Lead: decided share at the last (a‴) snapshot by its distance to the end of the listing
+    # (the last snapshot that still lists the event, any book), and how often rule (c)'s settled cut removed the end
+    allq = q[q["match"].isin(keep)]
+    end = allq.groupby("match")["ts"].max()
+    y = x[x["draftkings_home"].notna() & x["draftkings_away"].notna()].copy()
+    y["p"] = devig_power(y["draftkings_home"].to_numpy(), y["draftkings_away"].to_numpy())
+    last = y.groupby("match").tail(1).set_index("match")
+    last["decided"] = (last["p"] <= 0.10) | (last["p"] >= 0.90)
+    last["before"] = (end.reindex(last.index) - last["ts"]).dt.total_seconds() / 60
+    lo = allq[["draftkings_home", "draftkings_away"]].min(axis=1)
+    hi = allq[["draftkings_home", "draftkings_away"]].max(axis=1)
+    settled_at = allq[(lo <= 1.01) | (hi >= 50)].groupby("match")["ts"].min()
+    sat = settled_at.reindex(last.index)
+    last["cut"] = (sat > last["ts"]).fillna(False).astype(bool)
+    bins = [-1, 10, 20, 30, np.inf]
+    last["bucket"] = pd.cut(last["before"], bins, labels=["0–10", "10–20", "20–30", "30+"])
+    L += ["", "Decided share (DK) at the last (a‴) snapshot, by minutes from it to the last snapshot that still lists "
+          "the event:", "", "| Minutes before the end of the listing | Matches | Decided | Settled price cut off after it |",
+          "|---|---|---|---|"]
+    for b, g in last.groupby("bucket", observed=False):
+        L.append(f"| {b} | {len(g):,} | {g['decided'].mean():.0%} | {g['cut'].mean():.0%} |")
+    first_bucket = last.loc[last["bucket"] == "0–10", "decided"].mean()
+    L += ["", f"Rule (c)'s settled cut removed the final snapshot(s) for {last['cut'].mean():.0%} of matches. "
+          f"Lead's criterion: decided ≥ 85% in the 0–10 min bucket ({first_bucket:.0%}): "
+          f"**{'DK valid' if first_bucket >= 0.85 else 'price validity unresolved'}**."]
     dk = out[("draftkings", "Pooled")]
     ok = dk["last"] >= 0.70 and dk["same"] <= 0.20
     L += ["", f"Pass criteria (amendment 4, fixed before looking): DK decided at the last (a‴) snapshot ≥ 70% "

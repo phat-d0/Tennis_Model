@@ -80,3 +80,4 @@ def test_validity_counts_decided_and_identical_prices_without_outcomes():
     assert dk[4].strip() == "0%" and dk[5].strip() == "50%"      # decided at first / last
     assert dk[7].strip() == "33%"                                # 1 of 3 consecutive pairs identical
     assert "FAIL" in text
+    assert "| 0–10 | 2 | 50% | 0% |" in text                     # both last (a‴) rows are the last listed ones
