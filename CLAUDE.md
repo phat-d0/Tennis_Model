@@ -553,7 +553,7 @@ Since phat-d0/Tennis_Model#116 also: `min_arb_profit_per_contract` (the alert th
   2025–26 = main sample (93%); a gate pass must hold there alone. Matches not quoted live are the big mismatches
   (dog median 5.00–12.40). Refinement (339 matches with un-pulled slots + 36 postponed, ≤ 22,940 credits) waits on the
   Lead. Job total 206,000. 374 tests (pandas 2 and 3.1).
-- 2026-10-29: DK in-play refinement of un-pulled slots (Lead-approved; PR phat-d0/Tennis_Model#PRNUM): `pull --season` from main
+- 2026-10-29: DK in-play refinement of un-pulled slots (Lead-approved; PR phat-d0/Tennis_Model#168): `pull --season` from main
   after #166, newest first: 2025 120, 2024 6,030, 2023 5,740 credits (11,890 of a 14,700 ceiling; job total 217,890 of 270,000;
   spend log in docs/data_inventory.md). Re-stated from cache: no un-pulled slot left; (a‴) keeps 694 / 943 / 1,605 / 1,074
   (4,316; 2023–24 now 92%, 2025–26 93%); the excluded matches are still heavy mismatches. New `pull --season S --postponed`
