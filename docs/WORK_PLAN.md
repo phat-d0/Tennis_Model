@@ -63,7 +63,7 @@ conflict (git merges edits that touch different blocks).
   readout in Jan 2027.
   Pilot done (#160); **full pull done: 205,930 credits** (2023–May 2026, 4,673 matches; #164; re-walk +70 → 206,000).
   In-play window amendment in review (#166): rule (a‴), 4,256 matches kept after the Lead's close-event/anchor fixes,
-  2025–26 main sample (93%), gate must hold there alone. `dk_history.prices` commence label fix in its own PR, merged before
+  2025–26 main sample (93%), gate must hold there alone. `dk_history.prices` commence label fixed in #167 (merged), before
   any study. Next: the refinement pull (339 + 36 matches, ≤ 22,940 credits) if the Lead approves, then the four studies. Close-timing check (#165): 1–5% of closes
   taken before a start moved > 1 h; no headline verdict changes without them.
   Waiting on: Lead review of the window amendment (PR); a real draw fixture (Wikimedia 429s cloud
