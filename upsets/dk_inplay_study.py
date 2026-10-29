@@ -66,6 +66,15 @@ def live_rows(q: pd.DataFrame, m: pd.DataFrame, home_is_w: pd.Series, f: pd.Data
     x["odds_dog"] = np.where(dog_w, x["odds_w"], x["odds_l"])
     x["odds_fav"] = np.where(dog_w, x["odds_l"], x["odds_w"])
     x["p_dog"] = devig_power(x["odds_dog"].to_numpy(), x["odds_fav"].to_numpy())
+    # Pinnacle's fair in-play p for the dog at the same snapshot (quote <= fresh_min old), else NaN
+    ph, pa = x["pinnacle_home"], x["pinnacle_away"]
+    pin_ok = ph.notna() & pa.notna() & ((x["ts"] - x["pinnacle_updated"]) <= pd.Timedelta(minutes=fresh_min))
+    hw2 = x["match"].map(home_is_w).astype(bool)
+    pin_w, pin_l = np.where(hw2, ph, pa), np.where(hw2, pa, ph)
+    pd_, pf_ = np.where(dog_w, pin_w, pin_l), np.where(dog_w, pin_l, pin_w)
+    x["p_pin_dog"] = np.nan
+    if pin_ok.any():
+        x.loc[pin_ok, "p_pin_dog"] = devig_power(pd_[pin_ok.to_numpy()], pf_[pin_ok.to_numpy()])
     return x.sort_values(["sack_row", "ts"]).reset_index(drop=True)
 
 
@@ -93,18 +102,23 @@ def hedge_rule(e: pd.DataFrame, x: pd.DataFrame, level: float | None, cut: float
     out = e.copy()
     out["pnl"] = hold_pnl(out["odds_bet"], out["won"], out["void"])
     out["hedged"] = False
+    out["exp_delta"] = np.nan
     if level is None:
         return out
     xs = x[x["sack_row"].isin(out["sack_row"])].copy()
     side_of = out.set_index("sack_row")["side"]
     xs["p_bet"] = np.where(xs["sack_row"].map(side_of) == "dog", xs["p_dog"], 1 - xs["p_dog"])
     xs["odds_other"] = np.where(xs["sack_row"].map(side_of) == "dog", xs["odds_fav"], xs["odds_dog"])
+    xs["p_pin_bet"] = np.where(xs["sack_row"].map(side_of) == "dog", xs["p_pin_dog"], 1 - xs["p_pin_dog"])
     h = first_hit(xs, "p_bet", level, above=True)
     o2 = payout_odds(out["sack_row"].map(h["odds_other"]), cut)
     hit = o2.notna()
     locked = out["odds_bet"] - 1.0 - out["odds_bet"] / o2
     out.loc[hit, "pnl"] = np.where(out.loc[hit, "void"], 0.0, locked[hit])
     out["hedged"] = hit
+    # expected cost of the hedge at Pinnacle's fair p at that snapshot: locked - E[hold from there]
+    p_fair = out["sack_row"].map(h["p_pin_bet"])
+    out["exp_delta"] = np.where(hit & ~out["void"], locked - (p_fair * out["odds_bet"] - 1.0), np.nan)
     return out
 
 
@@ -245,8 +259,8 @@ def report(s: pd.DataFrame, x: pd.DataFrame, x1: pd.DataFrame, sack: pd.DataFram
     L += ["## 2. DK exit-level curve (3% cut)", ""]
     for dc in DOG_CUTS:
         e = dog_entries(s, dc)
-        L += [f"Dog < {dc:.0%}:", "", "| Level | Seasons | Positions | Hedged | P&L | ROI | Δ vs hold | SD | P10 |",
-              "|---|---|---|---|---|---|---|---|---|"]
+        L += [f"Dog < {dc:.0%}:", "", "| Level | Seasons | Positions | Hedged | P&L | ROI | Δ vs hold (per position) | Δ per hedge: realized / "
+              "expected at Pinnacle fair (n) | SD | P10 |", "|---|---|---|---|---|---|---|---|---|---|"]
         hold = hedge_rule(e, x, None, GATE_CUT)
         for lv in (None,) + LEVELS:
             b = hedge_rule(e, x, lv, GATE_CUT)
@@ -254,8 +268,12 @@ def report(s: pd.DataFrame, x: pd.DataFrame, x1: pd.DataFrame, sack: pd.DataFram
                 g, h = b[b["season"].isin(seasons)], hold[hold["season"].isin(seasons)]
                 st = stats(g)
                 d = (g["pnl"].sum() - h["pnl"].sum()) / max(len(g), 1)
-                L.append(f"| {'hold' if lv is None else f'{lv:.2f}'} | {name} | {st['n']:,} | {int(g['hedged'].sum()):,} | "
-                         f"{st['pnl']:+.1f}u | {st['roi']:+.1%} | {d:+.3f}u | {st['sd']:.2f} | {st['p10']:+.2f} |")
+                nh = int(g["hedged"].sum())
+                ex = g["exp_delta"].dropna()
+                per = (f"{(g['pnl'].sum() - h['pnl'].sum()) / nh:+.3f}u / {ex.mean():+.3f}u ({len(ex):,})"
+                       if nh and len(ex) else "–")
+                L.append(f"| {'hold' if lv is None else f'{lv:.2f}'} | {name} | {st['n']:,} | {nh:,} | "
+                         f"{st['pnl']:+.1f}u | {st['roi']:+.1%} | {d:+.3f}u | {per} | {st['sd']:.2f} | {st['p10']:+.2f} |")
         oos, g = walk_forward(e, x)
         L += ["", f"Walk-forward on L (dog < {dc:.0%}): " + "; ".join(
             f"{int(r.season)} L={r.level} {r.n} positions {r.pnl:+.1f}u" for r in oos.itertuples()) +
