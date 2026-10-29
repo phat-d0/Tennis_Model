@@ -264,3 +264,20 @@ def test_close_event_ids_takes_the_event_the_close_came_from_not_the_first_joine
     got = di.close_event_ids(None, None)
     assert got["event_id"].to_dict() == {7: "relist"}
     assert got.loc[7, "commence"] == ts("2024-01-02 12:00", tz="UTC")    # the close's own start, not the first joined
+
+
+def test_postponed_moves_only_postponed_matches_to_their_final_start(monkeypatch):
+    ts = lambda x: pd.Timestamp(x, tz="UTC")  # noqa: E731
+    w = pd.DataFrame({"key": "k", "commence": [ts("2024-01-02 10:00"), ts("2024-01-02 12:00"), ts("2024-01-02 14:00")],
+                      "season": 2024, "close_event_id": ["e0", "e1", "e2"], "dur": 120})
+    monkeypatch.setattr(di, "walk", lambda w, fetch, step, slack: {"matches": w.assign(event_id=w["close_event_id"])})
+    q = pd.DataFrame({"match": [0, 0, 1, 1, 2], "ts": [ts("2024-01-02 09:00"), ts("2024-01-02 13:00"),
+                                                     ts("2024-01-02 11:00"), ts("2024-01-02 13:30"),
+                                                     ts("2024-01-02 13:00")],
+                      "listed_start": [ts("2024-01-02 10:00"), ts("2024-01-03 10:00"),     # 0: moved a day, pull ended
+                                       ts("2024-01-02 12:00"), ts("2024-01-02 12:30"),     # 1: moved 30 min only
+                                       ts("2024-01-02 17:00")]})                           # 2: moved 3 h, pull ended
+    monkeypatch.setattr(di, "quotes", lambda m: q)
+    got = di.postponed(w)
+    assert got["close_event_id"].tolist() == ["e0", "e2"]
+    assert got["commence"].tolist() == [ts("2024-01-03 10:00"), ts("2024-01-02 17:00")]
