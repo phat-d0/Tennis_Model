@@ -94,7 +94,7 @@ Technical notes:
 - **Does DraftKings offer Challenger markets?** DraftKings sportsbook URLs for Challenger events exist, e.g. `sportsbook.draftkings.com/es/leagues/tenis/challenger-bloomfield-hills`. `[snippet]` I did not open DraftKings pages (ToU).
 - **The Odds API:** `GET /v4/sports?all=true` (0 credits) lists **51 tennis keys including inactive ones, all ATP/WTA tour-level, none Challenger, 125 or ITF.** `[live]`
   - Its tennis page names Grand Slams, 1000s and 500s. `[snippet]`
-  - No other endpoint or plan adds Challengers that I could find. The key's monthly quota is 4,938,943 remaining; that is quota, not coverage.
+  - No other endpoint or plan adds Challengers that I could find. The key's monthly quota is well above the reserve; that is quota, not coverage.
 
 | Provider | Challenger? | DraftKings for tennis? | Price | Personal / free plan | Public display under ToS |
 |---|---|---|---|---|---|
