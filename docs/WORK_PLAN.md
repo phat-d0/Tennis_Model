@@ -22,8 +22,8 @@ C0–C4 on the VPS; the page Portfolio incl. Seed loses early).
 4. **Not built (owner can ask):** a live MISMATCH50 rule (backtest FAIL on Kalshi and DK; the Elo-rank feed
    `upsets.elo_ranks.current()` exists, a VPS job doesn't); live in-play DK tracking (plan only, nothing passed).
 5. **Open on the owner:** `ODDSPAPI_KEY` + allow oddspapi.io / api.oddspapi.io (DK Challenger lines test); whether to rotate the
-   Odds API key (it leaked into one cloud session's local log and transcript on 2026-10-28; fixed in #163); whether
-   docs/data_inventory.md should keep the exact balance (public) or "above floor: yes/no". en.wikipedia.org is allowed but
+   Odds API key (it leaked into one cloud session's local log and transcript on 2026-10-28; fixed in #163); (the spend
+   log's exact balance: decided 2026-11-01, yes/no only). en.wikipedia.org is allowed but
    Wikimedia rate-limits cloud IPs (429). Optional: GitHub Support purge of the orphaned commit ae08bf5.
 
 **Roles.** Each role edits only its own block. The blocks are kept apart by blank lines so that two PRs don't
@@ -149,8 +149,8 @@ Plan, method, gate and data blockers: `docs/upsets_plan.md`. Code: `upsets/` (Le
   (floor lowered to 10 for this key) on live DK + Pinnacle pre-match odds (`upsets/dk_live.py`, starts when a tennis
   key goes active), then ask again.** The owner then plans to switch `ODDS_API_KEY` to their shared paid plan (also
   used by soccer/baseball). The DK history pull (~13k) needs a fresh owner OK on a budget and a floor for that shared key. **Update (owner 2026-10-26):** the key is now the shared plan
-  (balance ≈ 10,906). **Reserve 5,000: no tennis call may take the balance below it.** Approved: DK history for the
-  **250/500 tier only** (budget ≈ balance − 5,000 − 481 for dk_live ≈ 5,400; listings first, then 6 h cells, else 8 h,
+  (balance then ≈ 11k on the old plan). **Reserve 5,000: no tennis call may take the balance below it.** Approved: DK history for the
+  **250/500 tier only** (budget ≈ start balance − 5,000 − 481 for dk_live ≈ 5,400; listings first, then 6 h cells, else 8 h,
   else most recent events first). dk_live is capped at 481. Slams/1000s (~14–15k more) wait for an owner decision
   (a 100K upgrade was suggested). Run by the Upsets role (session in docs/team/lead.md).
 - **Blocked (2026-10-25 17:37):** tennis-data.co.uk's Cloudflare blocks the cloud container's IP (403
@@ -226,7 +226,7 @@ The owner asked for a public phone page like the soccer app, refreshed every 3 h
 - **Credits:** capped at 600 a month, and never below the 5,000 reserve. This replaces dk_live and its 481 cap.
 - **Owners:** Upsets builds `upsets/site.py`, Dashboard builds `site/`, Lead writes the workflows.
 - **Owner's setup:** the `ODDS_API_KEY` Actions secret is added; Pages → Source "GitHub Actions" is still to do.
-- **DK history pull (250/500s):** done. 1,646 credits spent, balance 9,258. 24 of 62 tournament-years have history:
+- **DK history pull (250/500s):** done. 1,646 credits spent, balance above the reserve. 24 of 62 tournament-years have history:
   Beijing from 2024, Doha/Dubai from 2025, the rest 2026 only. That gives 434 round 1–2 matches; Data supplies
   results for the 12 events from Jun–Oct 2026.
 - **DK 250/500 study result (#86, PRELIMINARY): no edge.**
@@ -241,7 +241,7 @@ The owner asked for a public phone page like the soccer app, refreshed every 3 h
   - First run: ok, 29 matches, 3 credits.
   - Refresh is every 3 h, capped at 3,000 credits a month; the balance is never published.
 - **Slams + 1000s DK pull: done.** 17,563 credits, plus a 506-credit 250/500 top-up after a qualifying-week fix in `needed()`;
-  balance ≈ 4.98M.
+  balance above the reserve.
   - Preview (5,897 Sackmann-resolved bets): dogs −9.3% at DK, −5.3% at Pinnacle.
   - Margin DK 5.06% vs Pinnacle 2.71%.
   - Log loss: Pinnacle 0.5566 < DK 0.5583 < Elo 0.5867. Elo walk-forward FAIL (2,313 OOS, −14.6%).
@@ -251,7 +251,7 @@ The owner asked for a public phone page like the soccer app, refreshed every 3 h
   cap). It covers only the tournaments `/scores` covers, so the live ledger stays empty until about Jan 2027. The ledger lives in the
   Actions cache (lost if the cache is evicted). The backtest view shows aggregates only (Sackmann-resolved). In-sample at the power
   de-vig (since #112): line 205 bets +9.2% vs +8.0% expected; model −12.7% vs −10.8%; dogs −10.4% vs −12.0%. Not a result yet.
-- **Closing-price pull (C): done.** 4,297 snapshots, 42,960 credits; balance 4,938,958.
+- **Closing-price pull (C): done.** 4,297 snapshots, 42,960 credits; balance above the reserve.
 - **DK all tiers at the close (#99): no edge.** Dog ROI −11.2% against −10.9% expected at Pinnacle-fair, on 6,655 matches. DK's margin is
   5.16%, mostly on the dog. Elo walk-forward FAIL (−15.3%, 2,426 OOS bets). Drift report (#100): DK sits static in the last 3 h
   while Pinnacle moves. Name aliases are in (#95).

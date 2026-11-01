@@ -58,7 +58,8 @@ Each role also owns its own `tests/test_<area>*.py`.
    else reuses data from the `data-store` branch. Back off on 429. The Odds API: credits are limited
    (shared paid plan, 5,000 reserve); only Data and Upsets spend them, within the budget in
    `docs/WORK_PLAN.md`, never below the floor, and logs each spend (date, endpoint, credits,
-   balance after) in `docs/data_inventory.md`. The key comes from the env var `ODDS_API_KEY`; never commit it.
+   above the 5,000 reserve: yes/no) in `docs/data_inventory.md`. **No committed file or public log shows the exact
+   balance** (owner 2026-11-01; the repo is public). The key comes from the env var `ODDS_API_KEY`; never commit it.
 5. **Results go in `docs/` or `reports/`** with numbers, bad ones included.
 6. **Update your branch by merging `main` in, never by rebasing.**
 7. **Memory rule (owner 2026-10-28): every role records its own work.**
@@ -299,6 +300,8 @@ Since phat-d0/Tennis_Model#116 also: `min_arb_profit_per_contract` (the alert th
   Y = 1 − T. The cash-out study's new content is Δ vs hold on selection-neutral entries (docs/edge_cashout.md).
   Level exits apply only to entries below L (take-profit only). Set end = a Kalshi set-winner close_time ±3 min
   (ATP/WTA, descriptive). An exit bid's age = the other side's ask age.
+- 2026-11-01 (owner): the Odds API spend log (`docs/data_inventory.md`) records "above the 5,000 reserve: yes/no", never the
+  exact balance; no committed file or public log shows it. Local console output in a cloud session may still print it.
 
 ## Changelog
 - 2026-10-24: Project scaffold, core math + tests (12 passing), config, schema, CLAUDE.md.
@@ -408,7 +411,7 @@ Since phat-d0/Tennis_Model#116 also: `min_arb_profit_per_contract` (the alert th
   (phat-d0/Tennis_Model#79, #81).
 - 2026-10-26: DK 250/500 study (phat-d0/Tennis_Model#83, #86; `reports/upsets_dk_small.md`, PRELIMINARY): every early-round
   dog −18.7% at DK (417 bets, CI −32% to −6%), −15.6% at Pinnacle; DK margin 4.84% vs Pinnacle 2.82%; Elo WF FAIL (77 OOS,
-  −20.5%). 1,646 credits, balance 9,258. Results for Jun–Oct 2026 came from Kalshi settlements (Data), aggregates only.
+  −20.5%). 1,646 credits, balance above the reserve. Results for Jun–Oct 2026 came from Kalshi settlements (Data), aggregates only.
 - 2026-10-26: CI on every push/PR (`.github/workflows/ci.yml`, pandas 3.1 caught a list-truthiness bug). Public Tennis Odds page
   planned (docs/site_plan.md, phat-d0/Tennis_Model#84); page UI merged (phat-d0/Tennis_Model#85); builder + publish workflow pending.
   The page and its build never touch Kalshi data; the builder's `status` must never contain the API key or a URL.
@@ -578,6 +581,8 @@ Since phat-d0/Tennis_Model#116 also: `min_arb_profit_per_contract` (the alert th
 - 2026-10-29 (Lead): DK in-play job closed (#160–#170): 218,680 credits in the job log (owner cap 300,000; Lead cap 270,000),
   floor never near. Review caught the duplicate-listing event pick and the first-joined `commence` anchor (#166, #167) before
   any outcome was read. Master plan updated: DK in-play and Kalshi FAVDIP done (FAIL), no live in-play tracking proposed.
+- 2026-11-01 (owner, Lead): Odds API spend log shows "above the 5,000 reserve: yes/no" only (Team rule 4 changed); the exact
+  balances in docs/data_inventory.md, WORK_PLAN and this file were replaced (they stay in git history).
 - 2026-10-28 (Backtest): cash-out study code merged (phat-d0/Tennis_Model#125): `swinglock/backtest/cashout.py`, CLI
   `python -m swinglock.backtest.cashout --data <dir> [--sets <dir>/sets.parquet]`. Dated amendment (before any run):
   Level exits (12 gate rules), DOG50 fixed-rule gate on absolute P&L, DOG30 descriptive, set-end split (descriptive),

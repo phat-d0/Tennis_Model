@@ -103,62 +103,64 @@ Milestones (scheduled start) cover start dates from ~Feb 2025 onward.
 | 2026-10-26 04:30 | Kalshi `/milestones` listing (Data, results for the DK 250/500 study; a new `since` date missed the cache, avoidable) | since 2026-06-13 | 75 | 0 × 429 |
 
 ## The Odds API spends
-Shared paid-plan key since 2026-10-26 (owner). Global floor 5,000; dk_live reserve 481. Per-call log:
+Shared paid-plan key since 2026-10-26 (owner). Global floor 5,000; dk_live reserve 481. **Since 2026-11-01 (owner) this log
+records only whether the balance is above the 5,000 reserve, never the balance itself** (the repo is public); the exact values
+earlier rows carried were removed from this file. Per-call log:
 `data/raw/odds_api/spend.log` (DK history) and `data/raw/odds_api/live/spend.log` (dk_live), gitignored.
 
-| Date (UTC) | Who / job | Endpoint | Calls | Credits | Balance after |
+| Date (UTC) | Who / job | Endpoint | Calls | Credits | Above 5,000 reserve |
 |---|---|---|---|---|---|
-| 2026-10-26 04:16 | Upsets, DK history 250/500 (owner-approved; cap 5,423 = 10,904 − 5,000 − 481) | start balance | — | — | 10,904 |
-| 2026-10-26 04:16–04:20 | Upsets, phase (a) listings, 62 key-events, 478 listing calls | `/historical/sports/{key}/events` | 136 non-empty (342 empty, 0 credits) | 136 | 10,768 |
-| 2026-10-26 04:22–04:24 | Upsets, phase (c) odds, 6 h cells, `bookmakers=draftkings,pinnacle` | `/historical/sports/{key}/odds` | 151 | 1,510 | 9,258 |
-| | **Total for the 250/500 pull** | | 287 | **1,646** | 9,258 |
+| 2026-10-26 04:16 | Upsets, DK history 250/500 (owner-approved; cap 5,423 = start balance − 5,000 − 481) | start (free `/sports`) | — | — | yes |
+| 2026-10-26 04:16–04:20 | Upsets, phase (a) listings, 62 key-events, 478 listing calls | `/historical/sports/{key}/events` | 136 non-empty (342 empty, 0 credits) | 136 | yes |
+| 2026-10-26 04:22–04:24 | Upsets, phase (c) odds, 6 h cells, `bookmakers=draftkings,pinnacle` | `/historical/sports/{key}/odds` | 151 | 1,510 | yes |
+| | **Total for the 250/500 pull** | | 287 | **1,646** | yes |
 
-**Slams + 1000s pull** (Lead-approved 2026-10-26 after the owner's 5M-credit upgrade; job cap 40,000 = spend-log total ≤ 41,646; floor 5,000; 3 h cells; `python -m upsets.dk_history ... --tiers slam,1000 --project-until 2026-10-25 --snap-h 3`). Plan before the pull: ≤ 23,916 credits. Plan verified first with a free `/sports` call: 5,000,000 remaining, 0 used.
+**Slams + 1000s pull** (Lead-approved 2026-10-26 after the owner's 5M-credit upgrade; job cap 40,000 = spend-log total ≤ 41,646; floor 5,000; 3 h cells; `python -m upsets.dk_history ... --tiers slam,1000 --project-until 2026-10-25 --snap-h 3`). Plan before the pull: ≤ 23,916 credits. Plan verified first with a free `/sports` call (above the reserve, 0 used this month).
 
-| Date (UTC) | Who / job | Endpoint | Calls | Credits | Balance after |
+| Date (UTC) | Who / job | Endpoint | Calls | Credits | Above 5,000 reserve |
 |---|---|---|---|---|---|
-| 2026-10-26 05:03 | Upsets, DK history Slams + 1000s | start balance | — | — | 5,000,000 |
-| 2026-10-26 05:03–05:13 | Upsets, listings, 106 key-events (916 listing calls; 96 empty, 0 credits) | `/historical/sports/{key}/events` | 820 non-empty | 820 | 4,999,168 |
-| 2026-10-26 05:13–05:33 | Upsets, odds, 3 h cells, `bookmakers=draftkings,pinnacle` | `/historical/sports/{key}/odds` | 1,555 | 15,550 | 4,983,618 |
-| 2026-10-26 05:39–05:41 | Upsets, top-up after the projected-event fix (qualifying week skipped, +2 days, listing window +10 d): listings + odds | events / odds | 33 + 116 | 33 + 1,160 | 4,982,425 |
-| | **Total for the Slams + 1000s pull** | | 2,524 | **17,563** | 4,982,425 |
-| 2026-10-26 05:41–05:42 | Upsets, 250/500 top-up with the same fix (6 h cells, as the original pull) | events / odds | 36 + 47 | 36 + 470 | 4,981,919 |
-| | **DK history total so far (spend log)** | | 2,894 | **19,715** | 4,981,919 |
+| 2026-10-26 05:03 | Upsets, DK history Slams + 1000s | start (free `/sports`) | — | — | yes |
+| 2026-10-26 05:03–05:13 | Upsets, listings, 106 key-events (916 listing calls; 96 empty, 0 credits) | `/historical/sports/{key}/events` | 820 non-empty | 820 | yes |
+| 2026-10-26 05:13–05:33 | Upsets, odds, 3 h cells, `bookmakers=draftkings,pinnacle` | `/historical/sports/{key}/odds` | 1,555 | 15,550 | yes |
+| 2026-10-26 05:39–05:41 | Upsets, top-up after the projected-event fix (qualifying week skipped, +2 days, listing window +10 d): listings + odds | events / odds | 33 + 116 | 33 + 1,160 | yes |
+| | **Total for the Slams + 1000s pull** | | 2,524 | **17,563** | yes |
+| 2026-10-26 05:41–05:42 | Upsets, 250/500 top-up with the same fix (6 h cells, as the original pull) | events / odds | 36 + 47 | 36 + 470 | yes |
+| | **DK history total so far (spend log)** | | 2,894 | **19,715** | yes |
 
 **Closing-price snapshots (job C)** (Lead-approved 2026-10-26; job cap 50,000 = spend-log total ≤ 69,715; floor 5,000; plan sent to the Lead before the pull). `python -m upsets.dk_history close --other-from 2024-01-01 --project-until 2026-10-25 --close-min 10`: per round 1–2 match the target is the listed start − 5 min; cached snapshots ≤ 10 min old reused (213); the rest in 10-min cells per key, most recent first. Close age: median 0, p90 4, max 10 min (+ the API's 5–10 min snapshot step).
 
-| Date (UTC) | Who / job | Endpoint | Calls | Credits | Balance after |
+| Date (UTC) | Who / job | Endpoint | Calls | Credits | Above 5,000 reserve |
 |---|---|---|---|---|---|
-| 2026-10-26 06:07–07:03 | Upsets, closing snapshots, 10,335 matches, `bookmakers=draftkings,pinnacle` | `/historical/sports/{key}/odds` | 4,296 paid (4,297 fetched) | 42,960 | 4,938,958 |
-| | **DK history total so far (spend log)** | | 7,190 | **62,675** | 4,938,958 |
+| 2026-10-26 06:07–07:03 | Upsets, closing snapshots, 10,335 matches, `bookmakers=draftkings,pinnacle` | `/historical/sports/{key}/odds` | 4,296 paid (4,297 fetched) | 42,960 | yes |
+| | **DK history total so far (spend log)** | | 7,190 | **62,675** | yes |
 
 **DK in-play snapshots (DOG50 / exit curve / MISMATCH50 / FAVDIP on DK)** (owner-approved cap 300,000; Lead's job cap 270,000
 in this job's own spend log `data/raw/odds_api/inplay/spend.log`; floor 5,000; pre-registered in reports/upsets_dk_inplay.md,
 phat-d0/Tennis_Model#157). Staged: pilot ≤ 2,000 first, full pull only after the Lead's go. In-play snapshots are cached apart
 (`data/raw/odds_api/inplay/`) so the close studies' closes don't change.
 
-| Date (UTC) | Who / job | Endpoint | Calls | Credits | Balance after |
+| Date (UTC) | Who / job | Endpoint | Calls | Credits | Above 5,000 reserve |
 |---|---|---|---|---|---|
-| 2026-10-28 17:09–17:11 | Upsets, in-play **pilot**, ATP Qatar 2025 (24 R1–R2 matches), 10-min, `bookmakers=draftkings,pinnacle` | `/historical/sports/{key}/odds` | 175 | 1,750 | 4,652,408 |
-| 2026-10-28 17:37–18:00 | Upsets, in-play stage 1, season 2026 (1,131 R1–R2 matches; stopped by an HTTP 502 in tennis_atp_italian_open; 6 of 23 keys done, 304 matches at 53.4 credits each vs 63.2 planned; resumes after #163) | `/historical/sports/{key}/odds` | 1,667 | 16,670 | 4,624,936 |
-| 2026-10-28 18:15–19:13 | Upsets, in-play stage 1 resumed from main (`pull --season 2026`, after #163); cached snapshots re-read free | `/historical/sports/{key}/odds` | 4,232 | 42,320 | 4,561,316 |
+| 2026-10-28 17:09–17:11 | Upsets, in-play **pilot**, ATP Qatar 2025 (24 R1–R2 matches), 10-min, `bookmakers=draftkings,pinnacle` | `/historical/sports/{key}/odds` | 175 | 1,750 | yes |
+| 2026-10-28 17:37–18:00 | Upsets, in-play stage 1, season 2026 (1,131 R1–R2 matches; stopped by an HTTP 502 in tennis_atp_italian_open; 6 of 23 keys done, 304 matches at 53.4 credits each vs 63.2 planned; resumes after #163) | `/historical/sports/{key}/odds` | 1,667 | 16,670 | yes |
+| 2026-10-28 18:15–19:13 | Upsets, in-play stage 1 resumed from main (`pull --season 2026`, after #163); cached snapshots re-read free | `/historical/sports/{key}/odds` | 4,232 | 42,320 | yes |
 | | **Season 2026 done:** 1,131 matches, 58,990 credits = 52.2/match (plan 60.5); event found 1,107, seen in play 1,107, finish detected 1,096 | | 5,899 | 58,990 | |
-| 2026-10-28 19:15–21:03 | Upsets, in-play stage 2, season 2025 (`pull --season 2025`, from main 9c8c243) | `/historical/sports/{key}/odds` | 7,953 | 79,530 | 4,477,245 |
+| 2026-10-28 19:15–21:03 | Upsets, in-play stage 2, season 2025 (`pull --season 2025`, from main 9c8c243) | `/historical/sports/{key}/odds` | 7,953 | 79,530 | yes |
 | | **Season 2025 done:** 1,753 matches, 79,530 credits = 45.4/match (plan 53.5); event found 1,735, seen in play 1,735, finish detected 1,678 | | | | |
-| 2026-10-28 21:04–21:59 | Upsets, in-play stage 3, season 2024 (`pull --season 2024`, from main 9c8c243) | `/historical/sports/{key}/odds` | 4,199 | 41,990 | 4,435,245 |
+| 2026-10-28 21:04–21:59 | Upsets, in-play stage 3, season 2024 (`pull --season 2024`, from main 9c8c243) | `/historical/sports/{key}/odds` | 4,199 | 41,990 | yes |
 | | **Season 2024 done:** 1,056 matches, 41,990 credits = 39.8/match (plan 46.7); event found 1,032, seen in play 1,032, finish detected 775 (2024 events often stay listed after the match, so their windows ran to the slack) | | | | |
-| 2026-10-28 22:00–22:32 | Upsets, in-play stage 4, season 2023 (`pull --season 2023`, from main 9c8c243) | `/historical/sports/{key}/odds` | 2,367 | 23,670 | 4,411,572 |
+| 2026-10-28 22:00–22:32 | Upsets, in-play stage 4, season 2023 (`pull --season 2023`, from main 9c8c243) | `/historical/sports/{key}/odds` | 2,367 | 23,670 | yes |
 | | **Season 2023 done:** 733 matches (Slams), 23,670 credits = 32.3/match (plan 38.0); event found 712, seen in play 712, finish detected 385 | | | | |
-| | **In-play job total, pull complete (its spend log)** | | 20,593 | **205,930** of the 270,000 cap | 4,411,572 |
-| 2026-10-28 23:3x | Upsets, in-play coverage re-walk of the real (close) events (Lead-approved ≤ 310): `pull --season` 2026/2024/2023 with close event ids; only un-pulled snapshots paid | `/historical/sports/{key}/odds` | 7 | 70 | 4,411,497 |
-| | **In-play job total (its spend log)** | | 20,600 | **206,000** of the 270,000 cap | 4,411,497 |
-| 2026-10-29 02:09–02:10 | Upsets, in-play refinement of un-pulled slots (Lead-approved after #166; ceiling 260, stop at +25%): `pull --season 2025` from main 7f91c1b, windows anchored on the close event's own start; cached slots re-read free | `/historical/sports/{key}/odds` | 12 | 120 | 4,411,360 |
-| 2026-10-29 02:12–02:20 | Upsets, same, `pull --season 2024` (ceiling 7,170) | `/historical/sports/{key}/odds` | 603 | 6,030 | 4,405,330 |
-| 2026-10-29 02:22–02:30 | Upsets, same, `pull --season 2023` (ceiling 7,270) | `/historical/sports/{key}/odds` | 574 | 5,740 | 4,399,590 |
-| | **In-play job total (its spend log)**; refinement 11,890 of its 14,700 ceiling | | 21,789 | **217,890** of the 270,000 cap | 4,399,590 |
-| 2026-10-29 02:58 | Upsets, in-play postponed re-walk (Lead-approved after #168; stop at +25% per stage): `pull --season 2026 --postponed` from main 8589013, 4 matches (ceiling 970) | `/historical/sports/{key}/odds` | 7 | 70 | 4,399,520 |
-| 2026-10-29 03:01 | Upsets, same, `--season 2025 --postponed`, 16 matches (ceiling 2,970) | `/historical/sports/{key}/odds` | 1 | 10 | 4,399,510 |
-| 2026-10-29 03:04–03:05 | Upsets, same, `--season 2024 --postponed`, 11 matches (ceiling 2,610) | `/historical/sports/{key}/odds` | 70 | 700 | 4,398,810 |
-| 2026-10-29 03:07 | Upsets, same, `--season 2023 --postponed`, 1 match (ceiling 350) | `/historical/sports/{key}/odds` | 1 | 10 | 4,398,800 |
-| | **In-play job total (its spend log)**; postponed re-walk 790 of its 6,900 ceiling | | 21,868 | **218,680** of the 270,000 cap | 4,398,800 |
+| | **In-play job total, pull complete (its spend log)** | | 20,593 | **205,930** of the 270,000 cap | yes |
+| 2026-10-28 23:3x | Upsets, in-play coverage re-walk of the real (close) events (Lead-approved ≤ 310): `pull --season` 2026/2024/2023 with close event ids; only un-pulled snapshots paid | `/historical/sports/{key}/odds` | 7 | 70 | yes |
+| | **In-play job total (its spend log)** | | 20,600 | **206,000** of the 270,000 cap | yes |
+| 2026-10-29 02:09–02:10 | Upsets, in-play refinement of un-pulled slots (Lead-approved after #166; ceiling 260, stop at +25%): `pull --season 2025` from main 7f91c1b, windows anchored on the close event's own start; cached slots re-read free | `/historical/sports/{key}/odds` | 12 | 120 | yes |
+| 2026-10-29 02:12–02:20 | Upsets, same, `pull --season 2024` (ceiling 7,170) | `/historical/sports/{key}/odds` | 603 | 6,030 | yes |
+| 2026-10-29 02:22–02:30 | Upsets, same, `pull --season 2023` (ceiling 7,270) | `/historical/sports/{key}/odds` | 574 | 5,740 | yes |
+| | **In-play job total (its spend log)**; refinement 11,890 of its 14,700 ceiling | | 21,789 | **217,890** of the 270,000 cap | yes |
+| 2026-10-29 02:58 | Upsets, in-play postponed re-walk (Lead-approved after #168; stop at +25% per stage): `pull --season 2026 --postponed` from main 8589013, 4 matches (ceiling 970) | `/historical/sports/{key}/odds` | 7 | 70 | yes |
+| 2026-10-29 03:01 | Upsets, same, `--season 2025 --postponed`, 16 matches (ceiling 2,970) | `/historical/sports/{key}/odds` | 1 | 10 | yes |
+| 2026-10-29 03:04–03:05 | Upsets, same, `--season 2024 --postponed`, 11 matches (ceiling 2,610) | `/historical/sports/{key}/odds` | 70 | 700 | yes |
+| 2026-10-29 03:07 | Upsets, same, `--season 2023 --postponed`, 1 match (ceiling 350) | `/historical/sports/{key}/odds` | 1 | 10 | yes |
+| | **In-play job total (its spend log)**; postponed re-walk 790 of its 6,900 ceiling | | 21,868 | **218,680** of the 270,000 cap | yes |
 
