@@ -196,8 +196,9 @@ function tourFilter(all) {
 
 function matchesView() {
   const ch = odds && odds.challengers && typeof odds.challengers === "object" ? odds.challengers : null;
-  if (!ch) return tourLevelView([]);
-  const nTour = objects(odds.matches).length, nCh = objects(ch.matches).length;
+  const dk = dkBlock();
+  if (!ch && !dk) return tourLevelView([]);
+  const nTour = objects(odds.matches).length, nCh = challengerList(ch, dk).length;
   if (level !== "challengers") level = "tour";
   const levels = segmented("Level", [["tour", `Tour-level (${nTour})`], ["challengers", `Challengers (${nCh})`]], level,
     (k) => { level = k; store.set("tennis-level", k); render(); window.scrollTo(0, 0); });
@@ -291,33 +292,150 @@ function challengerCard(m) {
       thin.length ? el("span", {}, `Thin: ${thin.join(", ")}`) : null));
 }
 
+// ---------------------------------------------------------------- challengers (DraftKings via OddsPapi)
+// DraftKings pre-match decimal odds for the same Challenger / WTA 125 matches (`challengers_dk`, refreshed at most
+// every 12 h). Shown only inside these cards, next to Polymarket's book for the same match: OddsPapi's terms forbid
+// passing its data on as a standalone product, so there is no table export or download.
+
+const DK_LABEL = "DraftKings (via OddsPapi), pre-match";
+const DK_STALE_H = 24;
+
+// The block when it has something to say: null when missing or the build has no key.
+function dkBlock() {
+  const dk = odds && odds.challengers_dk && typeof odds.challengers_dk === "object" ? odds.challengers_dk : null;
+  return dk && dk.status !== "no_key" ? dk : null;
+}
+
+const dkShown = (dk) => !!dk && dk.status !== "orientation_check_failed";
+
+// Orientation-free key for a pairing: accents, case, hyphens and word order don't matter.
+const nameKey = (s) => String(s || "").normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase()
+  .replace(/[^a-z\s]/g, " ").split(/\s+/).filter(Boolean).sort().join(" ");
+const pairKey = (a, b) => [nameKey(a), nameKey(b)].sort().join(" | ");
+
+// One list for the Challengers view: Polymarket matches (each with its DraftKings twin, if any, turned to
+// Polymarket's player order) plus the DraftKings matches Polymarket doesn't list.
+function challengerList(ch, dk) {
+  const pm = ch ? objects(ch.matches) : [];
+  const dks = dkShown(dk) ? objects(dk.matches).filter((m) => m.draftkings && typeof m.draftkings === "object") : [];
+  const twins = new Map(dks.map((m) => [pairKey(m.player_1, m.player_2), m]));
+  const used = new Set();
+  const out = pm.map((m) => {
+    const k = pairKey(m.player_1, m.player_2), t = twins.get(k);
+    if (!t) return m;
+    used.add(k);
+    const same = nameKey(t.player_1) === nameKey(m.player_1);
+    const o = t.draftkings;
+    return { ...m, dk: { odds_1: same ? o.odds_1 : o.odds_2, odds_2: same ? o.odds_2 : o.odds_1, margin: o.margin,
+      fair_1: prob(t.fair_1) === null ? null : (same ? t.fair_1 : 1 - t.fair_1) } };
+  });
+  for (const m of dks) {
+    if (used.has(pairKey(m.player_1, m.player_2))) continue;
+    const o = m.draftkings;
+    out.push({ ...m, dkOnly: true, dk: { odds_1: o.odds_1, odds_2: o.odds_2, margin: o.margin, fair_1: prob(m.fair_1) } });
+  }
+  return out;
+}
+
+function dkTable(d, n1, n2) {
+  const row = (label, a, b) => el("tr", {}, el("td", {}, label), el("td", {}, a), el("td", {}, b));
+  return el("table", { class: "odds dkline" },
+    el("thead", {}, el("tr", {}, el("th", {}, ""), el("th", {}, n1), el("th", {}, n2))),
+    el("tbody", {},
+      row("DraftKings", dec(d.odds_1), dec(d.odds_2)),
+      row("Fair chance", d.fair_1 === null ? na() : pct(d.fair_1), d.fair_1 === null ? na() : pct(1 - d.fair_1))));
+}
+
+function dkCard(m) {
+  const [n1, n2] = shortNames(m.player_1, m.player_2);
+  const model = prob(m.model_p1);
+  const fair = m.dk.fair_1;
+  const started = (parseTs(m.commence_time) ?? Infinity) <= Date.now();
+  return el("article", { class: "card match chdk" },
+    el("div", { class: "match-head" },
+      el("span", {}, startText(m.commence_time)),
+      el("span", {}, started ? el("span", { class: "tag warn" }, "Started: odds were pre-match") : null, " ",
+        el("span", { class: "tag" }, "DraftKings only"), " ", m.tier || m.tour || "")),
+    el("div", { class: "players" },
+      el("i", { class: "dot1" }), el("span", {}, m.player_1 || "?"),
+      el("i", { class: "dot2" }), el("span", {}, m.player_2 || "?")),
+    fair !== null && el("div", { class: "probbar", "aria-hidden": "true" },
+      el("span", { style: `flex:${fair}` }), el("span", { style: `flex:${1 - fair}` })),
+    dkTable(m.dk, n1, n2),
+    el("div", { class: "card-foot" },
+      el("span", {}, "Model ", el("span", { class: "tag" }, "model: not proven"), " ",
+        model === null ? "—" : `${pct(model)} / ${pct(1 - model)}`),
+      isNum(m.dk.margin) ? el("span", {}, `DraftKings margin ${(m.dk.margin * 100).toFixed(1)}%`) : null,
+      el("span", {}, "Not listed on Polymarket")));
+}
+
+// The DraftKings source line under the Polymarket one: label and age, or a short note when there's nothing to show.
+function dkSourceLine(dk, nShown) {
+  if (!dk) return null;
+  if (dk.status === "orientation_check_failed") {
+    return el("p", { class: "note dk-note" }, "DraftKings Challenger odds are held back this time: a check against Polymarket didn't confirm which price belongs to which player.");
+  }
+  if (!nShown) return el("p", { class: "note dk-note" }, "DraftKings Challenger odds: not available right now.");
+  const label = typeof dk.label === "string" && dk.label ? dk.label : DK_LABEL;
+  const age = ageText(dk.fetched_at);
+  const st = typeof dk.status === "string" ? dk.status : "";
+  const extra = st.startsWith("error") ? " The last refresh failed; these are the last saved odds."
+    : st === "quota_guard" ? " Refreshes are paused near the monthly request limit; these are the last saved odds." : "";
+  const old = ageHours(dk.fetched_at) !== null && ageHours(dk.fetched_at) > DK_STALE_H;
+  return el("div", { class: "banner info dk" + (old ? " old" : "") }, el("b", {}, label),
+    `${age ? `Updated ${age}` : "Update time unknown"} (refreshes at most every 12 h). Decimal odds; fair chance = DraftKings' price with its margin removed.${extra}`);
+}
+
+function challengerOrDk(m) {
+  if (m.dkOnly) return dkCard(m);
+  const card = challengerCard(m);
+  if (m.dk) {
+    const [n1, n2] = shortNames(m.player_1, m.player_2);
+    card.insertBefore(dkTable(m.dk, n1, n2), card.querySelector(".card-foot"));
+    if (isNum(m.dk.margin)) card.querySelector(".card-foot").append(el("span", {}, `DraftKings margin ${(m.dk.margin * 100).toFixed(1)}%`));
+  }
+  return card;
+}
+
 function challengersView(ch, head) {
   const out = [...head];
-  const status = typeof ch.status === "string" ? ch.status : "missing";
   const add = (title, text, bad) => out.push(el("div", { class: "banner" + (bad ? " bad" : ""), role: "status" }, el("b", {}, title), text));
-  out.push(el("div", { class: "banner info" }, el("b", {}, "Polymarket (international), indicative: not tradable from the US"),
-    `Peer order-book prices per share, ${ageText(ch.fetched_at) ? `fetched ${ageText(ch.fetched_at)}` : "fetch time unknown"}. Size = shares at the best price; books are often only a few shares deep.`));
-  if (status !== "ok") add("Challenger prices not updated", status.startsWith("error") ? "The last fetch failed. These are the last saved prices." : `Status "${status}".`, status.startsWith("error"));
-  const fh = ageHours(ch.fetched_at);
-  if (fh !== null && fh > STALE_ODDS_H) add("Old prices", `These prices were fetched ${ageText(ch.fetched_at)}.`, false);
+  const dk = dkBlock();
+  if (ch) {
+    const status = typeof ch.status === "string" ? ch.status : "missing";
+    out.push(el("div", { class: "banner info" }, el("b", {}, "Polymarket (international), indicative: not tradable from the US"),
+      `Peer order-book prices per share, ${ageText(ch.fetched_at) ? `fetched ${ageText(ch.fetched_at)}` : "fetch time unknown"}. Size = shares at the best price; books are often only a few shares deep.`));
+    if (status !== "ok") add("Challenger prices not updated", status.startsWith("error") ? "The last fetch failed. These are the last saved prices." : `Status "${status}".`, status.startsWith("error"));
+    const fh = ageHours(ch.fetched_at);
+    if (fh !== null && fh > STALE_ODDS_H) add("Old prices", `These prices were fetched ${ageText(ch.fetched_at)}.`, false);
+  }
+  const all = challengerList(ch, dk);
+  const line = dkSourceLine(dk, all.filter((m) => m.dk).length);
+  if (line) out.push(line);
 
-  const all = objects(ch.matches);
   const [seg, byTour] = tourFilter(all);
-  const thinCount = byTour.filter((m) => thinReasons(side(m.p1), side(m.p2)).length).length;
+  const isThin = (m) => !m.dkOnly && thinReasons(side(m.p1), side(m.p2)).length > 0;
+  const thinCount = byTour.filter(isThin).length;
   out.push(seg);
   if (thinCount) {
     out.push(el("button", { class: "chip" + (hideThin ? " on" : ""), "aria-pressed": String(hideThin),
       onclick: () => { hideThin = !hideThin; store.set("tennis-hide-thin", hideThin); render(); } },
     hideThin ? `Showing ${byTour.length - thinCount} with usable books · show all ${byTour.length}` : `Hide ${thinCount} thin book${thinCount === 1 ? "" : "s"}`));
   }
-  const shown = hideThin ? byTour.filter((m) => !thinReasons(side(m.p1), side(m.p2)).length) : byTour;
+  const shown = hideThin ? byTour.filter((m) => !isThin(m)) : byTour;
   if (!shown.length) {
     out.push(el("div", { class: "card empty" }, all.length ? "No matches with these filters." : "No Challenger or WTA 125 matches listed right now."));
     return out;
   }
-  out.push(...grouped(shown, challengerCard));
-  out.push(el("p", { class: "note" },
-    "Bid = the best price someone will pay for a share that pays $1 if the player wins; ask = the best price to buy one. The spread is the cost of crossing the book. Polymarket international can't be traded from the US; these are shown only as an indicative line."));
+  out.push(...grouped(shown, challengerOrDk));
+  if (ch) {
+    out.push(el("p", { class: "note" },
+      "Bid = the best price someone will pay for a share that pays $1 if the player wins; ask = the best price to buy one. The spread is the cost of crossing the book. Polymarket international can't be traded from the US; these are shown only as an indicative line."));
+  }
+  if (all.some((m) => m.dk)) {
+    out.push(el("p", { class: "note" },
+      "DraftKings rows are pre-match decimal odds from the DraftKings Sportsbook, via OddsPapi. Compare a DraftKings fair chance with the Polymarket prices above it: a share's price in dollars is also its implied chance."));
+  }
   return out;
 }
 
@@ -650,6 +768,10 @@ function footer() {
     " (", el("a", { href: "https://creativecommons.org/licenses/by-sa/4.0/", rel: "noopener" }, "CC BY-SA"), ")."));
   if (odds && odds.challengers && typeof odds.challengers === "object") {
     lines.push(p("Challenger and WTA 125 prices: Polymarket (international) public order books, indicative only, not tradable from the US."));
+  }
+  const dk = dkBlock();
+  if (dkShown(dk) && objects(dk.matches).length) {
+    lines.push(p(typeof dk.credit === "string" && dk.credit ? dk.credit : "DraftKings Challenger and WTA 125 odds: OddsPapi (oddspapi.io)"));
   }
   return lines;
 }

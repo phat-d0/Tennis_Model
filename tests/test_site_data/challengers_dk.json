@@ -1,0 +1,89 @@
+{
+ "source": "draftkings_via_oddspapi",
+ "label": "DraftKings (via OddsPapi), pre-match",
+ "credit": "DraftKings Challenger and WTA 125 odds: OddsPapi (oddspapi.io)",
+ "fetched_at": "2026-10-26T05:45:00Z",
+ "status": "cached",
+ "matches": [
+  {
+   "event_id": "op-1001",
+   "tournament": "Halden Challenger",
+   "tour": "ATP",
+   "tier": "Challenger",
+   "commence_time": "2026-10-26T09:00:00Z",
+   "player_1": "Pablo Quintero",
+   "player_2": "Ruben Sato",
+   "draftkings": {
+    "odds_1": 1.62,
+    "odds_2": 2.3,
+    "last_update": "2026-10-26T05:40:00Z",
+    "margin": 0.0521
+   },
+   "fair_1": 0.5936,
+   "dk_implied_1": 0.6173,
+   "model_p1": 0.58,
+   "model_n1": 64,
+   "model_n2": 41
+  },
+  {
+   "event_id": "op-1002",
+   "tournament": "Halden Challenger",
+   "tour": "ATP",
+   "tier": "Challenger",
+   "commence_time": "2026-10-26T15:00:00Z",
+   "player_1": "Oskar Lind",
+   "player_2": "Mateo Rivas",
+   "draftkings": {
+    "odds_1": 2.05,
+    "odds_2": 1.74,
+    "last_update": "2026-10-26T05:40:00Z",
+    "margin": 0.0625
+   },
+   "fair_1": 0.4552,
+   "dk_implied_1": 0.4878,
+   "model_p1": 0.47,
+   "model_n1": 33,
+   "model_n2": 52
+  },
+  {
+   "event_id": "op-1003",
+   "tournament": "Lakeview 125",
+   "tour": "WTA",
+   "tier": "WTA 125",
+   "commence_time": "2026-10-26T12:00:00Z",
+   "player_1": "Hana Ishikawa-Moreno",
+   "player_2": "Freya Gallo",
+   "draftkings": {
+    "odds_1": 2.6,
+    "odds_2": 1.5,
+    "last_update": "2026-10-26T05:40:00Z",
+    "margin": 0.0513
+   },
+   "fair_1": 0.3554,
+   "dk_implied_1": 0.3846,
+   "model_p1": 0.36,
+   "model_n1": 48,
+   "model_n2": 27
+  },
+  {
+   "event_id": "op-1004",
+   "tournament": "Lakeview 125",
+   "tour": "WTA",
+   "tier": "WTA 125",
+   "commence_time": "2026-10-26T14:00:00Z",
+   "player_1": "Ines Duarte",
+   "player_2": "Kaja Novak",
+   "draftkings": {
+    "odds_1": 1.36,
+    "odds_2": 3.1,
+    "last_update": "2026-10-26T05:40:00Z",
+    "margin": 0.0579
+   },
+   "fair_1": 0.7126,
+   "dk_implied_1": 0.7353,
+   "model_p1": null,
+   "model_n1": 12,
+   "model_n2": 25
+  }
+ ]
+}

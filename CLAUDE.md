@@ -704,6 +704,12 @@ Since phat-d0/Tennis_Model#116 also: `min_arb_profit_per_contract` (the alert th
   home lists 4 portfolios (Elo model, DK vs Pinnacle, Underdogs, Seed loses early), Seed loses early holds 2 strategies
   (all / qualifiers), the strategy page keeps "not proven", the rule and Live paper / Backtest. A second tap on the tab
   goes home. Nothing removed; no Kalshi data. Service-worker cache v6. 14 site tests passing.
+- 2026-11-05 (Dashboard): public page shows DraftKings Challenger / WTA 125 pre-match odds via OddsPapi (`challengers_dk`,
+  Upsets' #175; owner decision 2026-11-05; phat-d0/Tennis_Model#177) inside the Challengers view. Matching
+  Polymarket cards get a DraftKings odds + fair-chance row (player order flipped when DK lists them the other way), and
+  DK-only matches get their own cards. The label + "updated <age> ago", status notes (`no_key` hidden,
+  `orientation_check_failed` = short note, no prices) and the OddsPapi credit are in the footer. No export or download.
+  Synthetic fixture; service-worker cache v7. 16 site tests passing.
 - 2026-10-28 (Scanner): paper C rules checked against Kalshi's placeholder listing books (combined ask ≈ $1.84): no rule
   opens on them, but **E1 is effectively consumed by the placeholder listing book; live C entries are E2 apart from the
   start-up batch**. P1–P4 unaffected. No rule change (Lead); dated note in docs/scanner_paper.md.

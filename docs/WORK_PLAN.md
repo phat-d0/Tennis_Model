@@ -47,8 +47,9 @@ conflict (git merges edits that touch different blocks).
   2026-10-28; #132 with Dashboard's #136, merged). Live C entries are E2 apart from the start-up batch (#146). Next: watch
   429s, the 04:00 UTC lookback and the C rules' first exits; fixes only, no new rules. Waiting on: the owner's health-check paste.
 
-- **Dashboard.** Now: public page Portfolio tab in the folder layout (home › portfolio › strategy), PR open; the Paper tab's
-  folder layout merged (#149). Next: check both against the owner's screenshots. Waiting on: Lead review; owner screenshots.
+- **Dashboard.** Now: DraftKings Challenger odds (OddsPapi, `challengers_dk`) on the public page's Challengers view, PR
+  open, built against Upsets' #175. Folder layouts are merged (#149, #150). Next: check the live block once #175 and the
+  `ODDSPAPI_KEY` secret are in. Waiting on: #175 merge; Lead review.
 
 - **Upsets.** Now: page builder + Portfolio upkeep (Polymarket Challengers #111, power de-vig #112 live). The Portfolio ledger
   and month's spend are restored from the live page when the cache is evicted (#129). Now (owner 2026-10-28): "seed loses
