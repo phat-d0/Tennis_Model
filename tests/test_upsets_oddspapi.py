@@ -15,7 +15,7 @@ TIERS = {"atp": {"charlottesville": ["Challenger", "Hard"]}, "wta": {"cali": ["W
 KEY = "SECRETKEY-abc123"
 
 
-def fixture(fid, cat, tour_name, p1, p2, tid, start="2026-11-05T18:00:00.000Z", status=0):
+def fixture(fid, cat, tour_name, p1, p2, tid, start="2026-11-06T09:00:00.000Z", status=0):
     return {"fixtureId": fid, "participant1Id": 1, "participant2Id": 2, "sportId": 12, "tournamentId": tid,
             "statusId": status, "hasOdds": True, "startTime": start, "participant1Name": p1, "participant2Name": p2,
             "categoryName": cat, "tournamentName": tour_name}
@@ -188,3 +188,17 @@ def test_orientation_guard_against_polymarket():
     assert op.orientation_ok(dk([(a, b, 0.28) for a, b in names]), same)[0] is False            # swapped prices
     assert op.orientation_ok(dk([(b, a, 0.28) for a, b in names]), same)[0] is True             # players listed the other way
     assert op.orientation_ok(dk([(a, b, 0.72) for a, b in names[:3]]), same)[0] is None         # too few to tell
+
+
+@pytest.mark.parametrize("status,make,key", [("cached", lambda: Session(), KEY),
+                                             ("quota_guard", lambda: Session(count=op.QUOTA_STOP), KEY),
+                                             ("error", lambda: Session(fail={"/account": 500}), KEY),
+                                             ("no_key", lambda: Session(), "")])
+def test_cached_copies_never_show_matches_that_have_started(tmp_path, status, make, key, monkeypatch):
+    monkeypatch.delenv(op.KEY_ENV, raising=False)
+    run(tmp_path, Session())                                    # f1 and f2 both start 2026-11-06 09:00
+    later = pd.Timestamp("2026-11-06 10:00", tz="UTC")          # 1 h after the start
+    if status == "cached":                                     # inside the 12 h refresh: fetched 6 h before the start
+        run(tmp_path, Session(), now=pd.Timestamp("2026-11-06 03:00", tz="UTC"))
+    doc, _, _ = run(tmp_path, make(), key=key, now=later)
+    assert doc["status"].startswith(status) and doc["matches"] == []

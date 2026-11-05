@@ -267,8 +267,11 @@ def _empty() -> dict:
     return {"source": SOURCE, "label": LABEL, "credit": CREDIT, "fetched_at": None, "matches": []}
 
 
-def _serve(cached: dict | None, status: str) -> dict:
+def _serve(cached: dict | None, status: str, now: pd.Timestamp) -> dict:
+    """The cached copy without matches that have started since it was fetched (their prices are pre-match)."""
     doc = dict(cached) if cached else _empty()
+    doc["matches"] = [m for m in doc.get("matches") or []
+                      if m.get("commence_time") and pd.Timestamp(m["commence_time"]) > now]
     doc["status"] = status
     return doc
 
@@ -280,17 +283,17 @@ def block(cache: Path, now: pd.Timestamp, tiers: dict | None, model_fn=None, key
     cached = _read(cache)
     if not key:
         log(f"[challengers_dk: {KEY_ENV} not set; block skipped]")
-        return _serve(cached, "no_key")
+        return _serve(cached, "no_key", now)
     if cached and cached.get("fetched_at") and \
             now - pd.Timestamp(cached["fetched_at"]) < pd.Timedelta(hours=REFRESH_H):
-        return _serve(cached, "cached")
+        return _serve(cached, "cached", now)
     client = Client(key, session=session, sleep=sleep)
     try:
         acct = client.account()
         used = acct["request_count"]
         if used is None or used >= QUOTA_STOP:
             log(f"[challengers_dk: quota guard, {used} of {acct['request_limit']} requests used; cached copy served]")
-            return _serve(cached, "quota_guard")
+            return _serve(cached, "quota_guard", now)
         fx = client.fixtures(now)
         candidates = [f for f in fx if tour_of(f) is not None]
         tids = sorted({f.get("tournamentId") for f in candidates if f.get("tournamentId") is not None}, key=str)
@@ -304,7 +307,7 @@ def block(cache: Path, now: pd.Timestamp, tiers: dict | None, model_fn=None, key
     except Exception as e:    # OddsPapiError carries only a code and a path; anything else: its class name only
         msg = str(e) if isinstance(e, OddsPapiError) else type(e).__name__
         log(f"[challengers_dk: {msg}; {client.billable} billable requests; cached copy served]")
-        return _serve(cached, f"error: {msg}")
+        return _serve(cached, f"error: {msg}", now)
     model = None
     if model_fn is not None and out:
         try:

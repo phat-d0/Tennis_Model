@@ -614,7 +614,8 @@ Since phat-d0/Tennis_Model#116 also: `min_arb_profit_per_contract` (the alert th
   proven with 3 billable calls (9 of 250 this month), see Key facts; names come as "Last, First" and are flipped. Every build
   re-checks the orientation against the Polymarket block: the DK block is withheld if clear favourites mostly disagree (≥ 5
   overlapping matches); a fixture without both names is dropped and logged. First live refresh: 24 Challenger matches from 6 of
-  8 events; Taranto and Luanda left out as tiers unknown to the #111 rule. 395 tests (pandas 2 and 3.1).
+  8 events; Taranto and Luanda left out as tiers unknown to the #111 rule. A served cached copy drops matches that have
+  started since it was fetched (Lead review). 399 tests (pandas 2 and 3.1).
 - 2026-10-28 (Backtest): cash-out study code merged (phat-d0/Tennis_Model#125): `swinglock/backtest/cashout.py`, CLI
   `python -m swinglock.backtest.cashout --data <dir> [--sets <dir>/sets.parquet]`. Dated amendment (before any run):
   Level exits (12 gate rules), DOG50 fixed-rule gate on absolute P&L, DOG30 descriptive, set-end split (descriptive),
