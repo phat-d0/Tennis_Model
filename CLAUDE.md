@@ -588,6 +588,8 @@ Since phat-d0/Tennis_Model#116 also: `min_arb_profit_per_contract` (the alert th
   any outcome was read. Master plan updated: DK in-play and Kalshi FAVDIP done (FAIL), no live in-play tracking proposed.
 - 2026-11-01 (owner, Lead): Odds API spend log shows "above the 5,000 reserve: yes/no" only (Team rule 4 changed); the exact
   balances in docs/data_inventory.md, WORK_PLAN and this file were replaced (they stay in git history).
+- 2026-11-05 (Lead): publish.yml passes the `ODDSPAPI_KEY` Actions secret to the page build (optional; an unset secret skips
+  the DraftKings Challenger block) and rebuilds on changes to `upsets/oddspapi.py`.
 - 2026-11-05 (Data): OddsPapi free-tier test (owner-approved 2026-11-01; docs/research/challenger_odds.md §5). 6 billable
   requests of 250/month + 2 unmetered `/v4/account`, no errors. **DraftKings pre-match match-winner odds exist for ATP Challenger
   (31 fixtures, 6 events) and WTA 125 (7, 2 events)**, margin ≈ 6.6% (tour control 4.8%), median last change 1.4–1.8 h. The

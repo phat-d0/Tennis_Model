@@ -1,5 +1,6 @@
 # Builds the Tennis Odds page and publishes it to GitHub Pages (docs/site_plan.md).
-# One-time setup: repo Settings -> Pages -> Source: "GitHub Actions"; Actions secret ODDS_API_KEY.
+# One-time setup: repo Settings -> Pages -> Source: "GitHub Actions"; Actions secrets ODDS_API_KEY and ODDSPAPI_KEY
+# (ODDSPAPI_KEY is optional: without it the DraftKings Challenger block is skipped; free plan, 250 requests a month).
 # Paid calls: at most 3,000 credits a month and never below the 5,000 reserve (enforced in upsets/site.py).
 # No Kalshi data is read or published here: the repo and the site are public.
 name: Publish page
@@ -10,7 +11,7 @@ on:
   workflow_dispatch:
   push:
     branches: [main]
-    paths: ["site/**", "upsets/site.py", "upsets/portfolio.py", "upsets/names.py", "upsets/elo.py", "upsets/elo_plus.py", "upsets/model.py", "upsets/polymarket.py", "upsets/wiki_seeds.py", "upsets/portfolio_backtest.py", ".github/workflows/publish.yml"]
+    paths: ["site/**", "upsets/site.py", "upsets/portfolio.py", "upsets/names.py", "upsets/elo.py", "upsets/elo_plus.py", "upsets/model.py", "upsets/polymarket.py", "upsets/wiki_seeds.py", "upsets/portfolio_backtest.py", "upsets/oddspapi.py", ".github/workflows/publish.yml"]
 
 permissions:
   contents: read
@@ -63,6 +64,7 @@ jobs:
       - name: Build
         env:
           ODDS_API_KEY: ${{ secrets.ODDS_API_KEY }}
+          ODDSPAPI_KEY: ${{ secrets.ODDSPAPI_KEY }}
         run: |
           mkdir -p _site/data
           python -m upsets.site build --out _site/data --cache data/site_cache \
