@@ -38,10 +38,15 @@ CHALLENGERS = SAMPLE.parent / "challengers.json"   # the proposed `challengers` 
                                                     # builder's shape test (tests/test_upsets_site.py) is unaffected
 
 
-def sample(challengers: bool = True) -> dict:
+CHALLENGERS_DK = SAMPLE.parent / "challengers_dk.json"   # synthetic `challengers_dk` (upsets/oddspapi.py, #175)
+
+
+def sample(challengers: bool = True, dk: bool = False) -> dict:
     d = json.loads(SAMPLE.read_text())
     if challengers:
         d["challengers"] = json.loads(CHALLENGERS.read_text())
+    if dk:
+        d["challengers_dk"] = json.loads(CHALLENGERS_DK.read_text())
     return d
 
 
@@ -56,6 +61,11 @@ def shifted(data: dict, built_ago: timedelta = timedelta(minutes=5)) -> dict:
         out["challengers"]["fetched_at"] = move(out["challengers"]["fetched_at"])
         for m in out["challengers"]["matches"]:
             m["commence_time"] = move(m["commence_time"])
+    if out.get("challengers_dk"):
+        out["challengers_dk"]["fetched_at"] = move(out["challengers_dk"]["fetched_at"])
+        for m in out["challengers_dk"]["matches"]:
+            m["commence_time"] = move(m["commence_time"])
+            m["draftkings"]["last_update"] = move(m["draftkings"]["last_update"])
     for m in out["matches"]:
         m["commence_time"] = move(m["commence_time"])
         for b in ("draftkings", "pinnacle"):
@@ -169,6 +179,26 @@ def test_no_kalshi_anywhere_in_page_code():
         assert "kalshi" not in path.read_text().lower(), path.relative_to(ROOT)
 
 
+DK_KEYS = {"source", "label", "credit", "fetched_at", "status", "matches"}
+DK_MATCH_KEYS = CH_MATCH_KEYS - {"p1", "p2"} | {"draftkings", "fair_1", "dk_implied_1"}
+
+
+def test_sample_challengers_dk_contract():
+    """The synthetic fixture has the shape upsets.oddspapi.block() writes (#175): displayed fields only."""
+    dk = sample(dk=True)["challengers_dk"]
+    assert set(dk) == DK_KEYS and dk["source"] == "draftkings_via_oddspapi"
+    assert dk["label"] == "DraftKings (via OddsPapi), pre-match" and "OddsPapi" in dk["credit"]
+    _iso(dk["fetched_at"])
+    for m in dk["matches"]:
+        assert set(m) == DK_MATCH_KEYS, m["event_id"]
+        assert m["tour"] in ("ATP", "WTA") and m["tier"] in ("Challenger", "WTA 125")
+        b = m["draftkings"]
+        assert set(b) == BOOK_KEYS
+        assert b["margin"] == pytest.approx(1 / b["odds_1"] + 1 / b["odds_2"] - 1, abs=1e-4)
+        assert m["dk_implied_1"] == pytest.approx(1 / b["odds_1"], abs=1e-4)
+        assert 0 < m["fair_1"] < 1 and (m["fair_1"] > 0.5) == (b["odds_1"] < b["odds_2"])
+
+
 # ---------------------------------------------------------------- browser
 
 CHECK_JS = r"""
@@ -275,6 +305,12 @@ const VIEWPORTS = { phone: { width: 390, height: 844 }, laptop: { width: 1280, h
         banners: [...document.querySelectorAll("#view .banner b")].map((b) => b.textContent),
         notProven: [...document.querySelectorAll("#view article.ch .tag")].filter((t) => t.textContent === "model: not proven").length,
         chip: document.querySelector("#view .chip")?.textContent || "",
+        dkOnly: document.querySelectorAll("#view article.chdk").length,
+        dkOdds: [...document.querySelectorAll("#view table.dkline tbody tr:first-child")]
+          .map((tr) => [...tr.cells].slice(1).map((c) => c.textContent).join("/")),
+        dkNote: document.querySelector("#view .dk-note")?.textContent || "",
+        dkBanner: document.querySelector("#view .banner.dk")?.textContent || "",
+        levelText: document.querySelector("#view .levels button:nth-child(2)")?.textContent || "",
         empty: document.querySelector("#view .empty")?.textContent || "",
         overflow: document.documentElement.scrollWidth - window.innerWidth,
       }));
@@ -432,6 +468,46 @@ def test_page_challengers_failed_or_absent(site, tmp_path):
     d.pop("challengers")
     for res in _check(tmp_path, site(d), "nochal"):
         assert not res["levels"] and res["cards"] == len(d["matches"])
+
+
+@needs_browser
+def test_page_challengers_dk(site, tmp_path):
+    """DraftKings Challenger odds (via OddsPapi): a DraftKings line on the Polymarket card of the same match (turned to
+    Polymarket's player order), DraftKings-only matches as their own cards, label + age, credit in the footer."""
+    d = shifted(sample(dk=True))
+    for res in _check(tmp_path, site(d), "chdk"):
+        ch = res["ch"]
+        assert ch["banners"] == ["Polymarket (international), indicative: not tradable from the US",
+                                 "DraftKings (via OddsPapi), pre-match"]
+        assert "Updated" in ch["dkBanner"] and "ago" in ch["dkBanner"]
+        assert ch["cards"] == len(d["challengers"]["matches"]) and ch["dkOnly"] == 2
+        # Quintero (same order), Lind (DraftKings only), Gallo (DK lists her second: flipped), Duarte (DraftKings only)
+        assert ch["dkOdds"] == ["1.62/2.30", "2.05/1.74", "1.50/2.60", "1.36/3.10"]
+        assert ch["groups"] == ["Halden Challenger", "Lakeview 125", "Marisol Challenger"]
+        assert ch["levelText"] == "Challengers (8)"
+        assert res["chHidden"]["dkOnly"] == 2 and res["chHidden"]["thin"] == 0
+        assert "OddsPapi (oddspapi.io)" in res["footer"]
+    held = shifted(sample(dk=True))
+    held["challengers_dk"].update(status="orientation_check_failed", matches=[])
+    for res in _check(tmp_path, site(held), "chdkheld"):
+        assert res["ch"]["dkOdds"] == [] and res["ch"]["dkOnly"] == 0 and "held back" in res["ch"]["dkNote"]
+        assert "OddsPapi" not in res["footer"]
+    nokey = shifted(sample(dk=True))
+    nokey["challengers_dk"]["status"] = "no_key"
+    for res in _check(tmp_path, site(nokey), "chdknokey"):
+        assert res["ch"]["dkOdds"] == [] and res["ch"]["dkNote"] == "" and "OddsPapi" not in res["footer"]
+    empty = shifted(sample(dk=True))
+    empty["challengers_dk"].update(status="ok", matches=[])
+    for res in _check(tmp_path, site(empty), "chdkempty"):
+        assert "not available" in res["ch"]["dkNote"] and res["ch"]["dkOdds"] == []
+    old = shifted(sample(dk=True))
+    old["challengers_dk"].update(status="error: HTTP 500 on /v4/fixtures",
+                                 fetched_at=_fmt(datetime.now(UTC) - timedelta(hours=30)))
+    old.pop("challengers")                     # DraftKings alone still opens the Challengers view
+    for res in _check(tmp_path, site(old), "chdkonly"):
+        ch = res["ch"]
+        assert res["levels"] and ch["cards"] == 0 and ch["dkOnly"] == 4
+        assert ch["banners"] == ["DraftKings (via OddsPapi), pre-match"] and "last refresh failed" in ch["dkBanner"]
 
 
 @needs_browser

@@ -29,6 +29,24 @@ no CDN, and no request to any other origin. Links to reports and the licence are
   the model chance with a "not proven" tag. **Thin books** (any spread > 5¢, a best level < 20 shares, or an empty side)
   are dimmed and tagged with the reason, and a "Hide N thin books" chip filters them out (remembered per device). A
   failed or stale fetch keeps the last prices, with banners inside the view.
+- **DraftKings Challengers** (owner decision 2026-11-05; `challengers_dk` from `upsets/oddspapi.py`, phat-d0/Tennis_Model#175):
+  DraftKings Sportsbook pre-match odds via OddsPapi, inside the Challengers view, so a match can be compared across the
+  two sources. A blue line under the Polymarket one shows `label` as written ("DraftKings (via OddsPapi), pre-match") and
+  "Updated <age> ago" from `fetched_at` (refreshes at most every 12 h). It turns amber after 24 h, and `error: …` or
+  `quota_guard` adds "these are the last saved odds".
+  - A Polymarket card whose two players DraftKings also prices (names matched without regard to accents, case, hyphens
+    or player order) gets a DraftKings row (decimal odds) and a fair-chance row (power de-vig, `fair_1`). When
+    DraftKings lists the players the other way round, its prices are turned to Polymarket's order. The margin goes in
+    the card foot.
+  - A match only DraftKings lists gets its own card in the same tournament group: players, a fair-chance bar, the
+    DraftKings table, the model ("not proven"), a "DraftKings only" tag. It is never thin, so "Hide thin books" keeps it.
+    The Challengers count on the switch includes these, and the switch appears when only this block exists.
+  - `no_key` hides everything; an empty list shows a quiet "not available right now";
+    `orientation_check_failed` shows only a short note ("held back … didn't confirm which price belongs to which player")
+    and no DraftKings price.
+  - Footer: `credit` ("DraftKings Challenger and WTA 125 odds: OddsPapi (oddspapi.io)") while DraftKings prices are shown.
+  - Shown in-app only: no download link and no table export (OddsPapi's terms forbid passing its data on as a standalone
+    product).
 - **Portfolio** (built by Upsets in phat-d0/Tennis_Model#96, at the owner's request): paper trades ($10 each, at
   DraftKings' price) per strategy (Elo model, DK vs Pinnacle, Underdogs), each tagged "not proven". Tiles show realized and
   expected profit, luck, ROI, CLV, win rate and drawdown, followed by a realized-vs-expected chart (drag or arrow keys to
