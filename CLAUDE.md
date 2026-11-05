@@ -240,6 +240,11 @@ Since phat-d0/Tennis_Model#116 also: `min_arb_profit_per_contract` (the alert th
   `/v4/account` unmetered, `/v4/historical-odds` free; 429 `REQUEST_LIMIT_EXCEEDED` when over. Cooldowns 1 s (2 s for
   `/v4/fixtures`). Tennis `sportId` 12; `odds-by-tournaments` takes ≤ 3 tournamentIds and one bookmaker (`draftkings`).
   Free tier: all sports and bookmakers, **pre-match only** (live fixtures → 403 RESTRICTED_ACCESS).
+- OddsPapi tennis DK match winner = market `121`; **outcome `121` = participant1, `122` = participant2** (Upsets 2026-11-05,
+  3 Lead-approved calls: on 19 Challenger matches also on Polymarket, DK's power de-vig with that orientation correlates 0.99
+  with Polymarket's mid, mean gap 1.4 pp, 8 of 8 clear favourites agree). `odds-by-tournaments` carries no names; `/v4/fixtures`
+  does, as **"Last, First"**. Challenger category "Challenger", tournament "ATP Challenger <City>, <Country> Men Singles";
+  WTA 125 category "WTA 125K", "WTA 125K <City>, <Country> Women Singles"; doubles are separate tournaments.
 - DraftKings Predictions: **no public/partner API**. ToU (2026-08-04) bans bots/scrapers and
   limits use to personal non-commercial. It's a broker (FCM) routing to CME / Crypto.com / DKeX /
   Bitnomial. Fee ≈ flat $0.02/contract between $0.30 and $0.94. → manual logging only.
@@ -307,6 +312,11 @@ Since phat-d0/Tennis_Model#116 also: `min_arb_profit_per_contract` (the alert th
   (ATP/WTA, descriptive). An exit bid's age = the other side's ask age.
 - 2026-11-01 (owner): the Odds API spend log (`docs/data_inventory.md`) records "above the 5,000 reserve: yes/no", never the
   exact balance; no committed file or public log shows it. Local console output in a cloud session may still print it.
+
+- 2026-11-05 (owner, via the Lead): DraftKings Challenger / WTA 125 **pre-match** odds from OddsPapi go on the public page
+  without emailing OddsPapi first. Its terms only forbid reselling or redistributing its data "as a standalone product",
+  and showing DK prices inside our page next to our model and Polymarket isn't one. Keep it clearly in-app; OddsPapi can
+  revoke access over misuse. Not added to the Portfolio's paper strategies (a separate owner decision).
 
 ## Changelog
 - 2026-10-24: Project scaffold, core math + tests (12 passing), config, schema, CLAUDE.md.
@@ -595,6 +605,19 @@ Since phat-d0/Tennis_Model#116 also: `min_arb_profit_per_contract` (the alert th
   (31 fixtures, 6 events) and WTA 125 (7, 2 events)**, margin ≈ 6.6% (tour control 4.8%), median last change 1.4–1.8 h. The
   free tier has **no in-play odds** (`has_live_odds` false for all 366 bookmakers). Nothing on the page: needs OddsPapi's
   written consent (owner). Key never printed; raw responses gitignored; no fixture committed.
+- 2026-11-05: OddsPapi DraftKings Challenger / WTA 125 block on the page (owner decision above; PR phat-d0/Tennis_Model#175;
+  `upsets/oddspapi.py`, odds.json `challengers_dk`). Pre-match match winner only: label "DraftKings (via OddsPapi), pre-match"
+  with `fetched_at` for its age, plus a footer credit; the #111 tier rule, the power de-vig and the page model, as the Polymarket
+  block. Key from `ODDSPAPI_KEY` (the Lead adds the Actions secret). The block is skipped with one log line when the key is unset,
+  and errors read "HTTP <code> on <path>". `/v4/account` (unmetered) is read before any billable call, and the block holds its
+  cached copy at ≥ 220 of 250 requests. It refreshes at most every 12 h, with calls spaced 1.1 s (2.1 s after `/v4/fixtures`).
+  A refresh costs 2–5 billable calls (≈ 180 a month). Only displayed fields are cached (Actions cache, never committed). Synthetic
+  tests: no key, quota guard, 12 h cache, the key never in output/logs/errors. Orientation (Lead: prove it or it doesn't ship):
+  proven with 3 billable calls (9 of 250 this month), see Key facts; names come as "Last, First" and are flipped. Every build
+  re-checks the orientation against the Polymarket block: the DK block is withheld if clear favourites mostly disagree (≥ 5
+  overlapping matches); a fixture without both names is dropped and logged. First live refresh: 24 Challenger matches from 6 of
+  8 events; Taranto and Luanda left out as tiers unknown to the #111 rule. A served cached copy drops matches that have
+  started since it was fetched (Lead review). 399 tests (pandas 2 and 3.1).
 - 2026-10-28 (Backtest): cash-out study code merged (phat-d0/Tennis_Model#125): `swinglock/backtest/cashout.py`, CLI
   `python -m swinglock.backtest.cashout --data <dir> [--sets <dir>/sets.parquet]`. Dated amendment (before any run):
   Level exits (12 gate rules), DOG50 fixed-rule gate on absolute P&L, DOG30 descriptive, set-end split (descriptive),

@@ -39,7 +39,7 @@ import numpy as np
 import pandas as pd
 import requests
 
-from . import elo, elo_plus, model, polymarket, portfolio, sackmann, wiki_seeds
+from . import elo, elo_plus, model, oddspapi, polymarket, portfolio, sackmann, wiki_seeds
 from .names import match_names, name_key, player_table
 from .odds_api import KEY_NAMES, BudgetError, OddsApi, parse_h2h
 
@@ -302,6 +302,15 @@ def _probs(m: pd.DataFrame, tours, surfaces, best_ofs, rt: dict | None, now: pd.
     return out
 
 
+def challenger_dk_block(session, cache: Path, now: pd.Timestamp, rt: dict | None) -> dict:
+    """odds.json `challengers_dk` (upsets.oddspapi): DraftKings Challenger / WTA 125 pre-match odds, refreshed at most
+    every 12 h, skipped without ODDSPAPI_KEY. Same tier rule and model as the Polymarket block."""
+    def model_fn(f):
+        return _probs(f, f["tour"], f["surface"], pd.Series(3, index=f.index), rt, now)
+    return oddspapi.block(cache, now, (rt or {}).get("tiers"), model_fn if rt and "ratings" in rt else None,
+                          session=session)
+
+
 def challenger_block(session, cache: Path, now: pd.Timestamp, rt: dict | None) -> dict:
     """odds.json `challengers` (upsets.polymarket). On a failed fetch: the last saved block with an error
     status (never str(e): only the exception class and HTTP code)."""
@@ -356,8 +365,10 @@ def page_matches(snaps: pd.DataFrame, titles: dict, rt: dict | None, now: pd.Tim
 def build(out: Path, cache: Path, archive: Path, floor: int = 5000, month_cap: int = 3000,
           now: pd.Timestamp | None = None, key: str | None = None, session=None,
           run_every_h: float = 3.0, pm_session=None, page_session=None, page_base: str = PAGE_DATA,
-          wiki_session=None) -> dict:
+          wiki_session=None, oddspapi_session=None) -> dict:
     """pm_session: an HTTP session for Polymarket's public APIs; None leaves the Challengers block out.
+    oddspapi_session: an HTTP session for OddsPapi (key from ODDSPAPI_KEY); None leaves the DraftKings Challengers
+    block out.
     page_session: an HTTP session for the live page, to restore the paper ledger and the month's spend
     when the cache was evicted (`restore`); None skips it. Raises RestoreError when that can't be done.
     wiki_session: an HTTP session for Wikipedia's API, for the "seed" Portfolio strategies; None skips them."""
@@ -427,6 +438,13 @@ def build(out: Path, cache: Path, archive: Path, floor: int = 5000, month_cap: i
     }
     if pm_session is not None:
         doc["challengers"] = challenger_block(pm_session, cache, now, rt)
+    if oddspapi_session is not None:
+        dk = challenger_dk_block(oddspapi_session, cache, now, rt)
+        ok, note = oddspapi.orientation_ok(dk, doc.get("challengers"))
+        print(f"[challengers_dk: {note}]")
+        if ok is False:          # never show prices that may sit on the wrong players
+            dk = {**dk, "status": "orientation_check_failed", "matches": []}
+        doc["challengers_dk"] = dk
     _write_json(out / "odds.json", doc)
     seeds = None
     if wiki_session is not None:
@@ -521,7 +539,7 @@ def main(argv=None) -> None:
     try:
         doc = build(a.out, a.cache, a.archive, a.floor, a.month_cap, run_every_h=a.run_every_h,
                     pm_session=requests.Session(), page_session=requests.Session(),
-                    wiki_session=requests.Session())
+                    wiki_session=requests.Session(), oddspapi_session=requests.Session())
     except RestoreError as e:
         raise SystemExit(f"[ledger: cache is empty and the live page's copy can't be read ({e}); stopping "
                          "so the live page and its ledger stay as they are]") from None
