@@ -116,6 +116,79 @@ None of these confirms DraftKings Challenger lines specifically. They confirm "D
 - **Option:** our project could apply as a "pregame handicapping project", but a public page is probably not what that offer is for.
 - **Resellers exist but are not sanctioned:** third parties resell Pinnacle-sourced odds (PinnWire, pinnapi, OddsPapi's Pinnacle feed). They are not sanctioned by Pinnacle as far as I can tell. `[snippet]`
 
+## 5. OddsPapi free-tier test (2026-11-05)
+
+Data role, owner-approved (2026-11-01), run 2026-11-05 around 09:40 UTC. Key from the env var `ODDSPAPI_KEY`; it never
+appears in a log, file or commit (the `/v4/account` response echoes the key, so its `api_key` field is stripped before
+saving). Raw responses stay in gitignored `data/raw/oddspapi/`. No fixture is committed.
+
+### What the docs say `[doc]`
+Source: oddspapi.io/en/docs, v4: overview, "Requests & Quota", Errors, and one page per endpoint.
+- Base `https://api.oddspapi.io/v4/…`. The key goes in the `apiKey` query parameter, so request URLs must never be logged.
+- **Quota:** 1 request = 1 call to a billable endpoint, whatever the response size or status (4xx/5xx count too). It
+  resets on the 1st of each month.
+  - `/v4/historical-odds` is free.
+  - `/v4/account` is unmetered and still works after the quota runs out.
+  - Over quota, every call except `/v4/account` returns 429 `REQUEST_LIMIT_EXCEEDED`.
+- **Cooldowns:** per endpoint, 1,000 ms (`account`, `sports`, `tournaments`, `odds-by-tournaments`) and 2,000 ms
+  (`fixtures`). I spaced calls 2.1 s apart.
+- **`odds-by-tournaments`:** up to 3 `tournamentIds` and exactly one `bookmaker` per call.
+- **403 `RESTRICTED_ACCESS`:** "No bookmakers with live access found" when a fixture is live and the plan has no
+  live-odds bookmaker.
+
+### What our free account has `[live]`
+`GET /v4/account`, read before and after the test:
+- `request_limit` 250 per month; `rate_limit` null; `websocket_access` 0; `valid_until` null.
+- All sports, ids 10–68, tennis = `sportId` 12.
+- 366 bookmakers, `draftkings` among them.
+- **`has_live_odds: false` for every bookmaker, DraftKings included. The free tier has no in-play odds**, so the
+  "live Challenger match" part of the test can't be done on this plan. Pre-match it is.
+- `request_count` was 0 before and **6 after**.
+
+### Calls made (6 billable + 2 unmetered)
+
+| # | Endpoint | Params | Result |
+|---|---|---|---|
+| – | `/v4/account` | – | 200 (unmetered) |
+| 1 | `/v4/sports` | – | 200; tennis = 12 |
+| 2 | `/v4/tournaments` | sportId=12 | 200; 11,453 tennis tournaments: Challenger 1,350, WTA 125K 339, ITF 8,020, ATP 311, WTA 312 |
+| 3 | `/v4/odds-by-tournaments` | bookmaker=draftkings, 3 Challenger singles | 200 |
+| 4 | `/v4/odds-by-tournaments` | bookmaker=draftkings, 3 Challenger singles | 200 |
+| 5 | `/v4/odds-by-tournaments` | bookmaker=draftkings, 2 WTA 125K singles | 200 |
+| 6 | `/v4/odds-by-tournaments` | bookmaker=draftkings, ATP Paris + WTA Chennai (control) | 200 |
+| – | `/v4/account` | – | 200 (unmetered) |
+
+No errors and no 429s.
+
+### DraftKings coverage `[live]`
+These are DraftKings pre-match match-winner odds (market 121, two outcomes) on fixtures that hadn't started.
+"Last change" is the age of the newest `changedAt` on that market at 09:43 UTC.
+
+| Tier | Events | Fixtures with DK odds | 2-way match winner | DK margin (median, range) | Last change (median, max) | Hours to start (min–max) |
+|---|---|---|---|---|---|---|
+| ATP Challenger | Charlottesville, Costa do Sauipe, Villa Maria, Taipei, Taranto, Bratislava II | **31** | 31 (29 all outcomes active) | 6.6% (6.0–6.7%) | 1.8 h, 8.8 h | 0.6–32 |
+| WTA 125K | Cali, Luanda | **7** | 7 (6 active) | 6.6% (5.9–6.7%) | 1.4 h, 15.3 h | 0.4–24 |
+| Tour control | ATP Paris, WTA Chennai | 12 | 12 | 4.8% (4.7–5.0%) | 3.0 h, 7.6 h | 0.3–21 |
+
+- **DraftKings does price ATP Challenger and WTA 125 matches**, through a source DraftKings doesn't run. Every Challenger
+  and WTA 125 event I queried returned DK match-winner odds.
+- **Not every listed match has a DK price yet.** The tournament list counted 56 upcoming Challenger singles across these
+  6 events; DK prices came back for 31 (55%). WTA 125: 13 listed, 7 priced. Most likely the later or unscheduled
+  matches aren't priced yet, but I didn't check it, to save calls.
+- **DK's Challenger and WTA 125 margin is about 6.6%**, against 4.8% on tour-level events here and 4.84% at tour level
+  in our Odds API study (`reports/upsets_dk_small.md`).
+- **Freshness:** prices had changed within the last 2 hours in the median case, the oldest up to 15 h. Fine for a
+  pre-match line, but there's no in-play price on this plan.
+- **Budget:** 250 requests a month at 1 request per call. A page build querying about 6 Challenger/WTA 125 events, 3
+  per call, costs 2–3 requests, so about 80–120 builds a month. That's below the page's 3-hourly rhythm (≈ 240 builds a
+  month), so a page feed would need either a slower cadence for this block or a paid plan. The pricing page builds a
+  custom plan (bookmakers × sports × requests); I didn't price one.
+
+### Terms, still open
+The ToS forbids redistributing the data "as a standalone product". Showing DK Challenger prices on our public page next
+to our own model is probably allowed, but needs OddsPapi's written OK first (owner decision). Nothing from this test is
+on the page.
+
 ## Recommendation (for the Lead / owner)
 
 1. **Polymarket international is the only free Challenger source today.**
@@ -124,6 +197,10 @@ None of these confirms DraftKings Challenger lines specifically. They confirm "D
    - Builder cost: about 10 gamma pages plus one `/books` POST per run. No key and no credits.
 2. **For DraftKings Challenger lines, trial before paying.**
    - Start with the **OddsPapi free tier**: one or two calls on a live Challenger match, to see whether a DraftKings price is actually there.
+   - **Done 2026-11-05 (§5):** DraftKings pre-match prices are there for ATP Challenger (31 of 31 returned fixtures) and
+     WTA 125 (7 of 7), with a margin of about 6.6%. The free tier has no in-play odds and allows 250 requests a month. For
+     the page: ask OddsPapi for written consent first, then pick a build cadence that fits 250 requests a month, or
+     price a small paid plan.
    - If DraftKings is missing or the free tier is too small, try **odds-api.io** (£49/month, ask for written consent to show prices) or **SportsGameOdds Pro** (7-day trial; Challenger coverage not stated).
    - Don't commit to OpticOdds or OddsJam (about $5k/month, unverified).
 3. **Don't use Kalshi Challenger prices on the page** (owner rule 4). **Don't use Pinnacle resellers**, since they are not sanctioned.
