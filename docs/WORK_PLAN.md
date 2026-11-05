@@ -71,8 +71,10 @@ conflict (git merges edits that touch different blocks).
   matches (25 still-postponed out). **Studies done: every gate FAILs** (DOG50, exit curve, MISMATCH50, FAVDIP; DK prices
   valid, reports/upsets_dk_inplay_results.md). Live in-play tracking: not proposed (nothing passed). Close-timing check (#165): 1–5% of closes
   taken before a start moved > 1 h; no headline verdict changes without them.
-  Waiting on: Lead review of the window amendment (PR); a real draw fixture (Wikimedia 429s cloud
-  IPs; the publish runner's log will show whether it gets through).
+  Now (owner 2026-11-05): DraftKings Challenger / WTA 125 pre-match odds from OddsPapi on the page (`upsets/oddspapi.py`,
+  odds.json `challengers_dk`; ≤ 250 requests a month, guard at 220, 12 h refresh). Needs the `ODDSPAPI_KEY` Actions secret
+  (Lead) and the block's rendering (Dashboard).
+  Waiting on: a real draw fixture (Wikimedia 429s cloud IPs; the publish runner's log will show whether it gets through).
 
 
 ## Done
