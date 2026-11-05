@@ -33,8 +33,9 @@ conflict (git merges edits that touch different blocks).
   the scanner and collector clients; the README. Waiting on: the owner's screenshots of the new Paper/Portfolio folder
   layouts; the owner's answers in item 5.
 
-- **Data.** Now: cash-out, MISMATCH50, MISMATCH50-U, E1r and fallen-favourite runs done (2026-10-28; all FAIL); aggregates sent to Backtest.
-  Next: the OddsPapi test; Kalshi work otherwise paused. Waiting on: the owner's OddsPapi key.
+- **Data.** Now: OddsPapi free-tier test done (2026-11-05): DK pre-match prices exist for Challenger and WTA 125; free tier has
+  no in-play odds, 250 requests/month. Next: nothing queued; Kalshi work paused. Waiting on: the owner's call on OddsPapi
+  (written consent for the page, cadence or paid plan).
 
 - **Backtest.** Done: cash-out study complete, every gate FAILs (`reports/backtest_cashout.md`): DOG50, DOGL, take-profit,
   MISMATCH50, MISMATCH50-U (unranked players are often the favourite, not a dog); E1 invalid (listing-book placeholders),

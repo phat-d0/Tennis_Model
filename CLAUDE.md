@@ -235,6 +235,11 @@ Since phat-d0/Tennis_Model#116 also: `min_arb_profit_per_contract` (the alert th
   share 14% → 72% from first to last in-play snapshot, calibrated within 0.023 in every p bin, log loss at the last in-play
   snapshot 26% of the close's. Pinnacle: 48% identical, 37% decided at the end, moves correlate 0.09 with DK's, even with
   a fresh `last_update`. So Pinnacle is no fair in-play reference here.
+- OddsPapi (oddspapi.io, v4 REST; docs read 2026-11-05): key in the `apiKey` query parameter (never log URLs); `/v4/account`
+  echoes the key (strip `api_key`). 1 request = 1 billable call whatever the status, monthly quota (free: 250), resets on the 1st;
+  `/v4/account` unmetered, `/v4/historical-odds` free; 429 `REQUEST_LIMIT_EXCEEDED` when over. Cooldowns 1 s (2 s for
+  `/v4/fixtures`). Tennis `sportId` 12; `odds-by-tournaments` takes ≤ 3 tournamentIds and one bookmaker (`draftkings`).
+  Free tier: all sports and bookmakers, **pre-match only** (live fixtures → 403 RESTRICTED_ACCESS).
 - DraftKings Predictions: **no public/partner API**. ToU (2026-08-04) bans bots/scrapers and
   limits use to personal non-commercial. It's a broker (FCM) routing to CME / Crypto.com / DKeX /
   Bitnomial. Fee ≈ flat $0.02/contract between $0.30 and $0.94. → manual logging only.
@@ -583,6 +588,11 @@ Since phat-d0/Tennis_Model#116 also: `min_arb_profit_per_contract` (the alert th
   any outcome was read. Master plan updated: DK in-play and Kalshi FAVDIP done (FAIL), no live in-play tracking proposed.
 - 2026-11-01 (owner, Lead): Odds API spend log shows "above the 5,000 reserve: yes/no" only (Team rule 4 changed); the exact
   balances in docs/data_inventory.md, WORK_PLAN and this file were replaced (they stay in git history).
+- 2026-11-05 (Data): OddsPapi free-tier test (owner-approved 2026-11-01; docs/research/challenger_odds.md §5). 6 billable
+  requests of 250/month + 2 unmetered `/v4/account`, no errors. **DraftKings pre-match match-winner odds exist for ATP Challenger
+  (31 fixtures, 6 events) and WTA 125 (7, 2 events)**, margin ≈ 6.6% (tour control 4.8%), median last change 1.4–1.8 h. The
+  free tier has **no in-play odds** (`has_live_odds` false for all 366 bookmakers). Nothing on the page: needs OddsPapi's
+  written consent (owner). Key never printed; raw responses gitignored; no fixture committed.
 - 2026-10-28 (Backtest): cash-out study code merged (phat-d0/Tennis_Model#125): `swinglock/backtest/cashout.py`, CLI
   `python -m swinglock.backtest.cashout --data <dir> [--sets <dir>/sets.parquet]`. Dated amendment (before any run):
   Level exits (12 gate rules), DOG50 fixed-rule gate on absolute P&L, DOG30 descriptive, set-end split (descriptive),
