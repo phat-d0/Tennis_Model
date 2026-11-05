@@ -603,7 +603,7 @@ Since phat-d0/Tennis_Model#116 also: `min_arb_profit_per_contract` (the alert th
   (31 fixtures, 6 events) and WTA 125 (7, 2 events)**, margin ≈ 6.6% (tour control 4.8%), median last change 1.4–1.8 h. The
   free tier has **no in-play odds** (`has_live_odds` false for all 366 bookmakers). Nothing on the page: needs OddsPapi's
   written consent (owner). Key never printed; raw responses gitignored; no fixture committed.
-- 2026-11-05: OddsPapi DraftKings Challenger / WTA 125 block on the page (owner decision above; PR phat-d0/Tennis_Model#PRNUM;
+- 2026-11-05: OddsPapi DraftKings Challenger / WTA 125 block on the page (owner decision above; PR phat-d0/Tennis_Model#175;
   `upsets/oddspapi.py`, odds.json `challengers_dk`). Pre-match match winner only: label "DraftKings (via OddsPapi), pre-match"
   with `fetched_at` for its age, plus a footer credit; the #111 tier rule, the power de-vig and the page model, as the Polymarket
   block. Key from `ODDSPAPI_KEY` (the Lead adds the Actions secret). The block is skipped with one log line when the key is unset,
