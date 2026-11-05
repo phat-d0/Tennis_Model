@@ -144,6 +144,18 @@ def city_of(name: str) -> str:
 
 # --- rows ----------------------------------------------------------------------------------------
 
+def person(name) -> str | None:
+    """OddsPapi lists players as 'Last, First' ('Seyboth Wild, Thiago'); the page and the model use 'First Last'."""
+    if not name:
+        return None
+    n = str(name).strip()
+    if n.count(",") == 1:
+        last, first = (x.strip() for x in n.split(","))
+        if last and first:
+            return f"{first} {last}"
+    return n
+
+
 def _price(market: dict, outcome: str) -> tuple[float | None, str | None]:
     o = ((market or {}).get("outcomes") or {}).get(outcome) or {}
     p = ((o.get("players") or {}).get("0")) or {}
@@ -161,7 +173,7 @@ def rows(fixtures: list[dict], odds: list[dict], tiers: dict | None, now: pd.Tim
     """Displayed rows (Challenger / WTA 125 singles, pre-match, both DK prices live) and the names of atp/wta-looking
     events of unknown tier, which are left out and logged, never guessed."""
     by_id = {str(o.get("fixtureId")): o for o in odds or []}
-    out, unknown = [], set()
+    out, unknown, unnamed = [], set(), set()
     for f in fixtures or []:
         tour = tour_of(f)
         if tour is None or f.get("statusId") not in (0, None):
@@ -184,6 +196,10 @@ def rows(fixtures: list[dict], odds: list[dict], tiers: dict | None, now: pd.Tim
         market = (book.get("markets") or {}).get(MATCH_WINNER) or {}
         if market and not market.get("marketActive", True):
             continue
+        p1, p2 = person(f.get("participant1Name")), person(f.get("participant2Name"))
+        if not p1 or not p2:          # prices can't be tied to named players: drop, never guess
+            unnamed.add(str(f.get("fixtureId")))
+            continue
         (o1, c1), (o2, c2) = _price(market, OUTCOME_1), _price(market, OUTCOME_2)
         if o1 is None or o2 is None:
             continue
@@ -194,12 +210,48 @@ def rows(fixtures: list[dict], odds: list[dict], tiers: dict | None, now: pd.Tim
         out.append({"event_id": str(f.get("fixtureId")),
                     "tournament": f"{city} {'Challenger' if tour == 'atp' else '125'}" + (" (qualifying)" if quali else ""),
                     "tour": tour.upper(), "tier": tier, "commence_time": _z(start),
-                    "player_1": f.get("participant1Name"), "player_2": f.get("participant2Name"),
+                    "player_1": p1, "player_2": p2,
                     "draftkings": {"odds_1": o1, "odds_2": o2, "last_update": _z(changed) if changed is not None else None,
                                    "margin": round(1 / o1 + 1 / o2 - 1, 4)},
                     "fair_1": round(fair, 4), "dk_implied_1": round(1 / o1, 4), "_surface": surface})
     out.sort(key=lambda r: (r["commence_time"], r["tournament"]))
+    if unnamed:
+        unknown.add(f"{len(unnamed)} fixture(s) without both player names")
     return out, sorted(unknown)
+
+
+# --- orientation guard -----------------------------------------------------------------------------
+
+ORIENT_MIN = 5          # overlapping matches with a clear favourite needed before the guard can act
+CLEAR = 0.10            # |p - 0.5| for a clear favourite
+
+
+def orientation_ok(dk: dict, poly: dict | None, norm=None) -> tuple[bool | None, str]:
+    """Check outcome 121 = participant1 against the Polymarket block (#111) on the same named matches: the DK fair
+    favourite must be Polymarket's mid favourite on most matches where both have a clear one. -> (True/False, or
+    None when there are too few overlapping matches to tell, and a one-line note)."""
+    from .names import norm_name
+    norm = norm or norm_name
+    pm = {}
+    for m in (poly or {}).get("matches") or []:
+        q1, q2 = m.get("p1") or {}, m.get("p2") or {}
+        if None in (q1.get("bid"), q1.get("ask"), q2.get("bid"), q2.get("ask")):
+            continue
+        a, b = (q1["bid"] + q1["ask"]) / 2, (q2["bid"] + q2["ask"]) / 2
+        if a + b > 0:
+            pm[(norm(m["player_1"]), norm(m["player_2"]))] = a / (a + b)
+    agree = disagree = 0
+    for m in dk.get("matches") or []:
+        k1, k2 = norm(m["player_1"]), norm(m["player_2"])
+        p = pm.get((k1, k2), None if (k2, k1) not in pm else 1 - pm[(k2, k1)])
+        f = m.get("fair_1")
+        if p is None or f is None or abs(p - 0.5) < CLEAR or abs(f - 0.5) < CLEAR:
+            continue
+        agree, disagree = agree + ((p > 0.5) == (f > 0.5)), disagree + ((p > 0.5) != (f > 0.5))
+    note = f"orientation vs Polymarket: {agree} agree, {disagree} disagree"
+    if agree + disagree < ORIENT_MIN:
+        return None, note + " (too few to tell)"
+    return disagree < agree, note
 
 
 # --- block ---------------------------------------------------------------------------------------

@@ -165,3 +165,26 @@ def test_city_and_tour_names():
     assert op.city_of("Cali (Qualifying)") == "cali"
     assert op.tour_of({"categoryName": "WTA 125K", "tournamentName": "Cali"}) == "wta"
     assert op.tour_of({"categoryName": "ITF Men", "tournamentName": "M25 Challenger"}) is None
+
+
+def test_last_first_names_and_unnamed_fixtures_are_dropped(tmp_path):
+    assert op.person("Seyboth Wild, Thiago") == "Thiago Seyboth Wild" and op.person("Ann A") == "Ann A"
+    fx = [dict(FIXTURES[0], participant1Name=None)]
+    out, notes = op.rows(fx, ODDS, TIERS, NOW)
+    assert out == [] and notes == ["1 fixture(s) without both player names"]
+
+
+def test_orientation_guard_against_polymarket():
+    def dk(pairs):
+        return {"matches": [{"player_1": a, "player_2": b, "fair_1": f} for a, b, f in pairs]}
+
+    def poly(pairs):
+        def q(p):
+            return {"bid": p - 0.01, "ask": p + 0.01}
+        return {"matches": [{"player_1": a, "player_2": b, "p1": q(p), "p2": q(1 - p)} for a, b, p in pairs]}
+    names = [(f"P{i}", f"Q{i}") for i in range(6)]
+    same = poly([(a, b, 0.75) for a, b in names])
+    assert op.orientation_ok(dk([(a, b, 0.72) for a, b in names]), same)[0] is True
+    assert op.orientation_ok(dk([(a, b, 0.28) for a, b in names]), same)[0] is False            # swapped prices
+    assert op.orientation_ok(dk([(b, a, 0.28) for a, b in names]), same)[0] is True             # players listed the other way
+    assert op.orientation_ok(dk([(a, b, 0.72) for a, b in names[:3]]), same)[0] is None         # too few to tell

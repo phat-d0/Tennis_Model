@@ -439,7 +439,12 @@ def build(out: Path, cache: Path, archive: Path, floor: int = 5000, month_cap: i
     if pm_session is not None:
         doc["challengers"] = challenger_block(pm_session, cache, now, rt)
     if oddspapi_session is not None:
-        doc["challengers_dk"] = challenger_dk_block(oddspapi_session, cache, now, rt)
+        dk = challenger_dk_block(oddspapi_session, cache, now, rt)
+        ok, note = oddspapi.orientation_ok(dk, doc.get("challengers"))
+        print(f"[challengers_dk: {note}]")
+        if ok is False:          # never show prices that may sit on the wrong players
+            dk = {**dk, "status": "orientation_check_failed", "matches": []}
+        doc["challengers_dk"] = dk
     _write_json(out / "odds.json", doc)
     seeds = None
     if wiki_session is not None:
